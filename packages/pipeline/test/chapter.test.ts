@@ -282,14 +282,16 @@ describe("chapter pipeline", { timeout: 20000 }, () => {
   ] as const)("cancels active %s and retains incurred usage", async (role) => {
     const p = await setup();
     let id = "";
+    let cancellation: ReturnType<typeof cancelRun> | undefined;
     p.ctx.onProgress = (run) => {
       id = run.id;
     };
     p.ctx.onRequest = (_request, current) => {
-      if (current === role) void cancelRun(p.fs, id, p.ctx);
+      if (current === role) cancellation = cancelRun(p.fs, id, p.ctx);
     };
     let run = await startChapter(p.fs, { chapter: 1 }, p.ctx);
     if (role === "jiyi-weihuyuan") run = await approve(p, run);
+    await cancellation;
     expect(run.status, run.error).toBe("CANCELLED");
     expect(run.roles[role]).toBeDefined();
     expect((await loadRun(p.fs, run.id)).status).toBe("CANCELLED");

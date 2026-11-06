@@ -2,5 +2,13 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "name": "cli"
+  "name": "cli",
+  "scripts": {
+    "dev": "node src/main.ts"
+  },
+  "dependencies": {
+    "@ruwen/core": "workspace:*",
+    "@ruwen/agents": "workspace:*",
+    "@ruwen/pipeline": "workspace:*"
+  }
 }

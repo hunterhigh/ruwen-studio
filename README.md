@@ -2,7 +2,7 @@
 
 将如文 5.0 写作系统做成多用户、可部署和可计费的网页产品。实施范围和验收以 [docs/PLAN.md](docs/PLAN.md) 为准。
 
-P0 已经人工确认。P1 领域核心、LocalDirFS、受控记忆提交与核心 CLI 已实现，当前继续 P2 岗位与章节流水线；尚无可使用的网页或付费账户。
+P0 已经人工确认。P1领域核心与P2的12岗位、章节流程、本地CLI已实现，当前进入P3真实模型验证；尚无可使用的网页或付费账户。
 
 ## 本地验证
 
@@ -28,6 +28,17 @@ pnpm core project-readiness --project-root ./my-novel
 
 新项目仍是待批准脚手架，readiness 返回 blocked 是正常状态。CLI 支持全部 11 个本阶段移植脚本的命令与参数；v4.1 目录迁移仍在后续范围。核心细节和已验证边界见 [P1 报告](docs/reports/phase-1.md)。
 
+已就绪的5.0项目可以运行章节CLI：
+
+```sh
+pnpm --filter cli dev chapter run --project ./my-novel --chapter 1 --faux
+pnpm --filter cli dev chapter resume --project ./my-novel --run <运行ID> --faux
+pnpm --filter cli dev chapter status --project ./my-novel --run <运行ID>
+pnpm --filter cli dev chapter cancel --project ./my-novel --run <运行ID>
+```
+
+批准候选稿和记忆预览各需输入一次`APPROVE`。回车或EOF保留待批准状态；`resume`重新展示内容和批准提示。真实模型需去掉`--faux`，在本项目`.env`配置`REAL_MODEL=1`和`ANTHROPIC_API_KEY`；密钥不得放入聊天或Git。P2已验证范围见[P2报告](docs/reports/phase-2.md)，当前没有网页入口。
+
 pnpm 11 的 `allowBuilds` 显式禁用三个依赖的安装脚本。当前检查可直接使用已发布的可选二进制；新增功能确实需要脚本时再按依赖逐项核验。
 
 上游固定在 `v5.0.0` / `9835470fa07b216c85602915a38063b0d7c937b5`。Windows 自动换行可能影响其模板批准哈希，基线测试从固定 Git 提交导出原始字节，在临时副本运行，不改变 vendor。升级上游需重新进行接口盘点和所有基线验证。
@@ -37,10 +48,10 @@ pnpm 11 的 `allowBuilds` 显式禁用三个依赖的安装脚本。当前检查
 | 目录 | 阶段与用途 |
 |---|---|
 | packages/core | P1：领域逻辑、ProjectFS/LocalDirFS、预览提交、CLI 与回归测试 |
-| packages/agents | P0 spike；P2 提示词、岗位与模型适配 |
-| packages/pipeline | P2：确定性岗位流程；当前仅骨架 |
+| packages/agents | P0 spike；P2 已实现提示词、12岗位、隔离工具与模型适配 |
+| packages/pipeline | P2：已实现本地章节状态机、双批准与取消 |
 | packages/db / packages/billing | P4 持久化 / P6 计费；当前仅骨架 |
-| apps/cli / apps/worker / apps/web | P2 CLI / P4 worker / P5 网页；当前仅骨架 |
+| apps/cli / apps/worker / apps/web | P2 CLI已实现；P4 worker / P5 网页仍为骨架 |
 | config | 经过静态目录核验的暂定模型路由、目录快照 |
 | fixtures | P1/P3 测试材料占位；当前没有演示项目内容 |
 | docs | 计划、接口盘点、技术决定和阶段报告 |

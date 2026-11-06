@@ -2,5 +2,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "name": "@ruwen/core"
+  "name": "@ruwen/core",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "dev": "node bin/ruwen-core.ts"
+  }
 }

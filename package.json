@@ -10,6 +10,7 @@
   "scripts": {
     "lint": "biome check .",
     "format": "biome check --write .",
+    "core": "node packages/core/bin/ruwen-core.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:upstream": "python -I -B scripts/verify-upstream.py"

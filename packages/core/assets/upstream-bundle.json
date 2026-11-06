@@ -1,0 +1,198 @@
+{
+  "commit": "9835470fa07b216c85602915a38063b0d7c937b5",
+  "files": {
+    "AGENTS.md": "IyDlpoLmloflhpnkvZzns7vnu5/pobnnm67ot6/nlLEKCi0g5raJ5Y+K5Ymn5oOF44CB6K6+5a6a44CB5Lq654mp44CB5b+D55CG5byg5Yqb44CB6aG555uu5aOw6Z+z44CB6aKG5Z+f6KGo546w5oiW5aSW6YOo56CU56m255qE5paw5aKe5LiO5L+u5pS577yM5YWI5L2/55SoIGAkcnV3ZW4tZ3VzaGktZ291c2lg44CC5Yib5oSP6LWE5paZ5YaZ5YWl5YmN5b+F6aG75ZCR55So5oi35bGV56S655CG6Kej5LiO5rK755CG6aKE6KeI44CCCi0g5bey5pyJ5om55YeG55qE5b2T5YmN56ug6IqC5oOF5aKD44CB5LiU55So5oi35rKh5pyJ5paw5aKe5Yib5oSP6KaB5rGC5pe277yM5L2/55SoIGAkcnV3ZW4temhhbmdqaWUteGllenVvYOOAggotIOeUqOaIt+WOn+Wni+aOqui+nuOAgeS+i+WtkOOAgeaKleivieWSjOe6oOmUmeWOhuWPsuS4jeW+l+S4juW5suWHgOWnlOaJmOWQjOaXtuS6pOe7meS4i+a4uOWyl+S9jeOAggotIOWwj+ivtOWAmemAieOAgei1hOaWmei/geenu+WSjOiusOW/huWPmOabtOWcqOeUqOaIt+aYjuehruaJueWHhuWJjeS4jeW+l+WGmeWFpeato+W8j+ato+WFuOOAggo=",
+    "authoring-ruwen-v5/manifests/author-manifest.json": "ewogICJwcm9qZWN0aW9uIjogImF1dGhvcmluZy1ydXdlbi12NS9wcm9qZWN0aW9ucy9jdXJyZW50Lm1kIiwKICAicHJvamVjdF92b2ljZSI6ICLooajnjrAv6aG555uu5aOw6Z+zLm1kIiwKICAicG92X2xlbnMiOiAi5Lq654mpL1BPVumVnOWktC/kuLvop5IubWQiLAogICJyZWxhdGlvbnNoaXBfbGVucyI6IG51bGwsCiAgImV4cHJlc3Npb25fcmVzb3VyY2UiOiBudWxsLAogICJhcHByb3ZlZF9wcm9zZV90YWlsIjogbnVsbCwKICAidXNlcl9hdXRob3JlZF90ZXh0IjogbnVsbCwKICAiY29udGV4dF9zY29wZSI6IHsKICAgICJwcm9qZWN0IjogIl9fUFJPSkVDVF9JRF9fIiwKICAgICJ2b2x1bWUiOiBudWxsLAogICAgImFyYyI6IG51bGwsCiAgICAiY2hhcHRlciI6IG51bGwsCiAgICAic2NlbmVfdHlwZSI6IG51bGwsCiAgICAicG92IjogIuS4u+inkiIKICB9LAogICJtYXhpbXVtX2NvbnRleHRfY2hhcmFjdGVycyI6IDgwMDAsCiAgIm91dHB1dCI6ICJhdXRob3JpbmctcnV3ZW4tdjUvcGFja2V0cy9jdXJyZW50Lm1kIgp9Cg==",
+    "authoring-ruwen-v5/projections/current.md": "IyDlvZPliY3nq6DoioLmg4XlooMKCumhueebruWIneWni+WMluWujOaIkOW5tuaJueWHhuaVheS6i+iuvuiuoeWQju+8jOeUseeroOiKguaDheWig+e8luivkeWRmOeUn+aIkOOAggo=",
+    "chapters/README.md": "IyDmraPlvI/nq6DoioIKCuWPquacieeUqOaIt+aJueWHhuW5tumAmui/h+aPkOWNh+mXqOeahE1hcmtkb3du56ug6IqC5Y+v5Lul6L+b5YWl5pys55uu5b2V44CC5bel56iL5YCZ6YCJ5L+d5a2Y5ZyoYGF1dGhvcmluZy1ydXdlbi12NS9g44CCCg==",
+    "世界/世界总表.md": "IyDkuJbnlYzmgLvooagKCiMjIOaXtuS7o+S4juepuumXtAoK5b6F55So5oi356Gu6K6k44CC6K6w5b2V5pe26Ze05bC65bqm44CB5YWz6ZSu56m66Ze05YWz57O744CB56e75Yqo5LiO6YCa5L+h55qE546w5a6e6L6555WM44CCCgojIyDnianotKjkuI7mioDmnK/ovrnnlYwKCuW+heeUqOaIt+ehruiupOOAguiusOW9lee7tOaMgeaXpeW4uOeUn+a0u+WSjOWGsueqgeeahOeJqei0qOOAgeaKgOacr+aIlui2heW4uOadoeS7tu+8jOiAjOmdnue9l+WIl+Wlh+inguOAggoKIyMg57O757uf57Si5byVCgrlvoXnlKjmiLfnoa7orqTjgILliJflh7rog73lpJ/op6Pph4rkuLvop5LnlJ/mtLvjgIHouqvku73kuI7ooYzliqjmiJDmnKznmoTmraPlvI/kuJbnlYzns7vnu5/lj4rotYTmupBJROOAggoKIyMg5pyJ5oSP5byA5pS+55qE5pyq55+lCgrljLrliIblsJrmnKrlrozmiJDkuI7mnInmhI/kuI3noa7lrprjgIIK",
+    "世界/当前态势.md": "IyDlvZPliY3mgIHlir8KCiMjIOa0u+i3g+WKm+mHj+S4juWQhOiHqui/kOWKqAoK5b6F6aG555uu5Yid5aeL5YyW44CCCgojIyDlj6/osIPnlKjotYTmupDkuI7njrDlrp7pmZDliLYKCuW+hemhueebruWIneWni+WMluOAggoKIyMg55u45LqS6K6k6K+G44CB6K+v6K+75LiO5peg5Lq65LuL5YWl5pe255qE5LiL5LiA5q2lCgrlvoXpobnnm67liJ3lp4vljJbjgILkuI3opoHop4TlrprkuLvop5LmgI7moLfku4vlhaXjgIIK",
+    "世界/系统/核心系统.md": "IyDmoLjlv4PkuJbnlYzns7vnu58KCiMjIOWPguS4juiAheS4juWPl+W9seWTjeiAhQoK5b6F55So5oi356Gu6K6k44CCCgojIyDotYTmupDmtYHjgIHop4TliJnjgIHmiJDmnKzkuI7pmZDliLYKCuW+heeUqOaIt+ehruiupOOAggoKIyMg5p2D5Yqb5oiW55+l6K+G5LiN5a+556ewCgrlvoXnlKjmiLfnoa7orqTjgIIKCiMjIOaXpeW4uOaOpeinpuS4juS4jeWQjOi6q+S7veeahOe7j+mqjAoK5b6F55So5oi356Gu6K6k44CCCgojIyDoh6rouqvov5DliqjjgIHlvZPliY3ljovlipvjgIHor6/op6PkuI7lvIDmlL7mnKrnn6UKCuW+heeUqOaIt+ehruiupOOAggo=",
+    "人物/POV镜头/主角.md": "IyDkuLvop5JQT1bplZzlpLQKCuW+heS4u+inkuaho+ahiOaJueWHhuWQjueUseihqOeOsOiuvuiuoeW4iOe8luivkeOAguWPquS/neeVmeS8mueos+WumuaUueWPmOazqOaEj+OAgeWPmei/sOi3neemu+OAgeWIpOaWreWPr+mdoOaAp+S4juS/oeaBr+i/m+WFpeaWueW8j+eahOWFs+ezu++8m+S4jei2hei/hzkwMOWtl+espu+8jOS4jeWIl+avj+auteW/heWGmeeXh+eKtuaIluihqOaDheOAggo=",
+    "人物/主角档案.md": "IyDkuLvop5LmoaPmoYgKCiMjIOWuouinguWtmOWcqOaooeWeiwoK5b6F55So5oi356Gu6K6k44CC5YaZ5Y+v55Sx5LiW55WM5qC46aqM55qE6Lqr5L2T44CB5bm06b6E6Zi25q6144CB5aSW6LKM57uT5p6E5LiO5Y+Y5YyW44CB5YGl5bq344CB6Lqr5Lu944CB56S+5Lya5L2N572u44CB6IO95Yqb44CB57uP5Y6G44CB6LWE5rqQ5ZKM5LmJ5Yqh77yM5bm26K+05piO6L+Z5Lqb5LqL5a6e5oCO5qC35b285q2k6ZmQ5Yi244CCCgojIyDlhoXlnKjnu4Tnu4fmqKHlnosKCuW+heeUqOaIt+ehruiupOOAguWGmeazqOaEj+OAgeassuacm+OAgeaBkOaDp+OAgeS/oeW/teOAgeivr+ino+OAgeiHquaIkeino+mHiuOAgemBk+W+t+mZkOWItuOAgeaDhee7qumYsuW+oeOAgeiusOW/huWSjOWIpOaWreaAjuagt+WFseWQjOe7hOe7h+S6uueJqe+8m+S4jeS9v+eUqOmAmueUqOS6uuagvOagh+etvuS7o+abv+WFs+ezu+OAggoKIyMg5Y+Z6L+w5o6l5Y+j5qih5Z6LCgrlvoXnlKjmiLfnoa7orqTjgILlhpnkurrnianmiJDkuLpQT1blkI7ku4DkuYjoh6rnhLbov5vlhaXmiJbpgb/lvIDms6jmhI/vvIzmgI7moLfor6/orqTnjrDlrp7vvIzlhoXlnKjnu4/pqozlpoLkvZXmlLnlj5jlj5nov7Dot53nprvjgIHlj6XlrZDov5Dliqjlkozkv6Hmga/lj6/pnaDmgKfvvIzlk6rkupvlhoXlrrnlj6rog73nlLHku5bkurrooYzkuLrmjqjmlq3jgIIKCiMjIOW8gOaUvuacquefpQoK5Y+q5pS+5LuN6ZyA55So5oi35Yaz5a6a5oiW5pyJ5oSP5L+d55WZ55qE5LiN56Gu5a6a6aG544CCCg==",
+    "人物/关系镜头/README.md": "IyDlhbPns7vplZzlpLQKCuS7heWcqOafkOauteWFs+ezu+ehruWunuaUueWPmOW9k+WJjVBPVueahOihjOWKqOaXtuW7uueri+eLrOeri+aWh+S7tuOAguWug+S4jeaYr+WFs+ezu+Wkp+e6su+8jOS5n+S4jemihOWumuacrOeroOino+mHiuOAggo=",
+    "故事/当前故事弧.md": "IyDlvZPliY3mlYXkuovlvKcKCiMjIOS9nOeUqOWfnwoK5Y2344CB5pWF5LqL5byn5ZKM6aKE6K6h56ug6IqC6IyD5Zu05b6F55So5oi356Gu6K6k44CCCgojIyDlhbfkvZPmlYXkuosKCueUseeUqOaIt+S4juaVheS6i+aehOaAneW4iOWFseWQjOW9ouaIkOOAguWPr+S7peaYjuehruS6i+S7tuOAgeWPguS4juaWueW8j+OAgeWboOaenOWSjOWQjuaenO+8m+S4jemihOWGmeWvueeZveOAgeaEj+ixoeWSjOS6uueJqeacgOe7iOiupOivhuOAggoKIyMg5byA5pS+5oiP5Ymn5oSP5Zu+Cgrlj6rlnKjnlKjmiLfmmI7noa7orqTlj6/lkI7kv53nlZnkuIDmnaHlhbHlrZjlipvph4/miJbmnKrop6PlpITlooPjgIIK",
+    "故事/系列设计.md": "IyDns7vliJforr7orqEKCuiusOW9lemVv+evh+S9jee9ruOAgeW3sue7j+aJueWHhueahOi/nOacn+eKtuaAgeWSjOS7jeW8gOaUvueahOacquadpeOAguWug+S4jei/m+WFpeWwj+ivtOS9nOiAhei1hOaWmeWMheOAggo=",
+    "校验/硬设定规则.md": "IyDnoazorr7lrprmoKHpqowKCuWPquiusOW9leWGmeWQjuWPr+S7peaYjuehruaLkue7neeahOi6q+S7veOAgeaXtuepuuOAgeefpeivhuadpea6kOOAgeeJqeeQhuOAgeWItuW6puOAgeiDveWKm+WSjOS4jeWPr+mAhuato+WFuOWGsueqgeOAguS4jeW+l+aKiuWuoee+juWBj+WlveaIluacquaPkOWPiuiuvuWumuWGmeaIkOWksei0peinhOWIme+8jOS5n+S4jeW+l+i/m+WFpeWwj+ivtOS9nOiAhei1hOaWmeWMheOAggo=",
+    "治理/交接/README.md": "IyDkuqTmjqXlv6vnhacKCuS/neWtmOW+heaJueWHhueahOe7k+aehOWMluS6pOaOpXBheWxvYWTjgILljp/lp4vnlKjmiLfmtojmga/kuI3lvpflhpnlhaXjgIIK",
+    "治理/审批/README.md": "IyDmibnlh4bkuovku7YKCuS/neWtmOS4juWFt+S9k+ebruagh+WTiOW4jOe7keWumueahOeUqOaIt+aJueWHhuS6i+S7tuOAguS6i+S7tuS4jeWPr+imhueblu+8m+WIm+aEj+WGheWuueS4jeWGmeWFpei/memHjOOAgmDlt7Lkvb/nlKgvYOS4uuavj+S4quS6i+S7tuS/neWtmOS4gOS4quS7peeLrOWNoOWIm+W7uuaWueW8j+WPluW+l+eahOa2iOi0ueagh+iusO+8jOS9v+W5tuihjOWyl+S9jeS4reS5n+WPquacieS4gOS4quiDveWkn+WPluW+l+ivpeaJueWHhu+8m+S4muWKoeWGmeWFpeWksei0peaXtuacquaPkOS6pOeahOS4tOaXtuagh+iusOS8muWbnua7muOAggo=",
+    "治理/审批/template-routing-activate.json": "ewogICJzY2hlbWFfdmVyc2lvbiI6ICIxLjAiLAogICJpZCI6ICJ0ZW1wbGF0ZS1yb3V0aW5nLWFjdGl2YXRlIiwKICAiYWN0aW9uIjogInJlc291cmNlX2FjdGl2YXRlIiwKICAidGFyZ2V0X3BhdGgiOiAiQUdFTlRTLm1kIiwKICAidGFyZ2V0X3NoYTI1NiI6ICJiYTQ5MDgwY2IwZGE2NTAzNjdhMDczNzRkYjg0NTZjZWNmMWVlYzM3NTQ4ZmVmZjgwMWIzMjVlODU1ZjEzZmIzIiwKICAiYXBwcm92ZWRfYXQiOiAiMjAyNi0wOC0yOFQwMDowMDowMFoiLAogICJhcHByb3ZlZF9ieSI6ICJ1c2VyIiwKICAiY29uc3VtZWQiOiBmYWxzZQp9Cg==",
+    "治理/审批/已使用/template-routing-activate.json": "eyJldmVudF9pZCI6InRlbXBsYXRlLXJvdXRpbmctYWN0aXZhdGUiLCJhY3Rpb24iOiJyZXNvdXJjZV9hY3RpdmF0ZSIsInRhcmdldF9wYXRoIjoiQUdFTlRTLm1kIiwidGFyZ2V0X3NoYTI1NiI6ImJhNDkwODBjYjBkYTY1MDM2N2EwNzM3NGRiODQ1NmNlY2YxZWVjMzc1NDhmZWZmODAxYjMyNWU4NTVmMTNmYjMiLCJjb25zdW1lciI6InhpYW5nbXUtemhpbGl5dWFuIiwiY29uc3VtZWRfYXQiOiIyMDI2LTA4LTI4VDAwOjAwOjAwWiJ9Cg==",
+    "治理/审计账本.jsonl": "Cg==",
+    "治理/文学问题账本.jsonl": "Cg==",
+    "治理/资源注册表.json": "ewogICJzY2hlbWFfdmVyc2lvbiI6ICIxLjAiLAogICJyZXNvdXJjZXMiOiBbCiAgICB7CiAgICAgICJpZCI6ICJ4aWFuZ211LWx1eW91LWd1aXplIiwKICAgICAgInBhdGgiOiAiQUdFTlRTLm1kIiwKICAgICAgInR5cGUiOiAiZ292ZXJuYW5jZSIsCiAgICAgICJvd25lciI6ICJ4aWFuZ211LXpoaWxpeXVhbiIsCiAgICAgICJ2ZXJzaW9uIjogIjEuMC4wIiwKICAgICAgInN0YXR1cyI6ICJhY3RpdmUiLAogICAgICAic3VwZXJzZWRlcyI6IG51bGwsCiAgICAgICJzY29wZSI6IHsicHJvamVjdCI6ICJfX1BST0pFQ1RfSURfXyIsICJ2b2x1bWVzIjogbnVsbCwgImFyY3MiOiBudWxsLCAiY2hhcHRlcnMiOiBudWxsLCAic2NlbmVfdHlwZXMiOiBudWxsLCAicG92cyI6IG51bGx9LAogICAgICAicmVhZGVycyI6IFsiY2h1YW5neWkteGlldGlhb3l1YW4iLCAieGlhbmdtdS16aGlsaXl1YW4iLCAiZ3VzaGktZ291c2lzaGkiLCAiemhhbmdqaWUtcWluZ2ppbmctYmlhbnlpeXVhbiIsICJ4aWFvc2h1by16dW96aGUiLCAid2VueHVlLWJpYW5qaSJdLAogICAgICAiYWxsb3dfYXV0aG9yIjogZmFsc2UsCiAgICAgICJzb3VyY2Vfc2hhMjU2IjogIl9fSEFTSF9fIiwKICAgICAgImFwcHJvdmFsIjogewogICAgICAgICJzdGF0dXMiOiAiYXBwcm92ZWQiLAogICAgICAgICJhcHByb3ZlZF9hdCI6ICIyMDI2LTA4LTI4VDAwOjAwOjAwWiIsCiAgICAgICAgImFwcHJvdmVkX2J5IjogInVzZXIiLAogICAgICAgICJhcHByb3ZhbF9ldmVudF9wYXRoIjogIuayu+eQhi/lrqHmibkvdGVtcGxhdGUtcm91dGluZy1hY3RpdmF0ZS5qc29uIiwKICAgICAgICAiYXBwcm92YWxfZXZlbnRfc2hhMjU2IjogIjM5NmExY2ZmNGYyY2I3M2IwZjA1ZDkyZTBhN2FlNTJjODBhODYzOTk0ODg5NjMyMmJkZjk1YzFjMDg3OTk3ZjYiCiAgICAgIH0KICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJ4aWFuZ211LXpoYW5nY2hlbmciLAogICAgICAicGF0aCI6ICLpobnnm64v6aG555uu56ug56iLLm1kIiwKICAgICAgInR5cGUiOiAiZ292ZXJuYW5jZSIsCiAgICAgICJvd25lciI6ICJ4aWFuZ211LXpoaWxpeXVhbiIsCiAgICAgICJ2ZXJzaW9uIjogIjAuMS4wIiwKICAgICAgInN0YXR1cyI6ICJwcm9wb3NlZCIsCiAgICAgICJzdXBlcnNlZGVzIjogbnVsbCwKICAgICAgInNjb3BlIjogeyJwcm9qZWN0IjogIl9fUFJPSkVDVF9JRF9fIiwgInZvbHVtZXMiOiBudWxsLCAiYXJjcyI6IG51bGwsICJjaGFwdGVycyI6IG51bGwsICJzY2VuZV90eXBlcyI6IG51bGwsICJwb3ZzIjogbnVsbH0sCiAgICAgICJyZWFkZXJzIjogWyJjaHVhbmd5aS14aWV0aWFveXVhbiIsICJ4aWFuZ211LXpoaWxpeXVhbiIsICJ3YWlidS16aGlzaGktZ3V3ZW4iLCAiZ3VzaGktZ291c2lzaGkiXSwKICAgICAgImFsbG93X2F1dGhvciI6IGZhbHNlLAogICAgICAic291cmNlX3NoYTI1NiI6ICJfX0hBU0hfXyIsCiAgICAgICJhcHByb3ZhbCI6IHsic3RhdHVzIjogInVuYXBwcm92ZWQiLCAiYXBwcm92ZWRfYXQiOiBudWxsLCAiYXBwcm92ZWRfYnkiOiBudWxsfQogICAgfSwKICAgIHsKICAgICAgImlkIjogInpodWp1ZS1kYW5nYW4iLAogICAgICAicGF0aCI6ICLkurrniakv5Li76KeS5qGj5qGILm1kIiwKICAgICAgInR5cGUiOiAiY2hhcmFjdGVyIiwKICAgICAgIm93bmVyIjogInhpYW5nbXUtemhpbGl5dWFuIiwKICAgICAgInZlcnNpb24iOiAiMC4xLjAiLAogICAgICAic3RhdHVzIjogInByb3Bvc2VkIiwKICAgICAgInN1cGVyc2VkZXMiOiBudWxsLAogICAgICAic2NvcGUiOiB7InByb2plY3QiOiAiX19QUk9KRUNUX0lEX18iLCAidm9sdW1lcyI6IG51bGwsICJhcmNzIjogbnVsbCwgImNoYXB0ZXJzIjogbnVsbCwgInNjZW5lX3R5cGVzIjogbnVsbCwgInBvdnMiOiBbIuS4u+inkiJdfSwKICAgICAgInJlYWRlcnMiOiBbInhpYW5nbXUtemhpbGl5dWFuIiwgIndhaWJ1LXpoaXNoaS1ndXdlbiIsICJiaWFveGlhbi1zaGVqaXNoaSIsICJndXNoaS1nb3VzaXNoaSIsICJ6aGFuZ2ppZS1xaW5namluZy1iaWFueWl5dWFuIiwgInhpYW5zaGktaGV5YW55dWFuIiwgImppeWktd2VpaHV5dWFuIl0sCiAgICAgICJhbGxvd19hdXRob3IiOiBmYWxzZSwKICAgICAgInNvdXJjZV9zaGEyNTYiOiAiX19IQVNIX18iLAogICAgICAiYXBwcm92YWwiOiB7InN0YXR1cyI6ICJ1bmFwcHJvdmVkIiwgImFwcHJvdmVkX2F0IjogbnVsbCwgImFwcHJvdmVkX2J5IjogbnVsbH0KICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJ6aHVqdWUtcG92LWppbmd0b3UiLAogICAgICAicGF0aCI6ICLkurrniakvUE9W6ZWc5aS0L+S4u+inki5tZCIsCiAgICAgICJ0eXBlIjogImNoYXJhY3RlciIsCiAgICAgICJvd25lciI6ICJiaWFveGlhbi1zaGVqaXNoaSIsCiAgICAgICJ2ZXJzaW9uIjogIjAuMS4wIiwKICAgICAgInN0YXR1cyI6ICJwcm9wb3NlZCIsCiAgICAgICJzdXBlcnNlZGVzIjogbnVsbCwKICAgICAgInNjb3BlIjogeyJwcm9qZWN0IjogIl9fUFJPSkVDVF9JRF9fIiwgInZvbHVtZXMiOiBudWxsLCAiYXJjcyI6IG51bGwsICJjaGFwdGVycyI6IG51bGwsICJzY2VuZV90eXBlcyI6IG51bGwsICJwb3ZzIjogWyLkuLvop5IiXX0sCiAgICAgICJyZWFkZXJzIjogWyJ6aGFuZ2ppZS1xaW5namluZy1iaWFueWl5dWFuIiwgInhpYW9zaHVvLXp1b3poZSJdLAogICAgICAiYWxsb3dfYXV0aG9yIjogdHJ1ZSwKICAgICAgInNvdXJjZV9zaGEyNTYiOiAiX19IQVNIX18iLAogICAgICAiYXBwcm92YWwiOiB7InN0YXR1cyI6ICJ1bmFwcHJvdmVkIiwgImFwcHJvdmVkX2F0IjogbnVsbCwgImFwcHJvdmVkX2J5IjogbnVsbH0KICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJzaGlqaWUtem9uZ2JpYW8iLAogICAgICAicGF0aCI6ICLkuJbnlYwv5LiW55WM5oC76KGoLm1kIiwKICAgICAgInR5cGUiOiAid29ybGQiLAogICAgICAib3duZXIiOiAieGlhbmdtdS16aGlsaXl1YW4iLAogICAgICAidmVyc2lvbiI6ICIwLjEuMCIsCiAgICAgICJzdGF0dXMiOiAicHJvcG9zZWQiLAogICAgICAic3VwZXJzZWRlcyI6IG51bGwsCiAgICAgICJzY29wZSI6IHsicHJvamVjdCI6ICJfX1BST0pFQ1RfSURfXyIsICJ2b2x1bWVzIjogbnVsbCwgImFyY3MiOiBudWxsLCAiY2hhcHRlcnMiOiBudWxsLCAic2NlbmVfdHlwZXMiOiBudWxsLCAicG92cyI6IG51bGx9LAogICAgICAicmVhZGVycyI6IFsieGlhbmdtdS16aGlsaXl1YW4iLCAid2FpYnUtemhpc2hpLWd1d2VuIiwgImJpYW94aWFuLXNoZWppc2hpIiwgImd1c2hpLWdvdXNpc2hpIiwgInpoYW5namllLXFpbmdqaW5nLWJpYW55aXl1YW4iLCAieGlhbnNoaS1oZXlhbnl1YW4iLCAiaml5aS13ZWlodXl1YW4iXSwKICAgICAgImFsbG93X2F1dGhvciI6IGZhbHNlLAogICAgICAic291cmNlX3NoYTI1NiI6ICJfX0hBU0hfXyIsCiAgICAgICJhcHByb3ZhbCI6IHsic3RhdHVzIjogInVuYXBwcm92ZWQiLCAiYXBwcm92ZWRfYXQiOiBudWxsLCAiYXBwcm92ZWRfYnkiOiBudWxsfQogICAgfSwKICAgIHsKICAgICAgImlkIjogInNoaWppZS1kYW5ncWlhbi10YWlzaGkiLAogICAgICAicGF0aCI6ICLkuJbnlYwv5b2T5YmN5oCB5Yq/Lm1kIiwKICAgICAgInR5cGUiOiAid29ybGQiLAogICAgICAib3duZXIiOiAieGlhbmdtdS16aGlsaXl1YW4iLAogICAgICAidmVyc2lvbiI6ICIwLjEuMCIsCiAgICAgICJzdGF0dXMiOiAicHJvcG9zZWQiLAogICAgICAic3VwZXJzZWRlcyI6IG51bGwsCiAgICAgICJzY29wZSI6IHsicHJvamVjdCI6ICJfX1BST0pFQ1RfSURfXyIsICJ2b2x1bWVzIjogbnVsbCwgImFyY3MiOiBudWxsLCAiY2hhcHRlcnMiOiBudWxsLCAic2NlbmVfdHlwZXMiOiBudWxsLCAicG92cyI6IG51bGx9LAogICAgICAicmVhZGVycyI6IFsieGlhbmdtdS16aGlsaXl1YW4iLCAid2FpYnUtemhpc2hpLWd1d2VuIiwgImd1c2hpLWdvdXNpc2hpIiwgInpoYW5namllLXFpbmdqaW5nLWJpYW55aXl1YW4iLCAieGlhbnNoaS1oZXlhbnl1YW4iLCAiaml5aS13ZWlodXl1YW4iXSwKICAgICAgImFsbG93X2F1dGhvciI6IGZhbHNlLAogICAgICAic291cmNlX3NoYTI1NiI6ICJfX0hBU0hfXyIsCiAgICAgICJhcHByb3ZhbCI6IHsic3RhdHVzIjogInVuYXBwcm92ZWQiLCAiYXBwcm92ZWRfYXQiOiBudWxsLCAiYXBwcm92ZWRfYnkiOiBudWxsfQogICAgfSwKICAgIHsKICAgICAgImlkIjogInNoaWppZS1oZXhpbi14aXRvbmciLAogICAgICAicGF0aCI6ICLkuJbnlYwv57O757ufL+aguOW/g+ezu+e7ny5tZCIsCiAgICAgICJ0eXBlIjogIndvcmxkIiwKICAgICAgIm93bmVyIjogInhpYW5nbXUtemhpbGl5dWFuIiwKICAgICAgInZlcnNpb24iOiAiMC4xLjAiLAogICAgICAic3RhdHVzIjogInByb3Bvc2VkIiwKICAgICAgInN1cGVyc2VkZXMiOiBudWxsLAogICAgICAic2NvcGUiOiB7InByb2plY3QiOiAiX19QUk9KRUNUX0lEX18iLCAidm9sdW1lcyI6IG51bGwsICJhcmNzIjogbnVsbCwgImNoYXB0ZXJzIjogbnVsbCwgInNjZW5lX3R5cGVzIjogbnVsbCwgInBvdnMiOiBudWxsfSwKICAgICAgInJlYWRlcnMiOiBbInhpYW5nbXUtemhpbGl5dWFuIiwgIndhaWJ1LXpoaXNoaS1ndXdlbiIsICJiaWFveGlhbi1zaGVqaXNoaSIsICJndXNoaS1nb3VzaXNoaSIsICJ6aGFuZ2ppZS1xaW5namluZy1iaWFueWl5dWFuIiwgInhpYW5zaGktaGV5YW55dWFuIl0sCiAgICAgICJhbGxvd19hdXRob3IiOiBmYWxzZSwKICAgICAgInNvdXJjZV9zaGEyNTYiOiAiX19IQVNIX18iLAogICAgICAiYXBwcm92YWwiOiB7InN0YXR1cyI6ICJ1bmFwcHJvdmVkIiwgImFwcHJvdmVkX2F0IjogbnVsbCwgImFwcHJvdmVkX2J5IjogbnVsbH0KICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJndXNoaS1kYW5ncWlhbi1odSIsCiAgICAgICJwYXRoIjogIuaVheS6iy/lvZPliY3mlYXkuovlvKcubWQiLAogICAgICAidHlwZSI6ICJzdG9yeSIsCiAgICAgICJvd25lciI6ICJndXNoaS1nb3VzaXNoaSIsCiAgICAgICJ2ZXJzaW9uIjogIjAuMS4wIiwKICAgICAgInN0YXR1cyI6ICJwcm9wb3NlZCIsCiAgICAgICJzdXBlcnNlZGVzIjogbnVsbCwKICAgICAgInNjb3BlIjogeyJwcm9qZWN0IjogIl9fUFJPSkVDVF9JRF9fIiwgInZvbHVtZXMiOiBudWxsLCAiYXJjcyI6IG51bGwsICJjaGFwdGVycyI6IG51bGwsICJzY2VuZV90eXBlcyI6IG51bGwsICJwb3ZzIjogbnVsbH0sCiAgICAgICJyZWFkZXJzIjogWyJ4aWFuZ211LXpoaWxpeXVhbiIsICJndXNoaS1nb3VzaXNoaSIsICJ6aGFuZ2ppZS1xaW5namluZy1iaWFueWl5dWFuIiwgInFpbmdqaWUtaGV5YW55dWFuIiwgImppeWktd2VpaHV5dWFuIl0sCiAgICAgICJhbGxvd19hdXRob3IiOiBmYWxzZSwKICAgICAgInNvdXJjZV9zaGEyNTYiOiAiX19IQVNIX18iLAogICAgICAiYXBwcm92YWwiOiB7InN0YXR1cyI6ICJ1bmFwcHJvdmVkIiwgImFwcHJvdmVkX2F0IjogbnVsbCwgImFwcHJvdmVkX2J5IjogbnVsbH0KICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJiaWFveGlhbi14aWFuZ211LXNoZW5neWluIiwKICAgICAgInBhdGgiOiAi6KGo546wL+mhueebruWjsOmfsy5tZCIsCiAgICAgICJ0eXBlIjogImV4cHJlc3Npb24iLAogICAgICAib3duZXIiOiAiYmlhb3hpYW4tc2hlamlzaGkiLAogICAgICAidmVyc2lvbiI6ICIwLjEuMCIsCiAgICAgICJzdGF0dXMiOiAicHJvcG9zZWQiLAogICAgICAic3VwZXJzZWRlcyI6IG51bGwsCiAgICAgICJzY29wZSI6IHsicHJvamVjdCI6ICJfX1BST0pFQ1RfSURfXyIsICJ2b2x1bWVzIjogbnVsbCwgImFyY3MiOiBudWxsLCAiY2hhcHRlcnMiOiBudWxsLCAic2NlbmVfdHlwZXMiOiBudWxsLCAicG92cyI6IG51bGx9LAogICAgICAicmVhZGVycyI6IFsieGlhbmdtdS16aGlsaXl1YW4iLCAiYmlhb3hpYW4tc2hlamlzaGkiLCAiemhhbmdqaWUtcWluZ2ppbmctYmlhbnlpeXVhbiIsICJ4aWFvc2h1by16dW96aGUiXSwKICAgICAgImFsbG93X2F1dGhvciI6IHRydWUsCiAgICAgICJzb3VyY2Vfc2hhMjU2IjogIl9fSEFTSF9fIiwKICAgICAgImFwcHJvdmFsIjogeyJzdGF0dXMiOiAidW5hcHByb3ZlZCIsICJhcHByb3ZlZF9hdCI6IG51bGwsICJhcHByb3ZlZF9ieSI6IG51bGx9CiAgICB9LAogICAgewogICAgICAiaWQiOiAieGlhb3lhbi15aW5nc2hlZGluZyIsCiAgICAgICJwYXRoIjogIuagoemqjC/noazorr7lrprop4TliJkubWQiLAogICAgICAidHlwZSI6ICJ2YWxpZGF0aW9uIiwKICAgICAgIm93bmVyIjogInhpYW5zaGktaGV5YW55dWFuIiwKICAgICAgInZlcnNpb24iOiAiMC4xLjAiLAogICAgICAic3RhdHVzIjogInByb3Bvc2VkIiwKICAgICAgInN1cGVyc2VkZXMiOiBudWxsLAogICAgICAic2NvcGUiOiB7InByb2plY3QiOiAiX19QUk9KRUNUX0lEX18iLCAidm9sdW1lcyI6IG51bGwsICJhcmNzIjogbnVsbCwgImNoYXB0ZXJzIjogbnVsbCwgInNjZW5lX3R5cGVzIjogbnVsbCwgInBvdnMiOiBudWxsfSwKICAgICAgInJlYWRlcnMiOiBbInhpYW5nbXUtemhpbGl5dWFuIiwgInhpYW5zaGktaGV5YW55dWFuIl0sCiAgICAgICJhbGxvd19hdXRob3IiOiBmYWxzZSwKICAgICAgInNvdXJjZV9zaGEyNTYiOiAiX19IQVNIX18iLAogICAgICAiYXBwcm92YWwiOiB7InN0YXR1cyI6ICJ1bmFwcHJvdmVkIiwgImFwcHJvdmVkX2F0IjogbnVsbCwgImFwcHJvdmVkX2J5IjogbnVsbH0KICAgIH0KICBdCn0K",
+    "研究/README.md": "IyDnoJTnqbbotYTmlpkKCuS/neWtmOWklumDqOivgeaNruOAgeaWh+WtpuaWh+acrOWFs+ezu+inguWvn+OAgeadpea6kOWSjOS4jeehruWumuaAp+OAgueglOeptuawuOS4jeebtOaOpei/m+WFpeWwj+ivtOS9nOiAhei1hOaWmeWMhe+8m+aJueWHhuadkOaWmemhu+e7j+ihqOeOsOiuvuiuoeW4iOaIlumhueebruayu+eQhuWRmOi9rOivkeWIsOato+ehruiBjOi0o+OAggo=",
+    "表现/能力/README.md": "IyDooajnjrDog73lipsKCuaImOaWl+OAgeaUv+ayu+OAgeaEn+aDheaIluWFtuS7luWcuuaZr+iDveWKm+e7j+ihqOeOsOiuvuiuoeW4iOi9rOivkeWQjuaUvuWcqOi/memHjOOAguavj+mhueW/hemhu+acieaYjuehruS9nOeUqOWfn++8jOmAmui/h+mXreWQiOWuoeiuoeWSjOmdnuato+WFuOivleWGmeWQjuaJjeiDvea/gOa0u++8m+W9k+WJjeeroOiKguacgOWkmuijhei9veS4gOmhueOAggo=",
+    "表现/项目声音.md": "IyDpobnnm67lo7Dpn7MKCuW+heaJueWHhuadkOaWmeOAgemXreWQiOmjjumZqeWuoeiuoeOAgemalOemu+ivleWGmeS4jueUqOaIt+mYheivu+WujOaIkOWQjua/gOa0u+OAgui/memHjOWPquaPj+i/sOmhueebruiHqui6q+eos+WumueahOaWh+Wtl+mAieaLqeWFs+ezu++8jOS4jeS/neeVmeadpea6kOWQjeensOOAgeW8leaWh+OAgeWbuuWumuaEj+ixoeOAgeWPr+Wll+WPpeaIluWJp+aDheetlOahiO+8m+S4jei2hei/hzEsMjAw5a2X56ym44CCCg==",
+    "项目/项目章程.md": "IyDpobnnm67nq6DnqIsKCiMjIOmhueebrui6q+S7vQoK6aG555uu5ZCN56ew44CB5L2T6KOB6L6555WM44CB6aKE6K6h6KeE5qih5ZKM55uu5qCH6K+76ICF44CC6L+Z6YeM5Y+q6K6w5b2V5Lya6ZW/5pyf5pS55Y+Y5Yib5L2c5Yik5pat55qE5YaF5a6544CCCgojIyDliJvkvZzmnaXmupDmnYMKCuiusOW9leeUqOaIt+W3sue7j+aYjuehrueahOaguOW/g+ivieaxguOAgeS4jeWPr+i2iui/h+eahOWGheWuuei+ueeVjO+8jOS7peWPiuWTquS6m+mHjeWkp+WGs+WumuW/hemhu+WbnuWIsOeUqOaIt+OAggoKIyMg5b2T5YmN5byA5pS+6Zeu6aKYCgrkv53nlZnlsJrmnKrlhrPlrprjgIHkvYbkvJrmmL7okZfmlLnlj5jmlbTpg6jlsI/or7TnmoTpl67popjjgILkuI3opoHku6XkuLTml7bnrZTmoYjloavmu6HjgIIKCiMjIOaJueWHhueKtuaAgQoK5b6F55So5oi356Gu6K6k44CCCg=="
+  },
+  "soul": "# 如文·章节写作的创作核心\n\n<!-- AUTHOR_CORE_START -->\n写进一个有限意识正在经历的物质与社会时间。欲望、习惯、身体、身份、记忆、无知和他人共同决定注意。章节情境规定必要事实，不规定措辞、强调、解释和意义。约束留在幕后。动作已经承载的效果不再解释。人物的脸、目光、姿态与声音只在此刻真实可见时进入，并允许情绪名词被人物或叙述距离承担。生活不必为主线证明价值；结尾停在压力已经改变之处。\n<!-- AUTHOR_CORE_END -->\n\n## 不向小说作者加载的内容\n\n小说作者不读取完整人物档案、世界资料、故事大纲、研究、治理、校验、编辑问题账本、来源清单、审批对话或失败历史。它只接收编译后的当前处境和被批准的少量文字能力。\n\n## 稳定底线\n\n- 人物只能知道其有来源知道的事。\n- 不从规划语言替人物宣布最终心理答案。\n- 不把资料包的句子当作需要逐项证明的验收表。\n- 项目声音与表现能力不能凌驾于人物正在做的事。\n- 写作候选不是Canon；只有用户明确批准后才可提交。\n",
+  "contamination": [
+    {
+      "pattern": "^\\s*#{1,6}\\s*(fixed|preferred|offered|inferred)\\b",
+      "flags": "uim",
+      "label": "authority classification"
+    },
+    {
+      "pattern": "AUTHOR_DESIGN",
+      "flags": "ui",
+      "label": "author-design marker"
+    },
+    {
+      "pattern": "用户已批准|合并说明|完整保留|完整恢复|有意移章",
+      "flags": "u",
+      "label": "revision or source-fidelity history"
+    },
+    {
+      "pattern": "本章阅读收益|本章真正要做的事|章末状态",
+      "flags": "u",
+      "label": "predetermined chapter result"
+    },
+    {
+      "pattern": "^\\s*\\|\\s*U\\d+\\s*\\|",
+      "flags": "uim",
+      "label": "source-fidelity table"
+    },
+    {
+      "pattern": "current_instruction",
+      "flags": "ui",
+      "label": "free-form current instruction"
+    },
+    {
+      "pattern": "^\\s*(LOCK|DIRECTION|OPEN)\\s*[:：]",
+      "flags": "uim",
+      "label": "planning-authority label"
+    },
+    {
+      "pattern": "^\\s*(?:#{1,6}\\s*)?(?:规划理由|编辑检查|最终心理解释|预定比喻|最后画面|备选方案|planning rationale|editorial check|final interpretation|planned metaphor|final image|alternative plan)\\s*[:：]?",
+      "flags": "uim",
+      "label": "backstage planning material"
+    },
+    {
+      "pattern": "读者(?:应该|应当|必须)(?:感到|意识到|明白)|(?:the reader (?:should|must|needs to) (?:feel|realize|understand|notice))",
+      "flags": "ui",
+      "label": "predetermined reader response"
+    },
+    {
+      "pattern": "注意力契约|因果继承|段落(?:入口|出口)|对象变义|结尾(?:公式|结构)|(?:attention contract|causal inheritance|paragraph (?:entry|exit)|ending formula)",
+      "flags": "ui",
+      "label": "literary-mechanism instruction"
+    },
+    {
+      "pattern": "^\\s*(?:[-—]\\s*)?[“「『\"]\\S.{1,}[”」』\"]\\s*$|^\\s*(?:她|他|他们|[A-Z][A-Za-z '-]{1,30})\\s*[:：]\\s*[“\"]",
+      "flags": "uim",
+      "label": "explicit dialogue line"
+    },
+    {
+      "pattern": "(?:(?:planned dialogue|exact wording|line to use|she says|he says)\\s*[:：])|(?:预定对白|逐字台词|此处说|让(?:她|他)说)\\s*[:：]",
+      "flags": "ui",
+      "label": "planned dialogue or wording"
+    },
+    {
+      "pattern": "(?:这|此)(?:个|次|一)?(?:迟疑|沉默|回答|动作|决定|称呼|退出|相遇).{0,24}(?:使|让|意味着|说明|证明|获得.{0,8}解释)",
+      "flags": "u",
+      "label": "predetermined interpretation"
+    },
+    {
+      "pattern": "(?:她|他).{0,20}(?:仍然|继续).{0,30}(?:但|却|只是).{0,30}(?:不再|没有|不)",
+      "flags": "u",
+      "label": "defensive proof of planned behavior"
+    }
+  ],
+  "silent": [
+    {
+      "pattern": "^\\s*#{1,4}\\s*(?:来源|约束|完成清单|自检|规划说明|审计)\\s*$",
+      "flags": "uim"
+    },
+    {
+      "pattern": "(?:作为(?:AI|模型)|根据(?:以上|大纲|设定)要求|已完成(?:上述|所有)要求)",
+      "flags": "u"
+    },
+    {
+      "pattern": "(?:本章|本文|本段|这一章).{0,12}(?:逐项|落实|满足|遵循|完成).{0,12}(?:大纲|要求|限制|约束|设定|指令)",
+      "flags": "u"
+    },
+    {
+      "pattern": "(?:研究|资料|信息|事实).{0,10}(?:来源|出处).{0,10}(?:已|均已)?(?:核对|验证|确认)",
+      "flags": "u"
+    },
+    {
+      "pattern": "(?:逐项|全部).{0,10}(?:兑现|落实|满足|完成).{0,10}(?:要求|大纲|设定|约束|任务)",
+      "flags": "u"
+    },
+    {
+      "pattern": "(?:大纲|写作指令|文本约束|研究来源|设定清单|任务要求).{0,18}(?:执行|落实|遵照|依照|完成|核验|核对|满足|兑现|符合)",
+      "flags": "u"
+    },
+    {
+      "pattern": "(?:执行|落实|遵照|依照|完成|核验|核对|满足|兑现|符合).{0,18}(?:大纲|写作指令|文本约束|研究来源|设定清单|任务要求)",
+      "flags": "u"
+    },
+    {
+      "pattern": "(?:这段文字|这一节|正文|本章|本文|本段).{0,18}(?:已经|已)?(?:依照|照着|执行|遵循|按照).{0,12}(?:既定规则|前述规范|创作指示|写作规则|写作规范)",
+      "flags": "u"
+    }
+  ],
+  "closure": {
+    "route": [
+      {
+        "pattern": "(?:先|首先).{0,30}(?:再|然后|接着).{0,40}(?:最后|结尾)",
+        "flags": "us"
+      },
+      {
+        "pattern": "固定(?:镜头|步骤|顺序|流程)",
+        "flags": "us"
+      }
+    ],
+    "fulfillment": [
+      {
+        "pattern": "每(?:段|场|章|次).{0,16}(?:必须|都要|应当)",
+        "flags": "us"
+      },
+      {
+        "pattern": "逐项(?:检查|完成|体现|证明)",
+        "flags": "us"
+      }
+    ],
+    "closed_mapping": [
+      {
+        "pattern": "(?:政治|战斗|感情|家园|历史).{0,8}(?:等于|就是|必须通过)",
+        "flags": "us"
+      },
+      {
+        "pattern": "(?:短句|对白|回家|绳|账目).{0,8}(?:代表|象征|体现)",
+        "flags": "us"
+      },
+      {
+        "pattern": "情绪.{0,12}(?:不|不得|只能).{0,12}(?:命名|动作|表现)",
+        "flags": "us"
+      }
+    ],
+    "example_anchor": [
+      {
+        "pattern": "(?:例如|比如|譬如|可写成|示例)[：:]?",
+        "flags": "us"
+      },
+      {
+        "pattern": "[“\"].{2,40}[”\"]",
+        "flags": "us"
+      }
+    ],
+    "semantic_density": [
+      {
+        "pattern": "^(?:\\s*[-*+]\\s+|\\s*\\d+[.、)])(?:必须|需要|应当|确保)",
+        "flags": "usm"
+      }
+    ],
+    "source_proximity": [
+      {
+        "pattern": "(?:模仿|仿照|像).{0,12}(?:作者|作品|文风)",
+        "flags": "us"
+      },
+      {
+        "pattern": "(?:山冈庄八|冰与火之歌|德川家康|雪国|金阁寺|魔戒|基地)",
+        "flags": "us"
+      }
+    ]
+  }
+}

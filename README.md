@@ -2,7 +2,7 @@
 
 将如文 5.0 写作系统做成多用户、可部署和可计费的网页产品。实施范围和验收以 [docs/PLAN.md](docs/PLAN.md) 为准。
 
-当前仅完成 P0 的工程骨架和技术验证，尚无可使用的网页、领域核心或生产岗位流水线。P1 必须在 P0 人工验收后启动。
+P0 已经人工确认。P1 领域核心、LocalDirFS、受控记忆提交与核心 CLI 已实现，当前继续 P2 岗位与章节流水线；尚无可使用的网页或付费账户。
 
 ## 本地验证
 
@@ -16,7 +16,17 @@ pnpm typecheck
 pnpm test
 ```
 
-`pnpm test` 同时运行 pi faux 验证、模型目录检查、清单覆盖检查和上游 36 个原始 Python 测试。无需 API key，不调用真实模型或外部付费服务。可用 `PYTHON_BIN` 选择 Python 可执行文件（例如 Linux 的 python3）。单独运行上游测试用 `pnpm test:upstream`；该命令默认使用 python。
+`pnpm test` 同时运行 pi faux、核心移植、文件系统契约、不变量、严格差分和上游 36 个原始 Python 测试。无需 API key，不调用真实模型或外部付费服务。可用 `PYTHON_BIN` 选择测试用 Python 可执行文件（例如 Linux 的 python3）。单独运行上游测试用 `pnpm test:upstream`；该命令默认使用 python。产品核心运行时不需要 Python 或 Git。
+
+核心 CLI 示例（目标目录需不存在或为空）：
+
+```sh
+pnpm core init-project --project-root ./my-novel --project-id my-novel
+pnpm core resource-registry validate --project-root ./my-novel
+pnpm core project-readiness --project-root ./my-novel
+```
+
+新项目仍是待批准脚手架，readiness 返回 blocked 是正常状态。CLI 支持全部 11 个本阶段移植脚本的命令与参数；v4.1 目录迁移仍在后续范围。核心细节和已验证边界见 [P1 报告](docs/reports/phase-1.md)。
 
 pnpm 11 的 `allowBuilds` 显式禁用三个依赖的安装脚本。当前检查可直接使用已发布的可选二进制；新增功能确实需要脚本时再按依赖逐项核验。
 
@@ -26,7 +36,7 @@ pnpm 11 的 `allowBuilds` 显式禁用三个依赖的安装脚本。当前检查
 
 | 目录 | 阶段与用途 |
 |---|---|
-| packages/core | P1：领域逻辑与 ProjectFS；当前仅目录骨架 |
+| packages/core | P1：领域逻辑、ProjectFS/LocalDirFS、预览提交、CLI 与回归测试 |
 | packages/agents | P0 spike；P2 提示词、岗位与模型适配 |
 | packages/pipeline | P2：确定性岗位流程；当前仅骨架 |
 | packages/db / packages/billing | P4 持久化 / P6 计费；当前仅骨架 |

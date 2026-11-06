@@ -53,9 +53,11 @@ pnpm 11 的 `allowBuilds` 显式禁用三个依赖的安装脚本。当前检查
 | packages/db / packages/billing | P4 持久化 / P6 计费；当前仅骨架 |
 | apps/cli / apps/worker / apps/web | P2 CLI已实现；P4 worker / P5 网页仍为骨架 |
 | config | 经过静态目录核验的暂定模型路由、目录快照 |
-| fixtures | P1/P3 测试材料占位；当前没有演示项目内容 |
+| fixtures | P3手写5.0演示项目；已验证可复制和faux链，真实验证待API密钥 |
 | docs | 计划、接口盘点、技术决定和阶段报告 |
 | scripts | 开发验证工具，不属于产品运行时 |
 | vendor/ruwen | 只读的固定版本上游子模块 |
 
 模型默认值仅作为可替换起点；包目录中存在不代表账户有权限或服务商仍提供。P3 用真实 API 实测后再确定路由与价格。
+
+演示源在`fixtures/demo-project`。推荐先用`pnpm demo:create .local/my-demo`生成可修改副本，再以`--project .local/my-demo`运行章节CLI。真实三次验证入口为`pnpm benchmark:real`，当前准备与阻塞见[P3记录](docs/reports/phase-3.md)。

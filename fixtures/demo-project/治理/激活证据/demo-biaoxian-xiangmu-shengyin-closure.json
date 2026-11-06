@@ -1,0 +1,24 @@
+{
+  "path": "表现/项目声音.md",
+  "sha256": "40cfa0735ebbc4e4fcc7e4314b1b58832e0bb23ec4d6ce0f6996fe06e9ce6511",
+  "resource_id": "biaoxian-xiangmu-shengyin",
+  "resource_version": "0.1.0",
+  "manual_review": {
+    "resource_id": "biaoxian-xiangmu-shengyin",
+    "resource_path": "表现/项目声音.md",
+    "resource_version": "0.1.0",
+    "resource_sha256": "40cfa0735ebbc4e4fcc7e4314b1b58832e0bb23ec4d6ce0f6996fe06e9ce6511",
+    "reviewed_by": "user",
+    "checks": {
+      "route": "pass",
+      "fulfillment": "pass",
+      "closed_mapping": "pass",
+      "example_anchor": "pass",
+      "semantic_density": "pass",
+      "source_proximity": "pass"
+    }
+  },
+  "pass": true,
+  "decision": "candidate_allowed",
+  "findings": []
+}

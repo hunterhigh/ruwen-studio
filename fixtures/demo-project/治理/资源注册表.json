@@ -1,0 +1,342 @@
+{
+  "schema_version": "1.0",
+  "resources": [
+    {
+      "id": "xiangmu-luyou-guize",
+      "path": "AGENTS.md",
+      "type": "governance",
+      "owner": "xiangmu-zhiliyuan",
+      "version": "1.0.0",
+      "status": "active",
+      "supersedes": null,
+      "scope": {
+        "project": "demo-ruwen",
+        "volumes": null,
+        "arcs": null,
+        "chapters": null,
+        "scene_types": null,
+        "povs": null
+      },
+      "readers": [
+        "chuangyi-xietiaoyuan",
+        "xiangmu-zhiliyuan",
+        "gushi-gousishi",
+        "zhangjie-qingjing-bianyiyuan",
+        "xiaoshuo-zuozhe",
+        "wenxue-bianji"
+      ],
+      "allow_author": false,
+      "source_sha256": "ba49080cb0da650367a07374db8456cecf1eec37548feff801b325e855f13fb3",
+      "approval": {
+        "status": "approved",
+        "approved_at": "2026-08-28T00:00:00Z",
+        "approved_by": "user",
+        "approval_event_path": "治理/审批/template-routing-activate.json",
+        "approval_event_sha256": "396a1cff4f2cb73b0f05d92e0a7ae52c80a8639948896322bdf95c1c087997f6"
+      }
+    },
+    {
+      "id": "xiangmu-zhangcheng",
+      "path": "项目/项目章程.md",
+      "type": "governance",
+      "owner": "xiangmu-zhiliyuan",
+      "version": "0.1.0",
+      "status": "active",
+      "supersedes": null,
+      "scope": {
+        "project": "demo-ruwen",
+        "volumes": null,
+        "arcs": null,
+        "chapters": null,
+        "scene_types": null,
+        "povs": null
+      },
+      "readers": [
+        "chuangyi-xietiaoyuan",
+        "xiangmu-zhiliyuan",
+        "waibu-zhishi-guwen",
+        "gushi-gousishi"
+      ],
+      "allow_author": false,
+      "source_sha256": "e499023186b32f24587baea9e0f0f863d647d539cba4230715c4ca08b79d4444",
+      "approval": {
+        "status": "approved",
+        "approved_at": "2026-11-06T11:05:04.215Z",
+        "approved_by": "user",
+        "approval_event_path": "治理/审批/demo-xiangmu-zhangcheng.json",
+        "approval_event_sha256": "d9b81ce2a737db0772d28d2d00129a62f39746f978155d97315ef33abae61984"
+      }
+    },
+    {
+      "id": "zhujue-dangan",
+      "path": "人物/主角档案.md",
+      "type": "character",
+      "owner": "xiangmu-zhiliyuan",
+      "version": "0.1.0",
+      "status": "active",
+      "supersedes": null,
+      "scope": {
+        "project": "demo-ruwen",
+        "volumes": null,
+        "arcs": null,
+        "chapters": null,
+        "scene_types": null,
+        "povs": [
+          "主角"
+        ]
+      },
+      "readers": [
+        "xiangmu-zhiliyuan",
+        "waibu-zhishi-guwen",
+        "biaoxian-shejishi",
+        "gushi-gousishi",
+        "zhangjie-qingjing-bianyiyuan",
+        "xianshi-heyanyuan",
+        "jiyi-weihuyuan"
+      ],
+      "allow_author": false,
+      "source_sha256": "e37378f8afa714b32a12999c293f5b53a124245252d0b6da5a981931a0a6b4fb",
+      "approval": {
+        "status": "approved",
+        "approved_at": "2026-11-06T11:05:04.326Z",
+        "approved_by": "user",
+        "approval_event_path": "治理/审批/demo-zhujue-dangan.json",
+        "approval_event_sha256": "17286da9ef5a0b76e026a81df788061b0a1763f58ca9ddbcd7a1264ec3dff2db"
+      }
+    },
+    {
+      "id": "zhujue-pov-jingtou",
+      "path": "人物/POV镜头/主角.md",
+      "type": "character",
+      "owner": "biaoxian-shejishi",
+      "version": "0.1.0",
+      "status": "active",
+      "supersedes": null,
+      "scope": {
+        "project": "demo-ruwen",
+        "volumes": null,
+        "arcs": null,
+        "chapters": null,
+        "scene_types": null,
+        "povs": [
+          "林川"
+        ]
+      },
+      "readers": [
+        "zhangjie-qingjing-bianyiyuan",
+        "xiaoshuo-zuozhe"
+      ],
+      "allow_author": true,
+      "source_sha256": "f7a569b38733527388975bfa6c6ca70e2c313d65bf7c5be3221d1d8804b69e1f",
+      "approval": {
+        "status": "approved",
+        "approved_at": "2026-11-06T11:05:04.443Z",
+        "approved_by": "user",
+        "approval_event_path": "治理/审批/demo-zhujue-pov-jingtou.json",
+        "approval_event_sha256": "bb95c2795514780c48100e0592cd76e70d5ff4fb19b8df0d2cc22341401041f6"
+      }
+    },
+    {
+      "id": "shijie-zongbiao",
+      "path": "世界/世界总表.md",
+      "type": "world",
+      "owner": "xiangmu-zhiliyuan",
+      "version": "0.1.0",
+      "status": "active",
+      "supersedes": null,
+      "scope": {
+        "project": "demo-ruwen",
+        "volumes": null,
+        "arcs": null,
+        "chapters": null,
+        "scene_types": null,
+        "povs": null
+      },
+      "readers": [
+        "xiangmu-zhiliyuan",
+        "waibu-zhishi-guwen",
+        "biaoxian-shejishi",
+        "gushi-gousishi",
+        "zhangjie-qingjing-bianyiyuan",
+        "xianshi-heyanyuan",
+        "jiyi-weihuyuan"
+      ],
+      "allow_author": false,
+      "source_sha256": "90c247b308d34040018482cc92c43e02eaa066908ef93caff7896b05bbb73ee6",
+      "approval": {
+        "status": "approved",
+        "approved_at": "2026-11-06T11:05:04.564Z",
+        "approved_by": "user",
+        "approval_event_path": "治理/审批/demo-shijie-zongbiao.json",
+        "approval_event_sha256": "f37eb8c3063caf25d9dd6837d0c161bff0222ead67a58bf3f727919dfa952577"
+      }
+    },
+    {
+      "id": "shijie-dangqian-taishi",
+      "path": "世界/当前态势.md",
+      "type": "world",
+      "owner": "xiangmu-zhiliyuan",
+      "version": "0.1.0",
+      "status": "active",
+      "supersedes": null,
+      "scope": {
+        "project": "demo-ruwen",
+        "volumes": null,
+        "arcs": null,
+        "chapters": null,
+        "scene_types": null,
+        "povs": null
+      },
+      "readers": [
+        "xiangmu-zhiliyuan",
+        "waibu-zhishi-guwen",
+        "gushi-gousishi",
+        "zhangjie-qingjing-bianyiyuan",
+        "xianshi-heyanyuan",
+        "jiyi-weihuyuan"
+      ],
+      "allow_author": false,
+      "source_sha256": "078f6ef29e5d16a5ec3047034cddcf470cf7bef9826d181cd35fcb704c00e7e9",
+      "approval": {
+        "status": "approved",
+        "approved_at": "2026-11-06T11:05:04.683Z",
+        "approved_by": "user",
+        "approval_event_path": "治理/审批/demo-shijie-dangqian-taishi.json",
+        "approval_event_sha256": "22dd9162170ea9fc7ed2cd16b6d4a88e82df3ed4ec65fc0efac83c46c2dfbdb3"
+      }
+    },
+    {
+      "id": "shijie-hexin-xitong",
+      "path": "世界/系统/核心系统.md",
+      "type": "world",
+      "owner": "xiangmu-zhiliyuan",
+      "version": "0.1.0",
+      "status": "active",
+      "supersedes": null,
+      "scope": {
+        "project": "demo-ruwen",
+        "volumes": null,
+        "arcs": null,
+        "chapters": null,
+        "scene_types": null,
+        "povs": null
+      },
+      "readers": [
+        "xiangmu-zhiliyuan",
+        "waibu-zhishi-guwen",
+        "biaoxian-shejishi",
+        "gushi-gousishi",
+        "zhangjie-qingjing-bianyiyuan",
+        "xianshi-heyanyuan"
+      ],
+      "allow_author": false,
+      "source_sha256": "0cecec2633d9ac210ab21c257bc31aa205d79aa59b321a51e9bf30ec14a2972e",
+      "approval": {
+        "status": "approved",
+        "approved_at": "2026-11-06T11:05:04.821Z",
+        "approved_by": "user",
+        "approval_event_path": "治理/审批/demo-shijie-hexin-xitong.json",
+        "approval_event_sha256": "62f3d9aab9c7661bcb110b02cfe86a762d8485247934a63c39809fda98336681"
+      }
+    },
+    {
+      "id": "gushi-dangqian-hu",
+      "path": "故事/当前故事弧.md",
+      "type": "story",
+      "owner": "gushi-gousishi",
+      "version": "0.1.0",
+      "status": "active",
+      "supersedes": null,
+      "scope": {
+        "project": "demo-ruwen",
+        "volumes": null,
+        "arcs": null,
+        "chapters": null,
+        "scene_types": null,
+        "povs": null
+      },
+      "readers": [
+        "xiangmu-zhiliyuan",
+        "gushi-gousishi",
+        "zhangjie-qingjing-bianyiyuan",
+        "qingjie-heyanyuan",
+        "jiyi-weihuyuan"
+      ],
+      "allow_author": false,
+      "source_sha256": "08b7e97e2c8e991179f3eef8eaf03e88eb932e668aab92841fed8890908973b3",
+      "approval": {
+        "status": "approved",
+        "approved_at": "2026-11-06T11:05:04.951Z",
+        "approved_by": "user",
+        "approval_event_path": "治理/审批/demo-gushi-dangqian-hu.json",
+        "approval_event_sha256": "903a645d9a3204b7fea8268af1606fac617d37b5dd0634480a515957aedf2fa0"
+      }
+    },
+    {
+      "id": "biaoxian-xiangmu-shengyin",
+      "path": "表现/项目声音.md",
+      "type": "expression",
+      "owner": "biaoxian-shejishi",
+      "version": "0.1.0",
+      "status": "active",
+      "supersedes": null,
+      "scope": {
+        "project": "demo-ruwen",
+        "volumes": null,
+        "arcs": null,
+        "chapters": null,
+        "scene_types": null,
+        "povs": null
+      },
+      "readers": [
+        "xiangmu-zhiliyuan",
+        "biaoxian-shejishi",
+        "zhangjie-qingjing-bianyiyuan",
+        "xiaoshuo-zuozhe"
+      ],
+      "allow_author": true,
+      "source_sha256": "40cfa0735ebbc4e4fcc7e4314b1b58832e0bb23ec4d6ce0f6996fe06e9ce6511",
+      "approval": {
+        "status": "approved",
+        "approved_at": "2026-11-06T11:05:05.093Z",
+        "approved_by": "user",
+        "approval_event_path": "治理/审批/demo-biaoxian-xiangmu-shengyin.json",
+        "approval_event_sha256": "e61498f24f457331fdfacc636a749ab979c2a2f4530ee9b515ec2f5781796e7a",
+        "closure_audit_path": "治理/激活证据/demo-biaoxian-xiangmu-shengyin-closure.json",
+        "closure_audit_sha256": "2a7b4031d4a2a0d4cc05620abdc72e0ac4f8d8b3112b262da7ebedadd9a4a0b6",
+        "trial_report_path": "治理/激活证据/demo-biaoxian-xiangmu-shengyin-trial.json",
+        "trial_report_sha256": "d378207f963c054680dfe36cc03936cf637c2ebcb91a89ac71739a4506a9a6fa"
+      }
+    },
+    {
+      "id": "xiaoyan-yingsheding",
+      "path": "校验/硬设定规则.md",
+      "type": "validation",
+      "owner": "xianshi-heyanyuan",
+      "version": "0.1.0",
+      "status": "active",
+      "supersedes": null,
+      "scope": {
+        "project": "demo-ruwen",
+        "volumes": null,
+        "arcs": null,
+        "chapters": null,
+        "scene_types": null,
+        "povs": null
+      },
+      "readers": [
+        "xiangmu-zhiliyuan",
+        "xianshi-heyanyuan"
+      ],
+      "allow_author": false,
+      "source_sha256": "4c380f45363b23663d58cfcf2f6f223b3e8d62f89c20e6f880bd22d42ba283b0",
+      "approval": {
+        "status": "approved",
+        "approved_at": "2026-11-06T11:05:05.258Z",
+        "approved_by": "user",
+        "approval_event_path": "治理/审批/demo-xiaoyan-yingsheding.json",
+        "approval_event_sha256": "c1795fb6ad87ea44a44b4495cba6d66ddd70b89ab7f508a0114cc4dd2c0f67f9"
+      }
+    }
+  ]
+}

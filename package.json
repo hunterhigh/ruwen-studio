@@ -11,6 +11,8 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "core": "node packages/core/bin/ruwen-core.ts",
+    "demo:create": "node scripts/create-demo.ts",
+    "benchmark:real": "node scripts/benchmark-real.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:upstream": "python -I -B scripts/verify-upstream.py"

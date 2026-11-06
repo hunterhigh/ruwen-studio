@@ -1,0 +1,19 @@
+{
+  "projection": "authoring-ruwen-v5/projections/current.md",
+  "project_voice": "表现/项目声音.md",
+  "pov_lens": "人物/POV镜头/主角.md",
+  "relationship_lens": null,
+  "expression_resource": null,
+  "approved_prose_tail": null,
+  "user_authored_text": null,
+  "context_scope": {
+    "project": "demo-ruwen",
+    "volume": "v1",
+    "arc": "station",
+    "chapter": "001",
+    "scene_type": "travel",
+    "pov": "林川"
+  },
+  "maximum_context_characters": 8000,
+  "output": "authoring-ruwen-v5/packets/current.md"
+}

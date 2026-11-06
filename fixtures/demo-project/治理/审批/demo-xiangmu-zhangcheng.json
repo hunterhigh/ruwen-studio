@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "id": "demo-xiangmu-zhangcheng",
+  "action": "resource_activate",
+  "target_path": "项目/项目章程.md",
+  "target_sha256": "e499023186b32f24587baea9e0f0f863d647d539cba4230715c4ca08b79d4444",
+  "approved_at": "2026-11-06T11:05:04.128000+00:00",
+  "approved_by": "user",
+  "consumed": false
+}

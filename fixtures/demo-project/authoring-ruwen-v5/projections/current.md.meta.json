@@ -1,0 +1,39 @@
+{
+  "schema_version": "2.0",
+  "chapter": "001",
+  "context_scope": {
+    "project": "demo-ruwen",
+    "volume": "v1",
+    "arc": "station",
+    "chapter": "001",
+    "scene_type": "travel",
+    "pov": "林川"
+  },
+  "generated_at": "2026-11-06T11:05:05.593000+00:00",
+  "artifact": {
+    "path": "authoring-ruwen-v5/projections/current.md",
+    "sha256": "4fd051c3e76ba1d433967cdf273c28ef52fd27ad3b230ad0a2dec93677c920d5"
+  },
+  "sources": [
+    {
+      "role": "outline",
+      "path": "故事/当前故事弧.md",
+      "sha256": "08b7e97e2c8e991179f3eef8eaf03e88eb932e668aab92841fed8890908973b3"
+    },
+    {
+      "role": "character",
+      "path": "人物/主角档案.md",
+      "sha256": "e37378f8afa714b32a12999c293f5b53a124245252d0b6da5a981931a0a6b4fb"
+    },
+    {
+      "role": "world",
+      "path": "世界/世界总表.md",
+      "sha256": "90c247b308d34040018482cc92c43e02eaa066908ef93caff7896b05bbb73ee6"
+    },
+    {
+      "role": "situation",
+      "path": "世界/当前态势.md",
+      "sha256": "078f6ef29e5d16a5ec3047034cddcf470cf7bef9826d181cd35fcb704c00e7e9"
+    }
+  ]
+}

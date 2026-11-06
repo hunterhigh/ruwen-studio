@@ -1,0 +1,353 @@
+{
+  "piVersion": "1.5.0",
+  "source": "installed provider.getModels() (static catalogs; API availability unverified)",
+  "providers": [
+    {
+      "provider": "anthropic",
+      "models": [
+        {
+          "id": "claude-fable-5",
+          "api": "anthropic-messages",
+          "thinkingLevels": ["minimal", "low", "medium", "high", "xhigh", "max"]
+        },
+        {
+          "id": "claude-fable-5-1",
+          "api": "anthropic-messages",
+          "thinkingLevels": ["minimal", "low", "medium", "high", "xhigh", "max"]
+        },
+        {
+          "id": "claude-haiku-4-5",
+          "api": "anthropic-messages",
+          "thinkingLevels": ["off", "minimal", "low", "medium", "high"]
+        },
+        {
+          "id": "claude-haiku-4-5-20251001",
+          "api": "anthropic-messages",
+          "thinkingLevels": ["off", "minimal", "low", "medium", "high"]
+        },
+        {
+          "id": "claude-haiku-5-5",
+          "api": "anthropic-messages",
+          "thinkingLevels": ["off", "low", "medium", "high", "xhigh", "max"]
+        },
+        {
+          "id": "claude-opus-4-5",
+          "api": "anthropic-messages",
+          "thinkingLevels": ["off", "minimal", "low", "medium", "high"]
+        },
+        {
+          "id": "claude-opus-4-5-20251101",
+          "api": "anthropic-messages",
+          "thinkingLevels": ["off", "minimal", "low", "medium", "high"]
+        },
+        {
+          "id": "claude-opus-4-6",
+          "api": "anthropic-messages",
+          "thinkingLevels": ["off", "minimal", "low", "medium", "high", "max"]
+        },
+        {
+          "id": "claude-opus-4-7",
+          "api": "anthropic-messages",
+          "thinkingLevels": [
+            "off",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "id": "claude-opus-4-8",
+          "api": "anthropic-messages",
+          "thinkingLevels": [
+            "off",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "id": "claude-opus-5",
+          "api": "anthropic-messages",
+          "thinkingLevels": [
+            "off",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "id": "claude-opus-5-5",
+          "api": "anthropic-messages",
+          "thinkingLevels": ["low", "medium", "high", "xhigh", "max"]
+        },
+        {
+          "id": "claude-sonnet-4-5",
+          "api": "anthropic-messages",
+          "thinkingLevels": ["off", "minimal", "low", "medium", "high"]
+        },
+        {
+          "id": "claude-sonnet-4-5-20250929",
+          "api": "anthropic-messages",
+          "thinkingLevels": ["off", "minimal", "low", "medium", "high"]
+        },
+        {
+          "id": "claude-sonnet-4-6",
+          "api": "anthropic-messages",
+          "thinkingLevels": ["off", "minimal", "low", "medium", "high", "max"]
+        },
+        {
+          "id": "claude-sonnet-5",
+          "api": "anthropic-messages",
+          "thinkingLevels": [
+            "off",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        {
+          "id": "claude-sonnet-5-5",
+          "api": "anthropic-messages",
+          "thinkingLevels": ["low", "medium", "high", "xhigh", "max"]
+        }
+      ]
+    },
+    {
+      "provider": "openai",
+      "models": [
+        {
+          "id": "chat-latest",
+          "api": "openai-responses",
+          "thinkingLevels": ["off", "minimal", "low", "medium", "high"]
+        },
+        {
+          "id": "gpt-4",
+          "api": "openai-responses",
+          "thinkingLevels": ["off"]
+        },
+        {
+          "id": "gpt-4-turbo",
+          "api": "openai-responses",
+          "thinkingLevels": ["off"]
+        },
+        {
+          "id": "gpt-4.1",
+          "api": "openai-responses",
+          "thinkingLevels": ["off"]
+        },
+        {
+          "id": "gpt-4.1-mini",
+          "api": "openai-responses",
+          "thinkingLevels": ["off"]
+        },
+        {
+          "id": "gpt-4.1-nano",
+          "api": "openai-responses",
+          "thinkingLevels": ["off"]
+        },
+        {
+          "id": "gpt-4o",
+          "api": "openai-responses",
+          "thinkingLevels": ["off"]
+        },
+        {
+          "id": "gpt-4o-2024-05-13",
+          "api": "openai-responses",
+          "thinkingLevels": ["off"]
+        },
+        {
+          "id": "gpt-4o-2024-08-06",
+          "api": "openai-responses",
+          "thinkingLevels": ["off"]
+        },
+        {
+          "id": "gpt-4o-2024-11-20",
+          "api": "openai-responses",
+          "thinkingLevels": ["off"]
+        },
+        {
+          "id": "gpt-4o-mini",
+          "api": "openai-responses",
+          "thinkingLevels": ["off"]
+        },
+        {
+          "id": "gpt-5",
+          "api": "openai-responses",
+          "thinkingLevels": ["minimal", "low", "medium", "high"]
+        },
+        {
+          "id": "gpt-5-chat-latest",
+          "api": "openai-responses",
+          "thinkingLevels": ["off"]
+        },
+        {
+          "id": "gpt-5-mini",
+          "api": "openai-responses",
+          "thinkingLevels": ["minimal", "low", "medium", "high"]
+        },
+        {
+          "id": "gpt-5-nano",
+          "api": "openai-responses",
+          "thinkingLevels": ["minimal", "low", "medium", "high"]
+        },
+        {
+          "id": "gpt-5-pro",
+          "api": "openai-responses",
+          "thinkingLevels": ["high"]
+        },
+        {
+          "id": "gpt-5.1",
+          "api": "openai-responses",
+          "thinkingLevels": ["off", "low", "medium", "high"]
+        },
+        {
+          "id": "gpt-5.2",
+          "api": "openai-responses",
+          "thinkingLevels": ["off", "low", "medium", "high", "xhigh"]
+        },
+        {
+          "id": "gpt-5.2-pro",
+          "api": "openai-responses",
+          "thinkingLevels": ["medium", "high", "xhigh"]
+        },
+        {
+          "id": "gpt-5.3-codex",
+          "api": "openai-responses",
+          "thinkingLevels": ["off", "low", "medium", "high", "xhigh"]
+        },
+        {
+          "id": "gpt-5.3-codex-spark",
+          "api": "openai-responses",
+          "thinkingLevels": ["low", "medium", "high", "xhigh"]
+        },
+        {
+          "id": "gpt-5.4",
+          "api": "openai-responses",
+          "thinkingLevels": ["off", "low", "medium", "high", "xhigh"]
+        },
+        {
+          "id": "gpt-5.4-mini",
+          "api": "openai-responses",
+          "thinkingLevels": ["off", "low", "medium", "high", "xhigh"]
+        },
+        {
+          "id": "gpt-5.4-nano",
+          "api": "openai-responses",
+          "thinkingLevels": ["off", "low", "medium", "high", "xhigh"]
+        },
+        {
+          "id": "gpt-5.4-pro",
+          "api": "openai-responses",
+          "thinkingLevels": ["medium", "high", "xhigh"]
+        },
+        {
+          "id": "gpt-5.5",
+          "api": "openai-responses",
+          "thinkingLevels": ["off", "low", "medium", "high", "xhigh"]
+        },
+        {
+          "id": "gpt-5.5-pro",
+          "api": "openai-responses",
+          "thinkingLevels": ["medium", "high", "xhigh"]
+        },
+        {
+          "id": "gpt-5.6-cyber",
+          "api": "openai-responses",
+          "thinkingLevels": ["low", "medium", "high", "xhigh", "max"]
+        },
+        {
+          "id": "gpt-5.6-luna",
+          "api": "openai-responses",
+          "thinkingLevels": ["off", "low", "medium", "high", "xhigh", "max"]
+        },
+        {
+          "id": "gpt-5.6-sol",
+          "api": "openai-responses",
+          "thinkingLevels": ["off", "low", "medium", "high", "xhigh", "max"]
+        },
+        {
+          "id": "gpt-5.6-terra",
+          "api": "openai-responses",
+          "thinkingLevels": ["off", "low", "medium", "high", "xhigh", "max"]
+        },
+        {
+          "id": "gpt-6-astra",
+          "api": "openai-responses",
+          "thinkingLevels": ["low", "medium", "high", "xhigh", "max"]
+        },
+        {
+          "id": "gpt-6-luna",
+          "api": "openai-responses",
+          "thinkingLevels": ["off", "low", "medium", "high", "xhigh", "max"]
+        },
+        {
+          "id": "gpt-6-sol",
+          "api": "openai-responses",
+          "thinkingLevels": ["off", "low", "medium", "high", "xhigh", "max"]
+        },
+        {
+          "id": "gpt-6.1-sol",
+          "api": "openai-responses",
+          "thinkingLevels": ["low", "medium", "high", "xhigh", "max"]
+        },
+        {
+          "id": "gpt-6.1-terra",
+          "api": "openai-responses",
+          "thinkingLevels": ["off", "low", "medium", "high", "xhigh", "max"]
+        },
+        {
+          "id": "gpt-daybreak-blue-latest",
+          "api": "openai-responses",
+          "thinkingLevels": ["off", "low", "medium", "high", "xhigh", "max"]
+        },
+        {
+          "id": "gpt-daybreak-red-latest",
+          "api": "openai-responses",
+          "thinkingLevels": ["off", "low", "medium", "high", "xhigh", "max"]
+        },
+        {
+          "id": "o1",
+          "api": "openai-responses",
+          "thinkingLevels": ["low", "medium", "high"]
+        },
+        {
+          "id": "o1-pro",
+          "api": "openai-responses",
+          "thinkingLevels": ["low", "medium", "high"]
+        },
+        {
+          "id": "o3",
+          "api": "openai-responses",
+          "thinkingLevels": ["low", "medium", "high"]
+        },
+        {
+          "id": "o3-mini",
+          "api": "openai-responses",
+          "thinkingLevels": ["low", "medium", "high"]
+        },
+        {
+          "id": "o3-pro",
+          "api": "openai-responses",
+          "thinkingLevels": ["low", "medium", "high"]
+        },
+        {
+          "id": "o4-mini",
+          "api": "openai-responses",
+          "thinkingLevels": ["low", "medium", "high"]
+        }
+      ]
+    }
+  ]
+}

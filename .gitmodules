@@ -1,0 +1,3 @@
+[submodule "vendor/ruwen"]
+	path = vendor/ruwen
+	url = https://github.com/hunterhigh/ruwen-writing-system

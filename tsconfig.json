@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2023",
-    "lib": ["ES2023"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "allowImportingTsExtensions": true,
@@ -18,8 +19,19 @@
   "include": [
     "packages/**/*.ts",
     "apps/**/*.ts",
+    "apps/**/*.tsx",
+    "config/**/*.ts",
     "scripts/**/*.ts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "playwright.config.ts"
   ],
-  "exclude": ["node_modules", "vendor", "dist"]
+  "exclude": [
+    "node_modules",
+    "vendor",
+    "dist",
+    "**/.next",
+    "apps/web/next-env.d.ts",
+    "test-results",
+    "playwright-report"
+  ]
 }

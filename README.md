@@ -2,7 +2,7 @@
 
 将如文 5.0 写作系统做成多用户、可部署和可计费的网页产品。实施范围和验收以 [docs/PLAN.md](docs/PLAN.md) 为准。
 
-P0已经人工确认。P1/P2和P4数据库、后台worker、任务恢复与ZIP导入导出已实现。按2026-11-09用户要求，P3真实模型验证延期，暂不配置API；当前尚无可使用的网页或付费账户（P5/P6）。
+P1/P2/P4及审查修改已实现。P3改为公开上线前闸门，暂不配置API。P5已有本机HTTPS章节预览与安全基线，构思接入和安全设计全文核对仍待并行文档；尚未完成P5验收，也没有真实收费。预览启动与限制见[网页预览说明](docs/web-preview.md)。
 
 ## 本地验证
 
@@ -37,7 +37,7 @@ pnpm --filter cli dev chapter status --project ./my-novel --run <运行ID>
 pnpm --filter cli dev chapter cancel --project ./my-novel --run <运行ID>
 ```
 
-批准候选稿和记忆预览各需输入一次`APPROVE`。回车或EOF保留待批准状态；`resume`重新展示内容和批准提示。真实模型需去掉`--faux`，在本项目`.env`配置`REAL_MODEL=1`和`ANTHROPIC_API_KEY`；密钥不得放入聊天或Git。P2已验证范围见[P2报告](docs/reports/phase-2.md)，当前没有网页入口。
+批准候选稿和记忆预览各需输入一次`APPROVE`。回车或EOF保留待批准状态；`resume`重新展示内容和批准提示。真实模型仅在P3由人类配置并授权费用上限后启用；密钥不得放入聊天或Git。P2已验证范围见[P2报告](docs/reports/phase-2.md)。网页本机预览执行`pnpm dev`，不读取模型key，见[预览说明](docs/web-preview.md)。
 
 pnpm 11的`allowBuilds`保留三个原依赖安装脚本禁用；对已审阅的embedded-postgres平台包只启用重建所需符号链接的安装脚本。没有改变机器全局配置或创建操作系统用户。
 
@@ -52,7 +52,7 @@ pnpm 11的`allowBuilds`保留三个原依赖安装脚本禁用；对已审阅的
 | packages/pipeline | 章节状态机、双批准、取消和持久运行恢复接口 |
 | packages/db | P4：Drizzle/schema迁移、PostgresFS、文件历史与运行/费用事实 |
 | packages/billing | P6计费；仍为骨架 |
-| apps/cli / apps/worker / apps/web | CLI和pg-boss worker已实现；P5网页仍为骨架 |
+| apps/cli / apps/worker / apps/web | CLI/worker已实现；P5章节网页与安全基线可本机预览，完整验收待构思契约及安全设计 |
 | config | 经过静态目录核验的暂定模型路由、目录快照 |
 | fixtures | P3手写5.0演示项目；已验证可复制和faux链，真实验证待API密钥 |
 | docs | 计划、接口盘点、技术决定和阶段报告 |

@@ -16,6 +16,30 @@ import { queueExpirySeconds } from "../src/service.ts";
 import { fixture, waitStatus } from "./helpers.ts";
 
 const cleanups: (() => Promise<void>)[] = [];
+it("manual web return atomically updates run files, SQL status, steps and notifications", async () => {
+  const p = await fixture({}, true);
+  cleanups.push(() => p.service.stop());
+  const id = await p.service.enqueueChapter(p.fs, { chapter: 1 });
+  await waitStatus(p.service, id, "AWAITING_CANDIDATE_APPROVAL");
+  await p.service.returnCandidate(p.fs, id, "先调整人物选择");
+  expect((await loadRun(p.fs, id)).status).toBe("RETURNED");
+  expect(
+    (
+      await p.service.db.pool.query(
+        "SELECT status,finished_at FROM pipeline_runs WHERE id=$1",
+        [id],
+      )
+    ).rows[0],
+  ).toMatchObject({ status: "RETURNED", finished_at: expect.any(Date) });
+  expect(
+    (
+      await p.service.db.pool.query(
+        "SELECT status FROM pipeline_steps WHERE run_id=$1 AND step='RETURNED'",
+        [id],
+      )
+    ).rows[0]?.status,
+  ).toBe("completed");
+}, 30000);
 it("successful editor problems survive cancellation before pipeline report checkpoint with the real project UUID", async () => {
   let release = () => {};
   const gate = new Promise<void>((resolve) => {
@@ -229,10 +253,22 @@ it("role_runs persists the provider cacheRead/cacheWrite counters and additive m
   expect(rows.rows.some((row) => Number(row.cache_write_tokens) > 0)).toBe(
     true,
   );
+  const migrations = (
+    await p.service.db.pool.query(
+      "SELECT id,sha256 FROM ruwen_migrations ORDER BY id",
+    )
+  ).rows;
+  expect(migrations.map((row) => row.id)).toEqual(
+    expect.arrayContaining(["0001", "0002", "0100"]),
+  );
   await p.service.db.migrate();
   expect(
-    (await p.service.db.pool.query("SELECT id FROM ruwen_migrations")).rowCount,
-  ).toBe(2);
+    (
+      await p.service.db.pool.query(
+        "SELECT id,sha256 FROM ruwen_migrations ORDER BY id",
+      )
+    ).rows,
+  ).toEqual(migrations);
 }, 30000);
 afterEach(async () => {
   for (const fn of cleanups.splice(0)) await fn();

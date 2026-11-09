@@ -467,6 +467,8 @@ API 约定：
 - 生产在P3前只允许邀请码注册，真实收费默认关闭，服务端保护不能依靠隐藏按钮。
 - 构思页按`docs/contracts/ideation-service.md`接入，对方契约未推送时先做章节页。
 
+P5从第一天遵守人类追加的S1-1至S1-4：统一安全Markdown（禁HTML/图片、仅HTTPS链接并加三个rel保护、lint禁原始HTML注入）；CSP及安全响应头按人类安全设计3.3.4；资源ID接口含SSE/导出统一归属校验且每路由A→B为404测试，新增漏测令CI失败；所有应用状态变更CSRF，Cookie为HttpOnly/Secure/SameSite=Lax，登录IP与邮箱限流。`docs/security/SECURITY-DESIGN.md`由并行线程提交，收到后需核对全文，P5报告单列安全自查，不能以当前基线替代规范验收。
+
 验收：e2e全绿；阶段报告；**人工闸门**：提供可试用的预览环境，停下供人类试用。
 
 ### P6 计费

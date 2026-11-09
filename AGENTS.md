@@ -32,3 +32,10 @@ pnpm --filter web dev
 - 构思页面依据对方推送的`docs/contracts/ideation-service.md`接入；契约未到先做章节页面，不猜造服务接口。P6本线程只做计费界面和接入，账本、支付适配器、webhook由对方实现。
 - 新的大块工作开始前先拉取`origin/main`；共享`apps/worker/src/service.ts`和`packages/agents`只做增量改动，避免覆盖对方工作。
 - P3前：生产注册仅邀请码，真实收费开关默认关闭；不得因开发阶段使用faux或record/replay而视为闸门通过。
+
+## P5安全要求（2026-11-09人类补充）
+
+- 人类的`docs/security/SECURITY-DESIGN.md`由并行线程提交；收到后完整阅读，逐项落实第5节主线程S1-1至S1-4及3.3节第4条。在文档到达前不能声称按全文验收完成。
+- 用户与模型内容只通过统一SafeMarkdown组件显示：不允许原始HTML或图片，只允许HTTPS链接并加noopener noreferrer nofollow；lint禁止原始HTML注入。
+- HTTPS入口设置CSP与安全响应头。所有资源ID接口、SSE与导出统一requireOwnership，逐路由执行A→B返回404测试；新增路由漏测须使pnpm test/CI失败。
+- 所有应用状态变更校验CSRF；Cookie必须HttpOnly、Secure、SameSite=Lax；登录按IP及邮箱限流。P5阶段报告单列安全自查。

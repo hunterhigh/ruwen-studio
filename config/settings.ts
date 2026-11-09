@@ -17,6 +17,8 @@ export function runtimeSettings(): RuntimeSettings {
       settings.stream.pollIntervalMs,
       settings.stream.heartbeatMs,
       settings.stream.maxConnectionMs,
+      settings.preview.sessionHours,
+      ...Object.values(settings.security),
     ].every((value) => Number.isFinite(value) && value > 0) ||
     ![
       settings.release.p3GatePassed,
@@ -29,7 +31,9 @@ export function runtimeSettings(): RuntimeSettings {
     );
   return settings;
 }
-export function releasePolicy(env: NodeJS.ProcessEnv = process.env) {
+export function releasePolicy(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+) {
   const config = runtimeSettings().release;
   const p3GatePassed =
     env.P3_GATE_PASSED === "1" ||
@@ -44,7 +48,7 @@ export function releasePolicy(env: NodeJS.ProcessEnv = process.env) {
   };
 }
 export function assertRealChargingAllowed(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Readonly<Record<string, string | undefined>> = process.env,
 ) {
   if (!releasePolicy(env).realChargingEnabled)
     throw new Error("真实收费尚未开放：须先通过P3并明确启用收费开关");

@@ -1,0 +1,106 @@
+import { createHmac, randomBytes } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createServer } from "node:https";
+import { createRequire } from "node:module";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import type {
+  NextBundlerOptions,
+  NextServer,
+  NextServerOptions,
+} from "next/dist/server/next.js";
+import { generate } from "selfsigned";
+import { securityHeaders } from "../src/server/security.ts";
+
+const root = fileURLToPath(new URL("../../../", import.meta.url)),
+  directory = path.join(root, ".local/tls");
+const development = process.argv.includes("--dev");
+Reflect.set(
+  process.env,
+  "NODE_ENV",
+  development ? "development" : "production",
+);
+process.env.RUWEN_WORKSPACE_ROOT = root;
+process.env.NEXT_TELEMETRY_DISABLED = "1";
+process.env.RUWEN_IP_PROOF_SECRET ??= randomBytes(32).toString("hex");
+const port = Number(process.env.PORT ?? 3000),
+  keyFile =
+    process.env.TLS_KEY_FILE ?? path.join(directory, "localhost-key.pem"),
+  certFile =
+    process.env.TLS_CERT_FILE ?? path.join(directory, "localhost-cert.pem");
+if (development) {
+  await mkdir(directory, { recursive: true });
+  try {
+    await readFile(keyFile);
+    await readFile(certFile);
+  } catch {
+    const certificate = await generate(
+      [{ name: "commonName", value: "localhost" }],
+      {
+        keySize: 2048,
+        algorithm: "sha256",
+        extensions: [
+          {
+            name: "subjectAltName",
+            altNames: [
+              { type: 2, value: "localhost" },
+              { type: 7, ip: "127.0.0.1" },
+            ],
+          },
+        ],
+      },
+    );
+    await writeFile(keyFile, certificate.private, { mode: 0o600 });
+    await writeFile(certFile, certificate.cert);
+  }
+}
+const next = createRequire(import.meta.url)("next") as (
+  options: NextServerOptions & NextBundlerOptions,
+) => NextServer;
+const app = next({
+  webpack: true,
+  dev: development,
+  dir: fileURLToPath(new URL("../", import.meta.url)),
+  hostname: "localhost",
+  port,
+});
+await app.prepare();
+const handle = app.getRequestHandler(),
+  upgrade = app.getUpgradeHandler();
+const proof = process.env.RUWEN_IP_PROOF_SECRET;
+const prepare = (request: import("node:http").IncomingMessage) => {
+  const ip = request.socket.remoteAddress ?? "unknown";
+  request.headers["x-ruwen-client-ip"] = ip;
+  request.headers["x-ruwen-ip-proof"] = createHmac("sha256", proof)
+    .update(ip)
+    .digest("hex");
+  request.headers["x-forwarded-for"] = ip;
+  const nonce = randomBytes(24).toString("base64");
+  const headers = securityHeaders(nonce, development);
+  request.headers["content-security-policy"] =
+    headers["Content-Security-Policy"];
+  request.headers["x-nonce"] = nonce;
+  return headers;
+};
+const server = createServer(
+  { key: await readFile(keyFile), cert: await readFile(certFile) },
+  (request, response) => {
+    for (const [name, value] of Object.entries(prepare(request)))
+      response.setHeader(name, value);
+    void handle(request, response);
+  },
+);
+server.on("upgrade", (request, socket, head) => {
+  prepare(request);
+  void upgrade(request, socket, head);
+});
+server.listen(port, "127.0.0.1", () =>
+  console.log(`如文工作室：https://localhost:${port}（仅本机HTTPS）`),
+);
+const stop = () => {
+  server.close(() => {
+    void app.close().then(() => process.exit(0));
+  });
+};
+process.once("SIGINT", stop);
+process.once("SIGTERM", stop);

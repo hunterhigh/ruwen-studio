@@ -29,6 +29,13 @@
     "inviteOnly": true
   },
   "preview": { "invitationCode": "RUWEN-PREVIEW", "sessionHours": 24 },
+  "security": {
+    "loginWindowSeconds": 600,
+    "loginIpLimit": 10,
+    "loginEmailLimit": 5,
+    "csrfHours": 24,
+    "maxUploadBytes": 20971520
+  },
   "stream": {
     "pollIntervalMs": 250,
     "heartbeatMs": 15000,

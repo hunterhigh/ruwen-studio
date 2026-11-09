@@ -31,10 +31,13 @@ export function forwardStream(
           event.type === "text_delta" &&
           options.characterDelayMs !== undefined
         ) {
+          let deadline = performance.now();
           for (const char of event.delta) {
             options.signal?.throwIfAborted();
-            if (options.characterDelayMs > 0)
-              await delay(options.characterDelayMs, undefined, {
+            deadline += Math.max(0, options.characterDelayMs);
+            const remaining = deadline - performance.now();
+            if (remaining > 0)
+              await delay(remaining, undefined, {
                 signal: options.signal,
               });
             output.push({ ...event, delta: char });

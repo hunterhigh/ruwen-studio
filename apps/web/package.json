@@ -3,6 +3,11 @@
   "private": true,
   "type": "module",
   "name": "web",
+  "scripts": {
+    "dev": "node scripts/server.ts --dev",
+    "build": "next build --webpack",
+    "start": "node scripts/server.ts"
+  },
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.7.18",
     "@ruwen/agents": "workspace:*",
@@ -13,6 +18,11 @@
     "next": "16.4.5",
     "nodemailer": "10.4.0",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "react-markdown": "10.1.0",
+    "rehype-sanitize": "6.0.0",
+    "remark-gfm": "4.0.1",
+    "selfsigned": "5.5.0",
+    "worker": "workspace:*"
   }
 }

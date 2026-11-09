@@ -1,6 +1,7 @@
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  esbuild: { jsx: "automatic" },
   test: {
     globalSetup: ["./scripts/test-postgres.ts"],
     include: ["packages/**/*.test.ts", "apps/**/*.test.ts"],

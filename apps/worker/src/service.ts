@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   assemblePrompt,
   authorizedResourceInputs,
+  createFauxRuntime,
   type Data,
   DEFAULT_ROLE_TIMEOUT_MS,
   type ModelRuntime,
@@ -34,12 +35,14 @@ import {
   loadRun,
   normalizeChapter,
   type PipelineContext,
+  returnCandidate as returnChapterCandidate,
   runPath,
   startChapter,
   type UserApproval,
 } from "@ruwen/pipeline";
 import { PgBoss } from "pg-boss";
 import { runtimeSettings } from "../../../config/settings.ts";
+import { streamSink } from "./stream-events.ts";
 
 type Kind =
   | "chapter"
@@ -348,6 +351,15 @@ export class WorkerService {
     });
     return id;
   }
+  async returnCandidate(fs: PostgresFS, id: string, reason: string) {
+    const run = await loadRun(fs, id);
+    return returnChapterCandidate(fs, id, reason, {
+      projectKey: run.projectKey,
+      projectId: fs.projectId,
+      runtime: createFauxRuntime(),
+      onCheckpoint: (tx, next) => this.checkpoint(tx, next),
+    });
+  }
   private async checkpoint(fs: ProjectFS, run: ChapterRun) {
     if (!(fs instanceof PostgresFS))
       throw new Error("Durable checkpoint requires PostgresFS");
@@ -522,6 +534,7 @@ export class WorkerService {
     let polling: Promise<void> | undefined;
     let locked = false;
     let released = false;
+    let stream: ReturnType<typeof streamSink> | undefined;
     try {
       // Session lock serializes a project's jobs without holding an SQL transaction over model I/O.
       const lock = await connection.query<{ locked: boolean }>(
@@ -565,6 +578,12 @@ export class WorkerService {
       )
         throw new Error("Queue task kind mismatch");
       this.active.set(task.runId, control);
+      stream = streamSink(
+        this.db,
+        fs.projectId,
+        task.runId,
+        this.options.onError,
+      );
       if (stored.cancel_requested) control.abort();
       const poll = () => {
         if (polling) return;
@@ -590,6 +609,7 @@ export class WorkerService {
           this.options.runtime(),
         runId: task.runId,
         signal,
+        onDelta: (delta, role) => stream?.push(delta, role),
         ...(this.options.roleTimeoutMs === undefined
           ? {}
           : { timeoutMs: this.scheduling.roleTimeoutMs }),
@@ -680,6 +700,7 @@ export class WorkerService {
       }
       throw new Error("Unknown queue task kind");
     } finally {
+      await stream?.finish();
       if (timer) clearInterval(timer);
       await polling;
       if (this.active.get(task.runId) === control)

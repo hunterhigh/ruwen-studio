@@ -26,6 +26,9 @@ export const users = pgTable("users", {
   name: text("name").notNull().default(""),
   createdAt: time("created_at"),
   locale: text("locale").notNull().default("zh-CN"),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  image: text("image"),
+  updatedAt: time("updated_at"),
 });
 export const sessions = pgTable("sessions", {
   id: id(),
@@ -243,4 +246,90 @@ export const roleCostEvents = pgTable("role_cost_events", {
     .references(() => roleRuns.id),
   costUsd: numeric("cost_usd", { precision: 20, scale: 10 }).notNull(),
   createdAt: time("created_at"),
+});
+// Web authentication keeps the P4 legacy session/account tables untouched.
+export const authSessions = pgTable("auth_sessions", {
+  id: id(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: time("created_at"),
+  updatedAt: time("updated_at"),
+});
+export const authAccounts = pgTable(
+  "auth_accounts",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at", {
+      withTimezone: true,
+    }),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
+      withTimezone: true,
+    }),
+    scope: text("scope"),
+    password: text("password"),
+    createdAt: time("created_at"),
+    updatedAt: time("updated_at"),
+  },
+  (table) => [
+    uniqueIndex("auth_accounts_provider_id_account_id_key").on(
+      table.providerId,
+      table.accountId,
+    ),
+  ],
+);
+export const authVerifications = pgTable("auth_verifications", {
+  id: id(),
+  identifier: text("identifier").notNull(),
+  value: text("value").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: time("created_at"),
+  updatedAt: time("updated_at"),
+});
+export const webInvitations = pgTable("web_invitations", {
+  id: id(),
+  tokenHash: text("token_hash").notNull().unique(),
+  maxUses: integer("max_uses").notNull(),
+  uses: integer("uses").notNull().default(0),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  createdAt: time("created_at"),
+});
+export const webInviteGrants = pgTable("web_invite_grants", {
+  email: text("email").primaryKey(),
+  invitationId: uuid("invitation_id")
+    .notNull()
+    .references(() => webInvitations.id),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: time("created_at"),
+});
+export const webRunEvents = pgTable("web_run_events", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  runId: uuid("run_id")
+    .notNull()
+    .references(() => pipelineRuns.id, { onDelete: "cascade" }),
+  roleId: text("role_id").notNull(),
+  delta: text("delta").notNull(),
+  createdAt: time("created_at"),
+});
+export const webRateLimits = pgTable("web_rate_limits", {
+  keyHash: text("key_hash").primaryKey(),
+  windowStartedAt: timestamp("window_started_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  attempts: bigint("attempts", { mode: "number" }).notNull().default(1),
 });

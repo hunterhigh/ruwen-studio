@@ -9,7 +9,8 @@ import { runtimeSettings } from "../../../config/settings.ts";
 import { WorkerService } from "./service.ts";
 
 const env = fileURLToPath(new URL("../../../.env", import.meta.url));
-if (existsSync(env)) process.loadEnvFile(env);
+if (process.env.RUWEN_SKIP_ENV_FILE !== "1" && existsSync(env))
+  process.loadEnvFile(env);
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
 if (!(MODEL_MODES as readonly string[]).includes(process.env.MODEL_MODE ?? ""))
   throw new Error("MODEL_MODE must explicitly be faux, real, record or replay");
@@ -22,8 +23,12 @@ const modelRuntime = (request?: Data) =>
       typeof request?.simulation === "string"
         ? request.simulation
         : (process.env.FAUX_SCENARIO ?? runtimeSettings().faux.scenario),
+    ...(process.env.FAUX_CHARACTER_DELAY_MS === undefined
+      ? {}
+      : { characterDelayMs: Number(process.env.FAUX_CHARACTER_DELAY_MS) }),
   });
 const worker = new WorkerService(process.env.DATABASE_URL, {
+  ...(process.env.WORKER_QUEUE ? { queue: process.env.WORKER_QUEUE } : {}),
   concurrency: Number(process.env.WORKER_CONCURRENCY ?? execution.concurrency),
   ...(process.env.ROLE_TIMEOUT_MS === undefined
     ? {}

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   authorizedResourceInputs,
   type Data,
@@ -39,6 +39,7 @@ export type RunStatus =
   | "FAILED_PRECONDITION"
   | "FAILED"
   | "CANCELLED";
+export class InterruptedRoleError extends RoleExecutionError {}
 export interface ChapterRun {
   id: string;
   projectKey: string;
@@ -62,6 +63,7 @@ export interface ChapterRun {
   returnReason?: string;
   error?: string;
   failedRole?: RoleId;
+  requestSha256?: string;
 }
 export interface ChapterRequest {
   chapter: string | number;
@@ -72,6 +74,15 @@ export interface ChapterRequest {
 }
 export interface PipelineContext extends Omit<RoleContext, "fs"> {
   onProgress?: (run: ChapterRun) => void;
+  runId?: string;
+  deferMemory?: boolean;
+  executeRole?: (
+    id: RoleId,
+    input: Data,
+    ctx: RoleContext,
+    run: ChapterRun,
+  ) => Promise<RoleResult>;
+  onCheckpoint?: (fs: ProjectFS, run: ChapterRun) => Promise<void>;
 }
 export interface UserApproval {
   confirmed: true;
@@ -126,6 +137,21 @@ export function runPath(id: string): string {
   return `${DIRECTORY}/${id}/run.json`;
 }
 const runDirectory = (id: string) => runPath(id).slice(0, -"/run.json".length);
+export function inputDigest(value: unknown): string {
+  const ordered = (v: unknown): unknown =>
+    Array.isArray(v)
+      ? v.map(ordered)
+      : v !== null && typeof v === "object"
+        ? Object.fromEntries(
+            Object.entries(v)
+              .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+              .map(([k, item]) => [k, ordered(item)]),
+          )
+        : v;
+  return createHash("sha256")
+    .update(JSON.stringify(ordered(value)))
+    .digest("hex");
+}
 export async function loadRun(fs: ProjectFS, id: string): Promise<ChapterRun> {
   return (await parse(fs, runPath(id))) as unknown as ChapterRun;
 }
@@ -154,8 +180,30 @@ async function checkpoint(
   ctx: PipelineContext,
 ): Promise<void> {
   ensureLive(ctx.signal);
+  if (run.status === status) return;
+  const sequence: RunStatus[] = [
+    "REQUESTED",
+    "READINESS_OK",
+    "PACKET_COMPILED",
+    "AUTHOR_DONE",
+    "READER_DONE",
+    "EDITOR_DONE",
+    "PLOT_CHECKED",
+    "REALITY_CHECKED",
+    "AWAITING_CANDIDATE_APPROVAL",
+  ];
+  if (
+    sequence.includes(status) &&
+    sequence.indexOf(run.status) >= sequence.indexOf(status)
+  )
+    return;
   move(run, status);
-  await write(fs, runPath(run.id), run);
+  if (ctx.onCheckpoint)
+    await fs.transaction(async (tx) => {
+      await write(tx, runPath(run.id), run);
+      await ctx.onCheckpoint?.(tx, run);
+    });
+  else await write(fs, runPath(run.id), run);
   ctx.onProgress?.(structuredClone(run));
 }
 async function call(
@@ -168,7 +216,9 @@ async function call(
   ensureLive(ctx.signal);
   let result: RoleResult;
   try {
-    result = await runRole(id, input, { ...ctx, fs });
+    result = ctx.executeRole
+      ? await ctx.executeRole(id, input, { ...ctx, fs }, run)
+      : await runRole(id, input, { ...ctx, fs });
   } catch (error) {
     run.failedRole = id;
     if (error instanceof RoleExecutionError && error.partial)
@@ -218,7 +268,12 @@ async function stopOnError(
         ? "FAILED_PRECONDITION"
         : "FAILED";
   move(run, status);
-  await write(fs, runPath(run.id), run);
+  if (ctx.onCheckpoint)
+    await fs.transaction(async (tx) => {
+      await write(tx, runPath(run.id), run);
+      await ctx.onCheckpoint?.(tx, run);
+    });
+  else await write(fs, runPath(run.id), run);
   ctx.onProgress?.(structuredClone(run));
   return run;
 }
@@ -239,14 +294,38 @@ export async function startChapter(
   request: ChapterRequest,
   context: PipelineContext,
 ): Promise<ChapterRun> {
-  const id = randomUUID();
+  const id = context.runId ?? randomUUID();
+  const prior =
+    context.runId && (await fs.exists(runPath(id)))
+      ? await loadRun(fs, id)
+      : undefined;
+  if (
+    prior &&
+    (prior.projectKey !== context.projectKey ||
+      prior.requestSha256 !== inputDigest(request))
+  )
+    throw new Error("Run identity or request changed");
+  if (
+    prior &&
+    ![
+      "REQUESTED",
+      "READINESS_OK",
+      "PACKET_COMPILED",
+      "AUTHOR_DONE",
+      "READER_DONE",
+      "EDITOR_DONE",
+      "PLOT_CHECKED",
+      "REALITY_CHECKED",
+    ].includes(prior.status)
+  )
+    return prior;
   const control = new AbortController();
   active.set(`${fs.root}:${id}`, { control, projectKey: context.projectKey });
   const signal = context.signal
     ? AbortSignal.any([control.signal, context.signal])
     : control.signal;
   const ctx = { ...context, signal };
-  const run: ChapterRun = {
+  const run: ChapterRun = prior ?? {
     id,
     projectKey: ctx.projectKey,
     chapter: normalizeChapter(request.chapter),
@@ -259,8 +338,16 @@ export async function startChapter(
     roles: {},
     costTotal: 0,
     events: [{ status: "REQUESTED", time: new Date().toISOString() }],
+    requestSha256: inputDigest(request),
   };
-  await write(fs, runPath(id), run);
+  if (!prior) {
+    if (ctx.onCheckpoint)
+      await fs.transaction(async (tx) => {
+        await write(tx, runPath(id), run);
+        await ctx.onCheckpoint?.(tx, run);
+      });
+    else await write(fs, runPath(id), run);
+  }
   ctx.onProgress?.(structuredClone(run));
   try {
     ensureLive(signal);
@@ -285,14 +372,22 @@ export async function startChapter(
     const manifest =
       request.manifest ?? "authoring-ruwen-v5/manifests/author-manifest.json";
     run.paths.manifest = manifest;
-    if (await fs.exists(run.target))
+    if (run.status === "REQUESTED" && (await fs.exists(run.target)))
       run.targetBeforeSha256 = await fs.sha256(run.target);
     await checkpoint(fs, run, "READINESS_OK", ctx);
-    const compiled = await packet.compilePacket(fs, manifest);
-    run.paths.source_packet = compiled.output;
-    run.paths.packet = `${runDirectory(id)}/packet.md`;
-    await fs.write(run.paths.packet, await fs.read(compiled.output));
-    run.packetSha256 = await fs.sha256(run.paths.packet);
+    if (!run.packetSha256) {
+      const compiled = await packet.compilePacket(fs, manifest);
+      run.paths.source_packet = compiled.output;
+      run.paths.packet = `${runDirectory(id)}/packet.md`;
+      await fs.write(run.paths.packet, await fs.read(compiled.output));
+      run.packetSha256 = await fs.sha256(run.paths.packet);
+    } else if (
+      !run.paths.packet ||
+      !run.paths.source_packet ||
+      (await fs.sha256(run.paths.packet)) !== run.packetSha256 ||
+      (await fs.sha256(run.paths.source_packet)) !== run.packetSha256
+    )
+      throw new Error("Author packet changed while run was interrupted");
     const promisesPath = `${runDirectory(id)}/promises.json`;
     let lockedEvents = request.lockedEvents ?? [];
     let lockedOrder = request.lockedOrder ?? [];
@@ -323,7 +418,7 @@ export async function startChapter(
       fs,
       run,
       "xiaoshuo-zuozhe",
-      { packet: await text(fs, run.paths.packet) },
+      { packet: await text(fs, String(run.paths.packet)) },
       ctx,
     );
     if (typeof author.output !== "string")
@@ -543,55 +638,97 @@ export async function approveCandidate(
       );
       move(run, "CANDIDATE_APPROVED");
       await write(tx, runPath(id), run);
+      await ctx.onCheckpoint?.(tx, run);
     });
     ctx.onProgress?.(structuredClone(run));
-    try {
-      const prose = await text(fs, run.target);
-      const resources = await authorizedResourceInputs(
-        { ...ctx, fs },
-        "jiyi-weihuyuan",
-      );
-      const memory = asData(
-        (
-          await call(
-            fs,
-            run,
-            "jiyi-weihuyuan",
-            { approved_prose: prose, resources },
-            ctx,
-          )
-        ).output,
-      );
-      const patches = Array.isArray(memory.patches)
-        ? memory.patches.filter(object)
-        : [];
-      const allowed = new Map(
-        resources.map((resource) => [String(resource.path), resource.sha256]),
-      );
-      for (const patch of patches)
-        if (
-          typeof patch.path !== "string" ||
-          typeof patch.new_content !== "string" ||
-          !allowed.has(fs.path(patch.path)) ||
-          patch.base_sha256 !== allowed.get(fs.path(patch.path)) ||
-          patch.base_sha256 !== (await fs.sha256(patch.path))
+    if (ctx.deferMemory) return run;
+    return await generateMemoryPreview(fs, id, ctx);
+  } finally {
+    if (active.get(key)?.control === control) active.delete(key);
+  }
+}
+export async function generateMemoryPreview(
+  fs: ProjectFS,
+  id: string,
+  context: PipelineContext,
+): Promise<ChapterRun> {
+  const run = await ownedRun(fs, id, context);
+  if (run.status === "AWAITING_MEMORY_APPROVAL") return run;
+  if (!["CANDIDATE_APPROVED", "MEMORY_PREVIEW_READY"].includes(run.status))
+    throw new Error("Approved chapter is not awaiting memory generation");
+  const control = new AbortController();
+  const key = `${fs.root}:${id}`;
+  active.set(key, { control, projectKey: context.projectKey });
+  const ctx = {
+    ...context,
+    signal: context.signal
+      ? AbortSignal.any([context.signal, control.signal])
+      : control.signal,
+  };
+  try {
+    const prose = await text(fs, run.target);
+    const resources = await authorizedResourceInputs(
+      { ...ctx, fs },
+      "jiyi-weihuyuan",
+    );
+    const memory = asData(
+      (
+        await call(
+          fs,
+          run,
+          "jiyi-weihuyuan",
+          { approved_prose: prose, resources },
+          ctx,
         )
-          throw new Error("Memory role preview is based on stale resources");
-      run.paths.memory_preview = await createMemoryPreview(
-        fs,
+      ).output,
+    );
+    const patches = Array.isArray(memory.patches)
+      ? memory.patches.filter(object)
+      : [];
+    const allowed = new Map(
+      resources.map((resource) => [String(resource.path), resource.sha256]),
+    );
+    for (const patch of patches)
+      if (
+        typeof patch.path !== "string" ||
+        typeof patch.new_content !== "string" ||
+        !allowed.has(fs.path(patch.path)) ||
+        patch.base_sha256 !== allowed.get(fs.path(patch.path)) ||
+        patch.base_sha256 !== (await fs.sha256(patch.path))
+      )
+        throw new Error("Memory role preview is based on stale resources");
+    run.paths.memory_preview = await fs.transaction(async (tx) => {
+      const expected = `authoring-ruwen-v5/reports/memory-${id}.json`;
+      if (await tx.exists(expected)) {
+        const existing = await parse(tx, expected);
+        const canonical = patches.map((p) => ({
+          path: tx.path(String(p.path)),
+          base_sha256: p.base_sha256,
+          new_content: p.new_content,
+        }));
+        if (
+          existing.kind !== "memory_change_preview" ||
+          inputDigest(existing.patches) !== inputDigest(canonical) ||
+          existing.registry_sha256 !== (await tx.sha256("治理/资源注册表.json"))
+        )
+          throw new Error("Existing memory preview changed or became stale");
+        return expected;
+      }
+      return createMemoryPreview(
+        tx,
         `memory-${id}`,
         patches.map((p) => ({
           path: String(p.path),
           new_content: String(p.new_content),
         })),
       );
-      run.memoryPreviewSha256 = await fs.sha256(run.paths.memory_preview);
-      await checkpoint(fs, run, "MEMORY_PREVIEW_READY", ctx);
-      await checkpoint(fs, run, "AWAITING_MEMORY_APPROVAL", ctx);
-      return run;
-    } catch (error) {
-      return stopOnError(fs, run, error, ctx);
-    }
+    });
+    run.memoryPreviewSha256 = await fs.sha256(run.paths.memory_preview);
+    await checkpoint(fs, run, "MEMORY_PREVIEW_READY", ctx);
+    await checkpoint(fs, run, "AWAITING_MEMORY_APPROVAL", ctx);
+    return run;
+  } catch (error) {
+    return stopOnError(fs, run, error, ctx);
   } finally {
     if (active.get(key)?.control === control) active.delete(key);
   }
@@ -625,8 +762,10 @@ export async function approveMemory(
     );
     await commitMemoryPreview(tx, preview, String(event.event));
     move(run, "MEMORY_COMMITTED");
+    await ctx.onCheckpoint?.(tx, run);
     move(run, "DONE");
     await write(tx, runPath(id), run);
+    await ctx.onCheckpoint?.(tx, run);
     return run;
   });
   ctx.onProgress?.(structuredClone(committed));
@@ -654,6 +793,7 @@ export async function cancelRun(
     if (current.status !== "CANCELLED") {
       move(current, "CANCELLED");
       await write(tx, runPath(id), current);
+      await ctx.onCheckpoint?.(tx, current);
     }
     return current;
   });
@@ -675,6 +815,7 @@ export async function returnCandidate(
     ensureLive(ctx.signal);
     move(run, "RETURNED");
     await write(tx, runPath(id), run);
+    await ctx.onCheckpoint?.(tx, run);
     return run;
   });
   ctx.onProgress?.(structuredClone(returned));

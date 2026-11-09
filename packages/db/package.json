@@ -2,5 +2,14 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "name": "@ruwen/db"
+  "name": "@ruwen/db",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@ruwen/core": "workspace:*",
+    "drizzle-orm": "0.45.4",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
+  }
 }

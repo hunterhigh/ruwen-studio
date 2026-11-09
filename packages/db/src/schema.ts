@@ -1,0 +1,240 @@
+import { sql } from "drizzle-orm";
+import {
+  bigint,
+  boolean,
+  customType,
+  integer,
+  jsonb,
+  numeric,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
+
+const time = (name: string) =>
+  timestamp(name, { withTimezone: true }).notNull().defaultNow();
+const id = () => uuid("id").primaryKey().defaultRandom();
+const bytes = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
+export const users = pgTable("users", {
+  id: id(),
+  email: text("email").notNull().unique(),
+  name: text("name").notNull().default(""),
+  createdAt: time("created_at"),
+  locale: text("locale").notNull().default("zh-CN"),
+});
+export const sessions = pgTable("sessions", {
+  id: id(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: time("created_at"),
+});
+export const accounts = pgTable(
+  "accounts",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    accountId: text("account_id").notNull(),
+  },
+  (t) => [uniqueIndex("accounts_provider_account").on(t.provider, t.accountId)],
+);
+export const projects = pgTable("projects", {
+  id: id(),
+  ownerId: uuid("owner_id")
+    .notNull()
+    .references(() => users.id),
+  projectKey: text("project_key").notNull(),
+  title: text("title").notNull(),
+  createdAt: time("created_at"),
+  upstreamVersion: text("upstream_version").notNull().default("5.0.0"),
+});
+export const projectFiles = pgTable(
+  "project_files",
+  {
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    path: text("path").notNull(),
+    content: bytes("content").notNull(),
+    sha256: text("sha256").generatedAlwaysAs(
+      sql`encode(sha256(content), 'hex')`,
+    ),
+    size: integer("size").generatedAlwaysAs(sql`octet_length(content)`),
+    updatedAt: time("updated_at"),
+  },
+  (t) => [primaryKey({ columns: [t.projectId, t.path] })],
+);
+export const projectFileHistory = pgTable("project_file_history", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  path: text("path").notNull(),
+  sha256: text("sha256").notNull(),
+  content: bytes("content").notNull(),
+  changedAt: time("changed_at"),
+  causeEventId: text("cause_event_id"),
+});
+export const approvalEvents = pgTable(
+  "approval_events",
+  {
+    id: text("id").notNull(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    eventPath: text("event_path").notNull(),
+    action: text("action").notNull(),
+    targetPath: text("target_path").notNull(),
+    targetSha256: text("target_sha256").notNull(),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: time("created_at"),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.projectId, t.id] }),
+    uniqueIndex("approval_event_path").on(t.projectId, t.eventPath),
+  ],
+);
+export const pipelineRuns = pgTable("pipeline_runs", {
+  id: uuid("id").primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  chapter: text("chapter"),
+  status: text("status").notNull(),
+  request: jsonb("request").notNull(),
+  cancelRequested: boolean("cancel_requested").notNull().default(false),
+  createdAt: time("created_at"),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+});
+export const pipelineSteps = pgTable(
+  "pipeline_steps",
+  {
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => pipelineRuns.id, { onDelete: "cascade" }),
+    step: text("step").notNull(),
+    status: text("status").notNull(),
+    inputRef: jsonb("input_ref"),
+    outputRef: jsonb("output_ref"),
+    error: text("error"),
+    startedAt: time("started_at"),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [primaryKey({ columns: [t.runId, t.step] })],
+);
+export const prompts = pgTable("prompts", {
+  sha256: text("sha256").primaryKey(),
+  content: text("content").notNull(),
+});
+export const roleRuns = pgTable(
+  "role_runs",
+  {
+    id: id(),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => pipelineRuns.id, { onDelete: "cascade" }),
+    roleId: text("role_id").notNull(),
+    status: text("status").notNull(),
+    inputSha256: text("input_sha256").notNull(),
+    model: text("model"),
+    promptSha256: text("prompt_sha256").references(() => prompts.sha256),
+    result: jsonb("result"),
+    transcript: jsonb("transcript"),
+    usage: jsonb("usage"),
+    costUsd: numeric("cost_usd", { precision: 20, scale: 10 }),
+    startedAt: time("started_at"),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("role_run_once").on(t.runId, t.roleId)],
+);
+export const ideationMessages = pgTable("ideation_messages", {
+  id: id(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  sessionId: uuid("session_id").notNull(),
+  role: text("role").notNull(),
+  content: jsonb("content").notNull(),
+  createdAt: time("created_at"),
+});
+export const previews = pgTable("previews", {
+  id: id(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  payload: jsonb("payload").notNull(),
+  status: text("status").notNull().default("pending"),
+  createdAt: time("created_at"),
+});
+export const creditLedger = pgTable(
+  "credit_ledger",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    deltaCredits: bigint("delta_credits", { mode: "bigint" }).notNull(),
+    reason: text("reason").notNull(),
+    refType: text("ref_type").notNull(),
+    refId: text("ref_id").notNull(),
+    createdAt: time("created_at"),
+  },
+  (t) => [
+    uniqueIndex("credit_ledger_ref").on(t.userId, t.reason, t.refType, t.refId),
+  ],
+);
+export const creditReservations = pgTable("credit_reservations", {
+  id: id(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+  runId: uuid("run_id")
+    .notNull()
+    .references(() => pipelineRuns.id),
+  amount: bigint("amount", { mode: "bigint" }).notNull(),
+  status: text("status").notNull(),
+  createdAt: time("created_at"),
+});
+export const subscriptions = pgTable("subscriptions", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id),
+  provider: text("provider").notNull(),
+  externalId: text("external_id").notNull(),
+  plan: text("plan").notNull(),
+  status: text("status").notNull(),
+  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+});
+export const paymentEvents = pgTable(
+  "payment_events",
+  {
+    provider: text("provider").notNull(),
+    externalEventId: text("external_event_id").notNull(),
+    payload: jsonb("payload").notNull(),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+  },
+  (t) => [primaryKey({ columns: [t.provider, t.externalEventId] })],
+);
+// Actual charging is P6; P4 records each completed role cost once for settlement.
+export const roleCostEvents = pgTable("role_cost_events", {
+  roleRunId: uuid("role_run_id")
+    .primaryKey()
+    .references(() => roleRuns.id),
+  costUsd: numeric("cost_usd", { precision: 20, scale: 10 }).notNull(),
+  createdAt: time("created_at"),
+});

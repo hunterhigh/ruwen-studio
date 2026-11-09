@@ -3,6 +3,7 @@ export {
   commitMemoryPreview,
   createMemoryPreview,
 } from "./approval/memory-preview.ts";
+export { exportProjectZip, importProjectZip } from "./archive.ts";
 export * as checks from "./checks/index.ts";
 export { LocalDirFS } from "./fs/local-dir-fs.ts";
 export { AlreadyExists, type ProjectFS, UnsafePath } from "./fs/project-fs.ts";

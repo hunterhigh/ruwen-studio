@@ -5,6 +5,9 @@ packages:
 minimumReleaseAge: 1440
 
 allowBuilds:
+  '@embedded-postgres/windows-x64': true
+  '@embedded-postgres/linux-x64': true
+  '@embedded-postgres/darwin-arm64': true
   '@google/genai': false
   esbuild: false
   protobufjs: false

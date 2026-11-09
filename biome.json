@@ -1,6 +1,8 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.5/schema.json",
-  "files": { "includes": ["**", "!vendor", "!pnpm-lock.yaml", "!fixtures"] },
+  "files": {
+    "includes": ["**", "!vendor", "!pnpm-lock.yaml", "!fixtures", "!.local"]
+  },
   "formatter": { "indentStyle": "space", "indentWidth": 2 },
   "linter": { "enabled": true, "rules": { "recommended": true } }
 }

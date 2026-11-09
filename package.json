@@ -13,6 +13,8 @@
     "core": "node packages/core/bin/ruwen-core.ts",
     "demo:create": "node scripts/create-demo.ts",
     "benchmark:real": "node scripts/benchmark-real.ts",
+    "db:dev": "node scripts/dev-postgres.ts",
+    "demo:db": "node scripts/demo-db.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:upstream": "python -I -B scripts/verify-upstream.py"
@@ -20,6 +22,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.4.5",
     "@types/node": "24.10.1",
+    "embedded-postgres": "18.6.0-beta.19",
     "typescript": "5.9.3",
     "vitest": "4.0.18"
   }

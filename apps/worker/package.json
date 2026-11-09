@@ -2,5 +2,16 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "name": "worker"
+  "name": "worker",
+  "exports": "./src/service.ts",
+  "scripts": {
+    "dev": "node src/main.ts"
+  },
+  "dependencies": {
+    "@ruwen/agents": "workspace:*",
+    "@ruwen/core": "workspace:*",
+    "@ruwen/db": "workspace:*",
+    "@ruwen/pipeline": "workspace:*",
+    "pg-boss": "12.38.1"
+  }
 }

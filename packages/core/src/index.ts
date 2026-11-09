@@ -13,6 +13,26 @@ export * as candidateProblems from "./ledgers/candidate-problems.ts";
 export * as ledgers from "./ledgers/index.ts";
 export * as packet from "./packet/index.ts";
 export * as registry from "./registry/index.ts";
+export {
+  assertPublicArtifact,
+  migrateProjectPrompts,
+  publicRoleResult,
+  publicTranscript,
+} from "./security/artifacts.ts";
+export {
+  assertImportedMaterial,
+  assertInputLimits,
+  assertMaterialText,
+  securityLimits,
+} from "./security/input.ts";
+export {
+  LeakDetector,
+  type LeakKind,
+  normalizeSecurityText,
+  PROMPT_OVERLAP_LENGTH,
+  type SecurityEvent,
+  type SecurityEventKind,
+} from "./security/leaks.ts";
 export * as state from "./state/index.ts";
 export {
   applyEditorialEdits,

@@ -259,7 +259,7 @@ it("role_runs persists the provider cacheRead/cacheWrite counters and additive m
     )
   ).rows;
   expect(migrations.map((row) => row.id)).toEqual(
-    expect.arrayContaining(["0001", "0002", "0100"]),
+    expect.arrayContaining(["0001", "0002", "0003", "0100"]),
   );
   await p.service.db.migrate();
   expect(

@@ -3,6 +3,7 @@ import { readdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { securityNote } from "../security/notes.ts";
 import type { RoleId, RoleSpec } from "../types.ts";
 
 export const PLUGIN = "01-完整插件/ruwen-xiezuo-xitong";
@@ -21,9 +22,12 @@ const conceptual: RoleId[] = [
 ];
 export const skillRoot = (id: RoleId) =>
   `${PLUGIN}/skills/${conceptual.includes(id) ? "ruwen-gushi-gousi" : "ruwen-zhangjie-xiezuo"}`;
-function references(root: string): string[] {
+function references(
+  root: string,
+  upstreamRoot = defaultUpstreamRoot,
+): string[] {
   const walk = (relative: string): string[] =>
-    readdirSync(path.join(defaultUpstreamRoot, root, "references", relative), {
+    readdirSync(path.join(upstreamRoot, root, "references", relative), {
       withFileTypes: true,
     })
       .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
@@ -40,7 +44,10 @@ function references(root: string): string[] {
       });
   return walk("");
 }
-export const rolePromptFiles = (id: RoleId): RoleSpec["promptFiles"] => {
+export const rolePromptFiles = (
+  id: RoleId,
+  upstreamRoot = defaultUpstreamRoot,
+): RoleSpec["promptFiles"] => {
   const root = skillRoot(id),
     own = { path: `${root}/references/roles/${id}.md` };
   if (id === "qinggan-duzhe") return [own];
@@ -52,7 +59,7 @@ export const rolePromptFiles = (id: RoleId): RoleSpec["promptFiles"] => {
     { path: `${root}/CREATIVE-SOUL.md` },
     { path: `${PLUGIN}/shared/information-contract.md` },
     { path: `${PLUGIN}/shared/creative-communication-contract.md` },
-    ...references(root).map((path) => ({ path })),
+    ...references(root, upstreamRoot).map((path) => ({ path })),
     own,
   ];
 };
@@ -92,7 +99,7 @@ export async function assemblePrompt(
       : spec.id === "jiyi-weihuyuan"
         ? "\n平台提交格式：先按需读取资源；patches只引用本次实际读取的path与base_sha256。每项sections按完整Markdown标题heading替换其正文replacement，保留标题及其他小节；标题必须存在且唯一，不得引入同级或更高标题。每资源最多8小节，每小节最多4000字；不返回整份new_content。"
         : "";
-  const content = `${fragments.join("\n\n")}\n\n${PLATFORM_NOTE}\n\nCURRENT_ROLE:${spec.id}${editing}\n${format}\n`;
+  const content = `${fragments.join("\n\n")}\n\n${PLATFORM_NOTE}\n\nCURRENT_ROLE:${spec.id}${editing}\n${format}\n\n${securityNote(spec.id)}`;
   return {
     content,
     sha256: createHash("sha256").update(content, "utf8").digest("hex"),

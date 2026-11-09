@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "upstream_commit": "9835470fa07b216c85602915a38063b0d7c937b5",
+  "files": {
+    "01-完整插件/ruwen-xiezuo-xitong/shared/creative-communication-contract.md": "3b6c6e65e47dd309e7388e751e7cae5266cf5615740c63d9d9df4118af1dc3c6",
+    "01-完整插件/ruwen-xiezuo-xitong/shared/information-contract.md": "4c9930c6d7d81a72636909ed8444eaeba70e9b3eac08fb6b048aabc29b2db7f6",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-gushi-gousi/CREATIVE-SOUL.md": "5db2133b81a0bc7eabbd6ede05d406dd7f5ffa12826f8a00f50dce6266308f1d",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-gushi-gousi/SKILL.md": "29e41bea43f8a55d04a1eca0f6209033669884d8546e9563d7c3d936b71b2649",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-gushi-gousi/references/external-knowledge-and-expression.md": "4c633586437dea133f9df89de34cc3874c0a826f578424a5dbe6cacb5f28c58a",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-gushi-gousi/references/project-knowledge-model.md": "bd93050a2a72469557830467d66d99e3ab1d1d9070a481ddd06e0dee2a44cbf7",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-gushi-gousi/references/roles/biaoxian-shejishi.md": "e4fd21982436cd382e78832134d65d56b7c65eca042e230927308319c3484d6a",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-gushi-gousi/references/roles/chuangyi-xietiaoyuan.md": "a2b1a3f036cf0b03b6fa1db1e04fa124a54e0d5d99a6cd19e9936f64563b45a9",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-gushi-gousi/references/roles/gushi-gousishi.md": "f16e43f4c51f25079506264fd55578cda28e358ced64135dd5f7575bb178849c",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-gushi-gousi/references/roles/waibu-zhishi-guwen.md": "1304535b018c69519b520abf54b3534c706c91202891a36df2e695365c99281b",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-gushi-gousi/references/roles/xiangmu-zhiliyuan.md": "cf92d1b4f4941fe5e57e5b11fad51d587229dd9d3d5cb3008143cb9cc4f6ebbd",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-gushi-gousi/references/roles/zhangjie-qingjing-bianyiyuan.md": "cf5bab31a4ebf86cc4b77795eb3784ec41474ecc1ee0cd87928d0257e9c91207",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-gushi-gousi/references/scope-and-governance.md": "c55fc4d92e5c775db5bb58a3b5ae767a3a53a101d5d21e29d8229eb8af9876df",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-gushi-gousi/references/story-construction.md": "6760ea2b34364f38607ef0856b5b985f4f7b0efc79901905c10d09280ccf2a6f",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-zhangjie-xiezuo/CREATIVE-SOUL.md": "6ddd9a3d1f724aad31ea8c11d8871aa22f3ab0d969584b4f76e3c2aa7076a498",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-zhangjie-xiezuo/SKILL.md": "514a4c887c0d10d880a1ca07a606dd718a14c72ca9a91172f3868de0bc43e0e0",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-zhangjie-xiezuo/references/roles/jiyi-weihuyuan.md": "8cb1c14078bd44d38650a4a253d3a7f069bc6a46edce4929efbe4cf9f00b8959",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-zhangjie-xiezuo/references/roles/qinggan-duzhe.md": "de6176813f6b63c78564d40c0806df21168810af5bcd2385b9b65c474c198132",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-zhangjie-xiezuo/references/roles/qingjie-heyanyuan.md": "71c8d37d7f700ae56cc94b3fb84719afa09d41ec26e66d6d47dd91149f4058f3",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-zhangjie-xiezuo/references/roles/wenxue-bianji.md": "2eef65d4ea3340327e7a05b50819dfa39d88e0fc907d3ecfbc9d7dd9731b7759",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-zhangjie-xiezuo/references/roles/xianshi-heyanyuan.md": "93e01747e689c0d024d1bfd520fb4880a64419f1b50ecd060de10d40c87aaf2c",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-zhangjie-xiezuo/references/roles/xiaoshuo-zuozhe.md": "d4756529e16a66c88c2d61443a6cf21fd7af91b78c06418700ffddb3ac1f3980",
+    "01-完整插件/ruwen-xiezuo-xitong/skills/ruwen-zhangjie-xiezuo/references/workflow.md": "5382757c6e8e88f55aa06e4cad830f450433ac90833e7bb82c24d6d3c54d2755"
+  }
+}

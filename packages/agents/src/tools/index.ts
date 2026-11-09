@@ -2,7 +2,13 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { obj, str } from "@earendil-works/pi-schema";
-import { candidateProblems, registry } from "@ruwen/core";
+import {
+  assertInputLimits,
+  assertMaterialText,
+  candidateProblems,
+  registry,
+} from "@ruwen/core";
+import { escapeTaggedMaterial } from "../messages.ts";
 import { defaultUpstreamRoot } from "../prompts/manifest.ts";
 import type { Data, RoleContext, RoleId, RoleTool } from "../types.ts";
 
@@ -58,6 +64,7 @@ export async function readAuthorizedResource(
       .decode(bytes)
       .replace(/\r\n?/g, "\n"),
   };
+  assertMaterialText(String(result.content));
   ctx.onResourceRead?.(result, role);
   return result;
 }
@@ -71,7 +78,12 @@ export async function authorizedResourceInputs(
   return inputs;
 }
 const result = (value: Data) => ({
-  content: [{ type: "text" as const, text: JSON.stringify(value) }],
+  content: [
+    {
+      type: "text" as const,
+      text: escapeTaggedMaterial(JSON.stringify(value)),
+    },
+  ],
   details: value,
 });
 export function roleTools(id: RoleId, ctx: RoleContext): RoleTool[] {
@@ -151,9 +163,29 @@ export function roleTools(id: RoleId, ctx: RoleContext): RoleTool[] {
       parameters: obj({ query: str({ minLength: 1, maxLength: 500 }) }),
       execute: async (_call, args, signal) => {
         if (calls++ >= 3) throw new Error("本次调查已达到搜索次数上限");
-        return result({
-          results: await search.search(String(args.query), signal),
-        });
+        const results = await search.search(String(args.query), signal);
+        assertInputLimits(results);
+        const timestamp = new Date().toISOString();
+        const attribute = (value: string) =>
+          value
+            .replaceAll("&", "&amp;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;");
+        return {
+          content: [
+            {
+              type: "text",
+              text: results
+                .map(
+                  (record) =>
+                    `<外部资料 来源="${attribute(String(record.url ?? record.source ?? "未提供"))}" 抓取时间="${timestamp}">\n${escapeTaggedMaterial(JSON.stringify(record, null, 2))}\n</外部资料>`,
+                )
+                .join("\n\n"),
+            },
+          ],
+          details: { results },
+        };
       },
     });
   }

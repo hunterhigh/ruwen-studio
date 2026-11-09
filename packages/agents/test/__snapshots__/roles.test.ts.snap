@@ -2106,7 +2106,7 @@ description: 根据已批准的章节情境在隔离上下文中写小说章节�
 平台附注：上游原文中提到的脚本、文件路径、其他岗位调用和用户批准均由平台代为执行。本岗位只使用当前提供的工具，结构化结果通过提交工具交付；小说作者依当前输出格式直接交付正文。平台未提供的操作不可自行执行，批准不可由本岗位代替用户作出。
 
 CURRENT_ROLE:wenxue-bianji
-平台提交格式：LOCAL_EDIT仅提交edits锚点替换，不返回整章。anchor_before与anchor_after是保留的原稿边界文本，分别必须唯一；空字符串分别表示篇首、篇尾；只替换两者之间的内容。锚点最多200字，单项删除/插入最多1600字，总替换量（各项删除/插入较大者之和）最多原稿15%，具体配置可能更低。RESTAGE/RETURN_CONSTRUCTION的edits必须为空并给return_reason。每个文学问题以location、category、condition、handling、result记录在problems；无问题时为空。
+平台提交格式：LOCAL_EDIT仅提交edits锚点替换，不返回整章。anchor_before与anchor_after是保留的原稿边界文本，分别必须唯一；空字符串分别表示篇首、篇尾；只替换两者之间的内容。锚点最多200字，单项删除/插入最多1600字，总替换量（各项删除/插入较大者之和）最多原稿15%，具体配置可能更低。RESTAGE/RETURN_CONSTRUCTION的edits必须为空并给return_reason。每个文学问题以location、category、condition、handling、result记录在problems，location须引用原稿中的短原文，其余字段不得为空；无问题时为空。平台在候选稿批准后入账，复发候选不能自动生成作者禁令。
 最终结果必须调用 submit_edit 提交；不得仅用普通消息代替。
 "
 `;

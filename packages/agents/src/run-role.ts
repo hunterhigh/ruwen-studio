@@ -179,6 +179,22 @@ async function validateOutput(
       output.edits as unknown as EditorialEdit[],
       editingPolicy(),
     );
+    for (const problem of output.problems) {
+      if (
+        !object(problem) ||
+        !["location", "category", "condition", "handling", "result"].every(
+          (key) =>
+            typeof problem[key] === "string" && String(problem[key]).trim(),
+        )
+      )
+        throw new RoleOutputError(
+          "Literary problem fields must be nonempty text",
+        );
+      if (!String(input.prose).includes(String(problem.location)))
+        throw new RoleOutputError(
+          "Literary problem location must quote the original prose",
+        );
+    }
   }
   if (id === "jiyi-weihuyuan" && Array.isArray(output.patches)) {
     const seen = new Set<string>();

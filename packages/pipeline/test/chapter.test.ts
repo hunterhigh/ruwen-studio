@@ -11,10 +11,11 @@ import {
   ROLES,
   type RoleId,
 } from "@ruwen/agents";
-import { state } from "@ruwen/core";
+import { ledgers, state } from "@ruwen/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { defaultFauxResponse, requestRole } from "../../agents/src/faux.ts";
 import {
+  failWrite,
   PROJECTION,
   preparePacket,
   temporaryProject,
@@ -78,6 +79,102 @@ const approve = (
     p.ctx,
   );
 describe("chapter pipeline", { timeout: 20000 }, () => {
+  const problem = {
+    location: "粮车先出了驿门",
+    category: "explanation",
+    condition: "PRIVATE_CONDITION_837",
+    handling: "保留动作并删除重复解释",
+    result: "PRIVATE_RESULT_957",
+  };
+  const editorWithProblem = (id: RoleId) =>
+    id === "wenxue-bianji"
+      ? { decision: "LOCAL_EDIT", edits: [], problems: [problem] }
+      : undefined;
+  it("approved candidate records problems once, detects cross-task recurrence and does not generate author bans", async () => {
+    const p = await setup(editorWithProblem);
+    p.ctx.deferMemory = true;
+    for (let i = 0; i < 2; i++)
+      await ledgers.appendProblem(p.fs, {
+        ...problem,
+        task_id: "previous-task",
+        status: "candidate_approved",
+      });
+    const registryHash = await p.fs.sha256("治理/资源注册表.json");
+    const manifestHash = await p.fs.sha256(
+      "authoring-ruwen-v5/manifests/author-manifest.json",
+    );
+    const run = await startChapter(p.fs, { chapter: 1 }, p.ctx);
+    expect((await ledgers.problemSummary(p.fs)).categories).toEqual([
+      {
+        category: "explanation",
+        count: 2,
+        task_count: 1,
+        recurrence_candidate: false,
+      },
+    ]);
+    const approved = await approve(p, run);
+    expect(approved.status).toBe("CANDIDATE_APPROVED");
+    const entries = await ledgers.readEntries(p.fs, "治理/文学问题账本.jsonl");
+    expect(entries).toHaveLength(3);
+    expect(entries[2]).toMatchObject({
+      ...problem,
+      task_id: run.id,
+      recurrence_candidate: true,
+    });
+    expect((await ledgers.problemSummary(p.fs)).categories).toEqual([
+      {
+        category: "explanation",
+        count: 3,
+        task_count: 2,
+        recurrence_candidate: true,
+      },
+    ]);
+    expect(await p.fs.sha256("治理/资源注册表.json")).toBe(registryHash);
+    expect(
+      await p.fs.sha256("authoring-ruwen-v5/manifests/author-manifest.json"),
+    ).toBe(manifestHash);
+    await expect(approve(p, run)).rejects.toThrow("not awaiting");
+    expect(
+      await ledgers.readEntries(p.fs, "治理/文学问题账本.jsonl"),
+    ).toHaveLength(3);
+  });
+  it("ledger write failure rolls back candidate promotion and approval consumption, then succeeds on retry", async () => {
+    const p = await setup(editorWithProblem);
+    p.ctx.deferMemory = true;
+    const run = await startChapter(p.fs, { chapter: 1 }, p.ctx);
+    await expect(
+      approveCandidate(
+        failWrite(p.fs, "治理/文学问题账本.jsonl"),
+        run.id,
+        { confirmed: true, expectedSha256: required(run.candidateSha256) },
+        p.ctx,
+      ),
+    ).rejects.toThrow("simulated write failure");
+    expect(await p.fs.exists(run.target)).toBe(false);
+    expect((await loadRun(p.fs, run.id)).status).toBe(
+      "AWAITING_CANDIDATE_APPROVAL",
+    );
+    expect(
+      await ledgers.readEntries(p.fs, "治理/文学问题账本.jsonl"),
+    ).toHaveLength(0);
+    expect((await approve(p, run)).status).toBe("CANDIDATE_APPROVED");
+    expect(
+      await ledgers.readEntries(p.fs, "治理/文学问题账本.jsonl"),
+    ).toHaveLength(1);
+  });
+  it("abandoned and returned candidates leave problems only in private editorial reports pending OQ-017", async () => {
+    const p = await setup(editorWithProblem);
+    const first = await startChapter(p.fs, { chapter: 1 }, p.ctx);
+    await cancelRun(p.fs, first.id, p.ctx);
+    const second = await startChapter(p.fs, { chapter: 1 }, p.ctx);
+    await returnCandidate(p.fs, second.id, "重新考虑", p.ctx);
+    expect(
+      await ledgers.readEntries(p.fs, "治理/文学问题账本.jsonl"),
+    ).toHaveLength(0);
+    expect(
+      await p.fs.readText(required(first.roles["wenxue-bianji"]?.path)),
+    ).toContain("PRIVATE_CONDITION_837");
+  });
   it("memory patch must bind a resource actually read during this role run, even if its hash is known", async () => {
     let hash = "";
     const p = await setup((id) =>

@@ -27,3 +27,9 @@ stopReason=length立即抛RoleTruncatedError，不纠正、不自动重试，也
 ## A4路由复核（2026-11-09）
 
 默认改为目录中已有的Opus 5.5/high、Sonnet 5.5/medium、Haiku 5.5/off。三者的forceAdaptiveThinking均为true、目录maxTokens均128000；当前各岗上限不变且全部在模型额度内。Opus/Sonnet 5.5支持的思考级别不含off，因此维持high/medium；Haiku 5.5允许off。model-catalog测试逐个验证ID、思考模式、adaptive标志和该路由下的岗位额度。不改变OQ-003的P3人工闸门，不调用真实API。
+
+## B1文学问题账本（2026-11-09）
+
+问题输出沿用A2定义的五字段，location必须引用原稿短原文，字段非空。候选稿批准时从已保存的编辑报告读取problems，在同一项目事务内复用core.ledgers.appendProblem，以run.id为task_id；批准、章节晋升、问题入账与状态检查点共同提交/回滚，重复批准不重复计数。作者原稿和编辑报告保留原定位。core沿用至少三次且跨至少两个任务的复发候选门槛，新增的是流水线接入而非新的统计口径。
+
+只有项目治理员新增read_problem_summary工具，复用core.problemSummary，只返回total、category/count/task_count/recurrence_candidate；不给原始定位、条件、处理、结果和任务ID。通用注册表读取继续排除私有文学问题账本，不把统计转换成作者规则或资料包。放弃稿口径见未决OQ-017，当前不入账。测试覆盖批准前后、重复批准、入账失败整体回滚、跨任务门槛、治理读取无私有哨兵、放弃不入账与不生成作者禁令。

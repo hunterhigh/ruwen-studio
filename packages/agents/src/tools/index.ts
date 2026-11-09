@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { obj, str } from "@earendil-works/pi-schema";
-import { registry } from "@ruwen/core";
+import { ledgers, registry } from "@ruwen/core";
 import { defaultUpstreamRoot } from "../prompts/manifest.ts";
 import type { Data, RoleContext, RoleId, RoleTool } from "../types.ts";
 
@@ -76,6 +76,16 @@ const result = (value: Data) => ({
 });
 export function roleTools(id: RoleId, ctx: RoleContext): RoleTool[] {
   const tools: RoleTool[] = [];
+  if (id === "xiangmu-zhiliyuan")
+    tools.push({
+      name: "read_problem_summary",
+      label: "文学问题统计",
+      description:
+        "只读取类别、次数、任务数及复发候选标记，不返回正文定位、条件、处理、结果或任务标识；统计不能自动生成作者禁令。",
+      parameters: obj({}),
+      execute: async () =>
+        result((await ledgers.problemSummary(ctx.fs)) as Data),
+    });
   if (resourceReaders.includes(id)) {
     tools.push({
       name: "read_resource",

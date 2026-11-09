@@ -3,7 +3,7 @@ import {
   fauxToolCall,
   type TranscriptContext,
 } from "@earendil-works/pi-ai";
-import { registry } from "@ruwen/core";
+import { ledgers, registry } from "@ruwen/core";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import {
   preparePacket,
@@ -43,6 +43,76 @@ const ctx = (): RoleContext => ({
   fs: project.fs,
   projectKey: "test-project",
   runtime: createFauxRuntime(),
+});
+it("inv-ledger-separation: governance sees only category counts via its summary tool, never private problem fields", async () => {
+  for (const task of ["first", "second", "second"])
+    await ledgers.appendProblem(project.fs, {
+      location: "PRIVATE_LOCATION_681",
+      category: "explanation",
+      condition: "PRIVATE_CONDITION_682",
+      handling: "PRIVATE_HANDLING_683",
+      result: "PRIVATE_RESULT_684",
+      task_id: task,
+      status: "candidate_approved",
+    });
+  const requests: TranscriptContext[] = [];
+  const runtime = createFauxRuntime([
+    fauxAssistantMessage(fauxToolCall("read_problem_summary", {}), {
+      stopReason: "toolUse",
+    }),
+    fauxAssistantMessage(
+      fauxToolCall("submit_governance_preview", {
+        changes: [],
+        conflicts: [],
+        scope_changes: [],
+        writes_requested: [],
+        patches: [],
+      }),
+      { stopReason: "toolUse" },
+    ),
+  ]);
+  await runRole(
+    "xiangmu-zhiliyuan",
+    {
+      brief: { creative_value: "检查项目治理" },
+      resource_ids: [],
+      scope: { project: "test-project" },
+    },
+    { ...ctx(), runtime, onRequest: (request) => requests.push(request) },
+  );
+  const request = JSON.stringify(requests[1]);
+  expect(request).toContain("recurrence_candidate");
+  expect(request).toContain("explanation");
+  for (const sentinel of [
+    "PRIVATE_LOCATION_681",
+    "PRIVATE_CONDITION_682",
+    "PRIVATE_HANDLING_683",
+    "PRIVATE_RESULT_684",
+  ])
+    expect(request).not.toContain(sentinel);
+  const summary = await roleTools("xiangmu-zhiliyuan", ctx())
+    .find((tool) => tool.name === "read_problem_summary")
+    ?.execute("summary", {});
+  expect(summary?.details).toEqual({
+    total: 3,
+    categories: [
+      {
+        category: "explanation",
+        count: 3,
+        task_count: 2,
+        recurrence_candidate: true,
+      },
+    ],
+  });
+  for (const role of [
+    "xiaoshuo-zuozhe",
+    "qinggan-duzhe",
+    "wenxue-bianji",
+    "jiyi-weihuyuan",
+  ] as const)
+    expect(roleTools(role, ctx()).map((tool) => tool.name)).not.toContain(
+      "read_problem_summary",
+    );
 });
 it("inv-author-isolation / inv-reader-isolation: captured complete requests contain no private source or later opinion", async () => {
   const requests: TranscriptContext[] = [];

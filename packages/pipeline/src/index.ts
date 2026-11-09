@@ -19,6 +19,7 @@ import {
   commitMemoryPreview,
   createMemoryPreview,
   type EditorialEdit,
+  ledgers,
   type ProjectFS,
   packet,
   type SectionEdit,
@@ -643,6 +644,25 @@ export async function approveCandidate(
         Boolean(run.targetBeforeSha256),
         decision.expectedTargetSha256,
       );
+      const editorPath = run.roles["wenxue-bianji"]?.path;
+      if (!editorPath)
+        throw new Error("Approved candidate has no editorial report");
+      const editorial = asData((await parse(tx, editorPath)).output as Data);
+      if (!Array.isArray(editorial.problems))
+        throw new Error("Editorial problem records are missing");
+      for (const problem of editorial.problems) {
+        if (!object(problem))
+          throw new Error("Invalid literary problem record");
+        await ledgers.appendProblem(tx, {
+          location: problem.location,
+          category: problem.category,
+          condition: problem.condition,
+          handling: problem.handling,
+          result: problem.result,
+          task_id: run.id,
+          status: "candidate_approved",
+        });
+      }
       move(run, "CANDIDATE_APPROVED");
       await write(tx, runPath(id), run);
       await ctx.onCheckpoint?.(tx, run);

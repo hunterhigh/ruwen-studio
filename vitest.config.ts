@@ -7,5 +7,7 @@ export default defineConfig({
     testTimeout: 10_000,
     hookTimeout: 10_000,
     restoreMocks: true,
+    // LocalDirFS snapshots fsync many files; bound parallel suites to avoid I/O starvation.
+    maxWorkers: 2,
   },
 });

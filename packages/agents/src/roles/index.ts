@@ -10,6 +10,7 @@ import {
   str,
   union,
 } from "@earendil-works/pi-schema";
+import { formatUserMessage } from "../messages.ts";
 import { rolePromptFiles } from "../prompts/manifest.ts";
 import {
   type Data,
@@ -319,7 +320,7 @@ export const ROLES = Object.fromEntries(
           );
         return id === "xiaoshuo-zuozhe"
           ? String(selected.packet ?? "")
-          : JSON.stringify(selected);
+          : formatUserMessage(selected);
       },
     };
     return [id, Object.freeze(spec)];

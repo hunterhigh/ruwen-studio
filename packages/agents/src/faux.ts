@@ -6,6 +6,7 @@ import {
   fauxToolCall,
   type TranscriptContext,
 } from "@earendil-works/pi-ai";
+import { decodeUserMessage } from "./messages.ts";
 import { ROLES } from "./roles/index.ts";
 import {
   type Data,
@@ -167,6 +168,8 @@ function inputFrom(context: TranscriptContext): Data {
               .map((b) => (b.type === "text" ? b.text : ""))
               .join("");
       try {
+        const segmented = decodeUserMessage(raw);
+        if (segmented) return segmented;
         const value: unknown = JSON.parse(raw);
         if (
           value !== null &&

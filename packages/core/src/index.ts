@@ -9,6 +9,7 @@ export { LocalDirFS } from "./fs/local-dir-fs.ts";
 export { AlreadyExists, type ProjectFS, UnsafePath } from "./fs/project-fs.ts";
 export * as handoff from "./handoff/index.ts";
 export { initProject } from "./init/index.ts";
+export * as candidateProblems from "./ledgers/candidate-problems.ts";
 export * as ledgers from "./ledgers/index.ts";
 export * as packet from "./packet/index.ts";
 export * as registry from "./registry/index.ts";

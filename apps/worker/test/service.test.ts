@@ -4,6 +4,7 @@ import {
   DEFAULT_ROLE_TIMEOUT_MS,
   ROLE_OUTPUT_ATTEMPTS,
 } from "@ruwen/agents";
+import { candidateProblems, ledgers } from "@ruwen/core";
 import { PostgresFS } from "@ruwen/db";
 import { CHAPTER_ROLES, loadRun } from "@ruwen/pipeline";
 import { afterEach, expect, it } from "vitest";
@@ -15,6 +16,63 @@ import { queueExpirySeconds } from "../src/service.ts";
 import { fixture, waitStatus } from "./helpers.ts";
 
 const cleanups: (() => Promise<void>)[] = [];
+it("successful editor problems survive cancellation before pipeline report checkpoint with the real project UUID", async () => {
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let paused = false;
+  const p = await fixture(
+    {
+      runtime: () =>
+        createFauxRuntime(
+          Array.from({ length: 100 }, () => (context) => {
+            const response = defaultFauxResponse(context);
+            for (const block of response.content)
+              if (block.type === "toolCall" && block.name === "submit_edit")
+                block.arguments.problems = [
+                  {
+                    location: "粮车先出了驿门",
+                    category: "explanation",
+                    condition: "条件",
+                    handling: "处理",
+                    result: "结果",
+                  },
+                ];
+            return response;
+          }),
+        ),
+      onBoundary: async (kind, name) => {
+        if (kind === "role_completed" && name === CHAPTER_ROLES.editor) {
+          paused = true;
+          await gate;
+        }
+      },
+    },
+    true,
+  );
+  cleanups.push(() => p.service.stop());
+  const id = await p.service.enqueueChapter(p.fs, { chapter: 1 });
+  try {
+    await expect.poll(() => paused, { timeout: 5000 }).toBe(true);
+    const entries = await ledgers.readEntries(p.fs, candidateProblems.PATH);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      project_id: p.fs.projectId,
+      chapter: "001",
+      run_id: id,
+      status: "pending",
+    });
+    await p.service.cancel(p.fs, id);
+    release();
+    await waitStatus(p.service, id, "CANCELLED");
+    const after = await ledgers.readEntries(p.fs, candidateProblems.PATH);
+    expect(after).toHaveLength(1);
+    expect(after[0]?.status).toBe("abandoned");
+  } finally {
+    release();
+  }
+}, 30000);
 it("queue expiry derives from actual role timeout, chapter role count, output attempts and margin, including existing queues", async () => {
   const p = await fixture({ roleTimeoutMs: 1501, queueMarginSeconds: 123 });
   cleanups.push(() => p.service.stop());

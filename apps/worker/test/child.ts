@@ -1,4 +1,5 @@
 import { createFauxRuntime } from "@ruwen/agents";
+import { defaultFauxResponse } from "../../../packages/agents/src/faux.ts";
 import { type Task, WorkerService } from "../src/service.ts";
 
 const url = process.env.RUWEN_CHILD_DB,
@@ -6,7 +7,26 @@ const url = process.env.RUWEN_CHILD_DB,
 if (!url || !queue) throw new Error("Missing child database config");
 let triggered = false;
 const worker = new WorkerService(url, {
-  runtime: createFauxRuntime,
+  runtime: () =>
+    process.env.RUWEN_FAUX_EDITOR_PROBLEM === "1"
+      ? createFauxRuntime(
+          Array.from({ length: 100 }, () => (context) => {
+            const response = defaultFauxResponse(context);
+            for (const block of response.content)
+              if (block.type === "toolCall" && block.name === "submit_edit")
+                block.arguments.problems = [
+                  {
+                    location: "粮车先出了驿门",
+                    category: "explanation",
+                    condition: "条件",
+                    handling: "处理",
+                    result: "结果",
+                  },
+                ];
+            return response;
+          }),
+        )
+      : createFauxRuntime(),
   queue,
   heartbeatSeconds: 10,
   onBoundary: async (kind, name, runId) => {

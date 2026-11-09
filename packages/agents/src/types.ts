@@ -62,6 +62,7 @@ export interface SearchProvider {
 export interface RoleContext {
   fs: ProjectFS;
   projectKey: string;
+  projectId?: string;
   runtime: ModelRuntime;
   upstreamRoot?: string;
   signal?: AbortSignal;

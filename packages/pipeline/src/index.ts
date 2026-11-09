@@ -15,11 +15,11 @@ import {
   applyEditorialEdits,
   applySectionEdits,
   approval,
+  candidateProblems,
   checks,
   commitMemoryPreview,
   createMemoryPreview,
   type EditorialEdit,
-  ledgers,
   type ProjectFS,
   packet,
   type SectionEdit,
@@ -78,6 +78,7 @@ export interface ChapterRun {
   error?: string;
   failedRole?: RoleId;
   requestSha256?: string;
+  literaryProblemsRecorded?: boolean;
 }
 export interface ChapterRequest {
   chapter: string | number;
@@ -107,7 +108,7 @@ const active = new Map<
   string,
   { control: AbortController; projectKey: string }
 >();
-const DIRECTORY = "authoring-ruwen-v5/reports/runs";
+const DIRECTORY = candidateProblems.RUN_DIRECTORY;
 const NORMAL: Partial<Record<RunStatus, RunStatus[]>> = {
   REQUESTED: ["READINESS_OK", "FAILED_PRECONDITION"],
   READINESS_OK: ["PACKET_COMPILED"],
@@ -212,8 +213,9 @@ async function checkpoint(
   )
     return;
   move(run, status);
-  if (ctx.onCheckpoint)
+  if (ctx.onCheckpoint || run.literaryProblemsRecorded)
     await fs.transaction(async (tx) => {
+      await syncProblemStatus(tx, run, ctx);
       await write(tx, runPath(run.id), run);
       await ctx.onCheckpoint?.(tx, run);
     });
@@ -236,10 +238,10 @@ async function call(
   } catch (error) {
     run.failedRole = id;
     if (error instanceof RoleExecutionError && error.partial)
-      await storeResult(fs, run, id, error.partial);
+      await storeResult(fs, run, id, error.partial, ctx);
     throw error;
   }
-  await storeResult(fs, run, id, result);
+  await storeResult(fs, run, id, result, ctx);
   ensureLive(ctx.signal);
   return result;
 }
@@ -248,6 +250,7 @@ async function storeResult(
   run: ChapterRun,
   id: RoleId,
   result: RoleResult,
+  ctx: PipelineContext,
 ): Promise<void> {
   const p = `${runDirectory(run.id)}/${id}.json`;
   const prompt = `authoring-ruwen-v5/reports/prompts/${result.promptSha256}.txt`;
@@ -262,11 +265,40 @@ async function storeResult(
     0,
   );
   await fs.transaction(async (tx) => {
+    if (
+      id === CHAPTER_ROLES.editor &&
+      object(result.output) &&
+      Array.isArray(result.output.problems)
+    ) {
+      await candidateProblems.record(
+        tx,
+        {
+          projectId: ctx.projectId ?? ctx.projectKey,
+          chapter: run.chapter,
+          runId: run.id,
+          status: candidateProblems.statusFromRun(run as unknown as Data),
+        },
+        result.output.problems,
+      );
+      run.literaryProblemsRecorded = result.output.problems.length > 0;
+    }
     await write(tx, p, result);
     if (!(await tx.exists(prompt)))
       await tx.createExclusive(prompt, result.systemPrompt);
     await write(tx, runPath(run.id), run);
   });
+}
+async function syncProblemStatus(
+  fs: ProjectFS,
+  run: ChapterRun,
+  ctx: PipelineContext,
+) {
+  await candidateProblems.setStatus(
+    fs,
+    run.id,
+    candidateProblems.statusFromRun(run as unknown as Data),
+    ctx.projectId ?? ctx.projectKey,
+  );
 }
 async function stopOnError(
   fs: ProjectFS,
@@ -282,8 +314,9 @@ async function stopOnError(
         ? "FAILED_PRECONDITION"
         : "FAILED";
   move(run, status);
-  if (ctx.onCheckpoint)
+  if (ctx.onCheckpoint || run.literaryProblemsRecorded)
     await fs.transaction(async (tx) => {
+      await syncProblemStatus(tx, run, ctx);
       await write(tx, runPath(run.id), run);
       await ctx.onCheckpoint?.(tx, run);
     });
@@ -652,26 +685,8 @@ export async function approveCandidate(
         Boolean(run.targetBeforeSha256),
         decision.expectedTargetSha256,
       );
-      const editorPath = run.roles[CHAPTER_ROLES.editor]?.path;
-      if (!editorPath)
-        throw new Error("Approved candidate has no editorial report");
-      const editorial = asData((await parse(tx, editorPath)).output as Data);
-      if (!Array.isArray(editorial.problems))
-        throw new Error("Editorial problem records are missing");
-      for (const problem of editorial.problems) {
-        if (!object(problem))
-          throw new Error("Invalid literary problem record");
-        await ledgers.appendProblem(tx, {
-          location: problem.location,
-          category: problem.category,
-          condition: problem.condition,
-          handling: problem.handling,
-          result: problem.result,
-          task_id: run.id,
-          status: "candidate_approved",
-        });
-      }
       move(run, "CANDIDATE_APPROVED");
+      await syncProblemStatus(tx, run, ctx);
       await write(tx, runPath(id), run);
       await ctx.onCheckpoint?.(tx, run);
     });
@@ -851,6 +866,7 @@ export async function cancelRun(
     }
     if (current.status !== "CANCELLED") {
       move(current, "CANCELLED");
+      await syncProblemStatus(tx, current, ctx);
       await write(tx, runPath(id), current);
       await ctx.onCheckpoint?.(tx, current);
     }
@@ -873,6 +889,7 @@ export async function returnCandidate(
     run.returnReason = reason;
     ensureLive(ctx.signal);
     move(run, "RETURNED");
+    await syncProblemStatus(tx, run, ctx);
     await write(tx, runPath(id), run);
     await ctx.onCheckpoint?.(tx, run);
     return run;

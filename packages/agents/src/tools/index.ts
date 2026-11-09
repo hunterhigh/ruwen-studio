@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { obj, str } from "@earendil-works/pi-schema";
-import { ledgers, registry } from "@ruwen/core";
+import { candidateProblems, registry } from "@ruwen/core";
 import { defaultUpstreamRoot } from "../prompts/manifest.ts";
 import type { Data, RoleContext, RoleId, RoleTool } from "../types.ts";
 
@@ -84,7 +84,12 @@ export function roleTools(id: RoleId, ctx: RoleContext): RoleTool[] {
         "只读取类别、次数、任务数及复发候选标记，不返回正文定位、条件、处理、结果或任务标识；统计不能自动生成作者禁令。",
       parameters: obj({}),
       execute: async () =>
-        result((await ledgers.problemSummary(ctx.fs)) as Data),
+        result(
+          (await candidateProblems.counts(
+            ctx.fs,
+            ctx.projectId ?? ctx.projectKey,
+          )) as Data,
+        ),
     });
   if (resourceReaders.includes(id)) {
     tools.push({

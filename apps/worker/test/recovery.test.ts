@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { candidateProblems, ledgers } from "@ruwen/core";
 import { loadRun } from "@ruwen/pipeline";
 import { afterEach, expect, inject, it } from "vitest";
 import type { Task, WorkerService } from "../src/service.ts";
@@ -14,6 +15,7 @@ function child(
   service: WorkerService,
   task?: Task,
   fault?: { kind: string; name: string },
+  editorProblem = false,
 ) {
   const proc = spawn(
     process.execPath,
@@ -25,6 +27,7 @@ function child(
         MODEL_MODE: "faux",
         RUWEN_CHILD_DB: inject("databaseUrl"),
         RUWEN_CHILD_QUEUE: service.queue,
+        RUWEN_FAUX_EDITOR_PROBLEM: editorProblem ? "1" : "0",
         ...(task ? { RUWEN_CHILD_TASK: JSON.stringify(task) } : {}),
         ...(fault
           ? { RUWEN_FAULT_KIND: fault.kind, RUWEN_FAULT_NAME: fault.name }
@@ -123,6 +126,42 @@ async function setup(target: string) {
   }
   return { ...p, id, task };
 }
+it("SIGKILL after successful editor persistence preserves exactly one pending problem across recovery and abandonment", async () => {
+  const p = await fixture();
+  cleanup.push(() => p.service.stop());
+  const id = await p.service.enqueueChapter(p.fs, { chapter: 1 });
+  const task: Task = {
+    kind: "chapter",
+    projectId: p.fs.projectId,
+    ownerId: p.fs.ownerId,
+    runId: id,
+  };
+  const process = child(
+    p.service,
+    task,
+    { kind: "role_completed", name: "wenxue-bianji" },
+    true,
+  );
+  await process.wait("fault");
+  expect(await ledgers.readEntries(p.fs, candidateProblems.PATH)).toHaveLength(
+    1,
+  );
+  process.proc.kill("SIGKILL");
+  await process.closed;
+  await p.service.handle(task);
+  expect((await loadRun(p.fs, id)).status).toBe("AWAITING_CANDIDATE_APPROVAL");
+  expect(await ledgers.readEntries(p.fs, candidateProblems.PATH)).toHaveLength(
+    1,
+  );
+  await p.service.cancel(p.fs, id);
+  await p.service.handle({ ...task, kind: "cancel" });
+  const entries = await ledgers.readEntries(p.fs, candidateProblems.PATH);
+  expect(entries).toHaveLength(1);
+  expect(entries[0]).toMatchObject({
+    status: "abandoned",
+    task_id: candidateProblems.taskId(p.fs.projectId, "001"),
+  });
+}, 30000);
 it.each([
   "REQUESTED",
   "READINESS_OK",

@@ -3,7 +3,7 @@ import {
   fauxToolCall,
   type TranscriptContext,
 } from "@earendil-works/pi-ai";
-import { ledgers, registry } from "@ruwen/core";
+import { candidateProblems, registry } from "@ruwen/core";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import {
   preparePacket,
@@ -45,16 +45,25 @@ const ctx = (): RoleContext => ({
   runtime: createFauxRuntime(),
 });
 it("inv-ledger-separation: governance sees only category counts via its summary tool, never private problem fields", async () => {
-  for (const task of ["first", "second", "second"])
-    await ledgers.appendProblem(project.fs, {
-      location: "PRIVATE_LOCATION_681",
-      category: "explanation",
-      condition: "PRIVATE_CONDITION_682",
-      handling: "PRIVATE_HANDLING_683",
-      result: "PRIVATE_RESULT_684",
-      task_id: task,
-      status: "candidate_approved",
-    });
+  for (const [index, chapter] of ["001", "002", "002"].entries())
+    await candidateProblems.record(
+      project.fs,
+      {
+        projectId: "test-project",
+        chapter,
+        runId: `run-${index}`,
+        status: "pending",
+      },
+      [
+        {
+          location: "PRIVATE_LOCATION_681",
+          category: "explanation",
+          condition: "PRIVATE_CONDITION_682",
+          handling: "PRIVATE_HANDLING_683",
+          result: "PRIVATE_RESULT_684",
+        },
+      ],
+    );
   const requests: TranscriptContext[] = [];
   const runtime = createFauxRuntime([
     fauxAssistantMessage(fauxToolCall("read_problem_summary", {}), {

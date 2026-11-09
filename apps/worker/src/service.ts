@@ -13,7 +13,13 @@ import {
   type RoleResult,
   runRole,
 } from "@ruwen/agents";
-import { checks, handoff, type ProjectFS, state } from "@ruwen/core";
+import {
+  candidateProblems,
+  checks,
+  handoff,
+  type ProjectFS,
+  state,
+} from "@ruwen/core";
 import { Database, PostgresFS } from "@ruwen/db";
 import {
   approveCandidate,
@@ -453,6 +459,27 @@ export class WorkerService {
     if (!Number.isFinite(result.costTotal) || result.costTotal < 0)
       throw new Error("Invalid reported role cost");
     await fs.transaction(async (tx) => {
+      if (
+        id === CHAPTER_ROLES.editor &&
+        typeof result.output === "object" &&
+        Array.isArray(result.output.problems)
+      ) {
+        const run = await tx.sql<{ chapter: string; status: string }>(
+          "SELECT chapter,status FROM pipeline_runs WHERE id=$1 AND project_id=$2",
+          [runId, fs.projectId],
+        );
+        if (!run.rows[0]) throw new Error("Unknown editor run");
+        await candidateProblems.record(
+          tx,
+          {
+            projectId: fs.projectId,
+            chapter: run.rows[0].chapter,
+            runId,
+            status: "pending",
+          },
+          result.output.problems,
+        );
+      }
       await tx.sql(
         "INSERT INTO prompts(sha256,content) VALUES($1,$2) ON CONFLICT DO NOTHING",
         [result.promptSha256, result.systemPrompt],
@@ -552,6 +579,7 @@ export class WorkerService {
       };
       timer = setInterval(poll, 200);
       const ctx: PipelineContext = {
+        projectId: fs.projectId,
         projectKey: stored.project_key,
         runtime: this.options.runtime(),
         runId: task.runId,

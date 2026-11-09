@@ -6,6 +6,7 @@ import { compile } from "@earendil-works/pi-schema";
 import {
   applyEditorialEdits,
   applySectionEdits,
+  assertInputLimits,
   checks,
   type EditorialEdit,
   handoff,
@@ -308,6 +309,7 @@ export async function runRole(
   if (ctx.signal?.aborted)
     throw new RoleAbortError("Role cancelled before start");
   const spec = ROLES[id];
+  assertInputLimits(rawInput);
   const submitName =
     spec.output.kind === "tool" ? spec.output.toolName : undefined;
   const input = await prepareInput(id, rawInput, ctx);

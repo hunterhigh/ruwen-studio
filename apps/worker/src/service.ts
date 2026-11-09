@@ -15,6 +15,7 @@ import {
   runRole,
 } from "@ruwen/agents";
 import {
+  assertInputLimits,
   candidateProblems,
   checks,
   handoff,
@@ -203,6 +204,7 @@ export class WorkerService {
     });
   }
   async enqueueChapter(fs: PostgresFS, request: ChapterRequest) {
+    assertInputLimits(request);
     const id = randomUUID();
     await fs.transaction(async (tx) => {
       await tx.sql(
@@ -252,6 +254,7 @@ export class WorkerService {
     });
   }
   async enqueueDispatch(fs: PostgresFS, value: Data) {
+    assertInputLimits(value);
     const id = randomUUID();
     await fs.transaction(async (tx) => {
       const project = await tx.sql<{ project_key: string }>(
@@ -305,6 +308,7 @@ export class WorkerService {
     lockedEvents: string[] = [],
     lockedOrder: string[] = [],
   ) {
+    assertInputLimits({ chapter, scope, lockedEvents, lockedOrder });
     const id = randomUUID();
     const normalized = normalizeChapter(chapter);
     await fs.transaction(async (tx) => {
@@ -407,6 +411,7 @@ export class WorkerService {
     input: Data,
     ctx: Parameters<typeof runRole>[2],
   ): Promise<RoleResult> {
+    assertInputLimits(input);
     const hash = inputDigest(input);
     const cached = await fs.transaction(async (tx) => {
       const row = await tx.sql<{

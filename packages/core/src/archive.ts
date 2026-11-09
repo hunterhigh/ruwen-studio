@@ -4,6 +4,7 @@ import * as yauzl from "yauzl";
 import * as yazl from "yazl";
 import type { ProjectFS } from "./fs/project-fs.ts";
 import { assertPublicArtifact } from "./security/artifacts.ts";
+import { assertImportedMaterial, securityLimits } from "./security/input.ts";
 
 const LIMITS = {
   archiveBytes: 32 * 1024 * 1024,
@@ -20,6 +21,8 @@ const logicalPath = (fs: ProjectFS, p: string) => {
     p.split("/").some((part) => part === ".." || part === "." || !part)
   )
     throw new Error("Unsafe archive path");
+  if (p.split("/").length > securityLimits().archiveDepth)
+    throw new Error("Archive directory depth exceeds configured limit");
   const normalized = fs.path(p);
   if (normalized !== p) throw new Error("Noncanonical archive path");
   return p;
@@ -59,6 +62,7 @@ export async function exportProjectZip(fs: ProjectFS): Promise<Uint8Array> {
         names.add(folded);
         const bytes = await tx.read(p);
         assertPublicArtifact(p, bytes);
+        assertImportedMaterial(p, bytes);
         total += bytes.length;
         if (bytes.length > LIMITS.fileBytes || total > LIMITS.totalBytes)
           throw new Error("Project exceeds archive limits");
@@ -133,6 +137,13 @@ export async function importProjectZip(
             }
             total += entry.uncompressedSize;
             if (
+              entry.uncompressedSize >
+              Math.max(1, entry.compressedSize) * securityLimits().archiveRatio
+            )
+              throw new Error(
+                "Archive compression ratio exceeds configured limit",
+              );
+            if (
               total > LIMITS.totalBytes ||
               entry.uncompressedSize > LIMITS.fileBytes
             )
@@ -162,6 +173,7 @@ export async function importProjectZip(
             if (crc32(data) !== entry.crc32)
               throw new Error("ZIP checksum mismatch");
             assertPublicArtifact(p, data);
+            assertImportedMaterial(p, data);
             result.push({ p, data });
             zip.readEntry();
           })().catch(reject);

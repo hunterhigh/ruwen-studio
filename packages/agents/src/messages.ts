@@ -1,3 +1,4 @@
+import { assertInputLimits } from "@ruwen/core";
 import type { Data, Json } from "./types.ts";
 
 const labels: Record<string, string> = {
@@ -8,6 +9,31 @@ const labels: Record<string, string> = {
   raw_user_text: "用户当前表达",
   chapter: "章节号",
 };
+export const PLATFORM_TAG_NAMES = [
+  ...new Set([...Object.values(labels), "结构化资料", "外部资料"]),
+];
+const reservedTags = new RegExp(
+  `<\\s*\\/?\\s*(?:${PLATFORM_TAG_NAMES.join("|")})(?=[\\s/>])[^>]*>`,
+  "gu",
+);
+export function escapeTaggedMaterial(text: string): string {
+  return text
+    .replaceAll("&", "&amp;")
+    .replace(reservedTags, (tag) =>
+      tag.replaceAll("<", "&lt;").replaceAll(">", "&gt;"),
+    );
+}
+export function unescapeTaggedMaterial(text: string): string {
+  const entities: Record<string, string> = {
+    "&lt;": "<",
+    "&gt;": ">",
+    "&amp;": "&",
+  };
+  return text.replace(
+    /&(?:lt|gt|amp);/g,
+    (entity) => entities[entity] ?? entity,
+  );
+}
 function readingText(value: Json): string {
   if (typeof value === "string") return value;
   if (
@@ -29,19 +55,23 @@ function readingText(value: Json): string {
       .join("\n\n");
   return JSON.stringify(value, null, 2);
 }
-/** Length-delimited raw bodies preserve even literal closing tags inside prose. */
+/** Escape reserved delimiters while retaining verbatim Unicode and physical line breaks. */
 export function formatUserMessage(input: Data): string {
+  assertInputLimits(input);
   return Object.entries(input)
     .map(([key, value]) => {
+      if (!/^[a-z_]+$/.test(key))
+        throw new Error("Invalid platform field name");
       const label = labels[key] ?? "结构化资料";
       const format =
         typeof value === "string" || key === "reading" ? "text" : "json";
-      const body =
+      const raw =
         key === "reading"
           ? readingText(value)
           : typeof value === "string"
             ? value
             : JSON.stringify(value, null, 2);
+      const body = escapeTaggedMaterial(raw);
       return `<${label} field="${key}" format="${format}" chars="${Array.from(body).length}">\n${body}\n</${label}>`;
     })
     .join("\n\n");
@@ -71,7 +101,8 @@ export function decodeUserMessage(message: string): Data | undefined {
     const ending = `\n</${label}>`;
     if (!message.startsWith(ending, offset)) return undefined;
     offset += ending.length;
-    result[key] = format === "json" ? (JSON.parse(body) as Json) : body;
+    const decoded = unescapeTaggedMaterial(body);
+    result[key] = format === "json" ? (JSON.parse(decoded) as Json) : decoded;
     if (offset < message.length) {
       if (!message.startsWith("\n\n", offset)) return undefined;
       offset += 2;

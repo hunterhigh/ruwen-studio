@@ -7,7 +7,7 @@ import {
   type TranscriptContext,
 } from "@earendil-works/pi-ai";
 import { markdownSection } from "@ruwen/core";
-import { decodeUserMessage } from "./messages.ts";
+import { decodeUserMessage, unescapeTaggedMaterial } from "./messages.ts";
 import { ROLES } from "./roles/index.ts";
 import {
   type Data,
@@ -211,7 +211,9 @@ export const defaultFauxResponse = (context: TranscriptContext) => {
           for (const block of message.content)
             if (block.type === "text") {
               try {
-                const value: unknown = JSON.parse(block.text);
+                const value: unknown = JSON.parse(
+                  unescapeTaggedMaterial(block.text),
+                );
                 if (
                   value &&
                   typeof value === "object" &&

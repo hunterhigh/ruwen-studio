@@ -20,6 +20,12 @@ export {
   publicTranscript,
 } from "./security/artifacts.ts";
 export {
+  assertImportedMaterial,
+  assertInputLimits,
+  assertMaterialText,
+  securityLimits,
+} from "./security/input.ts";
+export {
   LeakDetector,
   type LeakKind,
   normalizeSecurityText,

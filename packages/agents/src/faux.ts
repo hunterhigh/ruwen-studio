@@ -6,6 +6,7 @@ import {
   fauxToolCall,
   type TranscriptContext,
 } from "@earendil-works/pi-ai";
+import { markdownSection } from "@ruwen/core";
 import { decodeUserMessage } from "./messages.ts";
 import { ROLES } from "./roles/index.ts";
 import {
@@ -47,7 +48,7 @@ export function fauxOutput(id: RoleId, input: Data = {}): Data | string {
         ],
       };
     case "wenxue-bianji":
-      return { decision: "LOCAL_EDIT", changes: [] };
+      return { decision: "LOCAL_EDIT", edits: [], problems: [] };
     case "qingjie-heyanyuan":
     case "xianshi-heyanyuan":
       return { pass: true, issues: [] };
@@ -66,7 +67,12 @@ export function fauxOutput(id: RoleId, input: Data = {}): Data | string {
               {
                 path: String(current.path),
                 base_sha256: String(current.sha256),
-                new_content: `${current.content}\n\n粮车已经离开驿站。\n`,
+                sections: [
+                  {
+                    heading: "## 活跃力量与各自运动",
+                    replacement: `${markdownSection(String(current.content), "## 活跃力量与各自运动").body}粮车已经离开驿站。\n\n`,
+                  },
+                ],
               },
             ]
           : [];
@@ -235,7 +241,9 @@ export const defaultFauxResponse = (context: TranscriptContext) => {
       });
 };
 export function createFauxRuntime(responses?: FauxResponseStep[]) {
-  const faux = fauxProvider({ models: [{ id: "ruwen-faux" }] });
+  const faux = fauxProvider({
+    models: [{ id: "ruwen-faux", maxTokens: 128000 }],
+  });
   const models = createModels();
   models.setProvider(faux.provider);
   faux.setResponses(

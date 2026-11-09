@@ -238,10 +238,10 @@ P0 时确认 pi-ai 1.5.0 的模型目录里有哪些模型 ID，再填默认值�
 |---|---|---|---|
 | 小说作者 `xiaoshuo-zuozhe` | `core.packet.compile()` 产出的作者资料包全文 | 无 | 纯文本正文，存为 `authoring-ruwen-v5/candidates/` 下的候选稿。禁止规划说明、完成清单、来源解释。 |
 | 情感读者 `qinggan-duzhe` | 正文 + 最少阅读定位（章节号、上一章尾部若干字；具体以岗位文件为准） | `submit_reading` | `{ reactions: [{ anchor: string /*正文中的短引文*/, type: "noticed"\|"expected"\|"misread"\|"lost_interest"\|"felt_explained", note: string }] }` |
-| 文学编辑 `wenxue-bianji` | 正文 + 读者反应 | `load_diagnostic(name)`：只能从 4 个诊断文件中选一个；每次运行最多调用 2 次 · `submit_edit` | `{ decision: "LOCAL_EDIT"\|"RESTAGE"\|"RETURN_CONSTRUCTION", edited_text?: string, changes: [{ kind: "fact"\|"literary", before: string, after: string, reason: string }], return_reason?: string }`。原稿由编排代码在调用前保存（I12）。 |
+| 文学编辑 `wenxue-bianji` | 正文 + 读者反应 | 按需诊断与submit_edit | `{ decision, edits: [{anchor_before, anchor_after, replacement, kind, reason}], problems: [{location, category, condition, handling, result}], return_reason? }`。代码应用唯一锚点替换，单项1600字，总量最多15%；原稿及事实/文学修改分别保留，见ADR-006。 |
 | 情节核验员 `qingjie-heyanyuan` | 编辑后正文 + generation field 中"必须发生的可观察事件和用户锁定顺序" | `submit_verdict` | `{ pass: boolean, issues: [{ promise: string, problem: "missing"\|"changed"\|"order", evidence: string }] }` |
 | 现实核验员 `xianshi-heyanyuan` | 编辑后正文 + 相关硬设定（`校验/硬设定规则.md` 中经注册表允许的部分） | `submit_verdict` | `{ pass: boolean, issues: [{ category: "identity"\|"time_space"\|"knowledge_source"\|"physics"\|"institution"\|"ability"\|"canon", evidence: string, rule_ref: string }] }` |
-| 记忆维护员 `jiyi-weihuyuan` | 用户批准正文 + 可读资源元数据（id/path/type/scope/sha256），不预装正文 | `read_resource(id)`按需且受I7约束；只允许对本次实际读取且哈希匹配的资源提出补丁 | 先产出变更预览；预览批准后才提交。格式随后续A2小节替换契约更新 |
+| 记忆维护员 `jiyi-weihuyuan` | 用户批准正文 + 可读资源元数据（id/path/type/scope/sha256），不预装正文 | `read_resource(id)`按需且受I7约束；只允许对本次实际读取且哈希匹配的资源提出补丁 | 先产出变更预览；预览批准后才提交。`patches:[{path,base_sha256,sections:[{heading,replacement}]}]`；代码应用小节后生成预览，见ADR-006 |
 
 ### 6.4 构思岗位
 

@@ -92,7 +92,12 @@ describe("chapter pipeline", { timeout: 20000 }, () => {
               {
                 path: "世界/当前态势.md",
                 base_sha256: hash,
-                new_content: "不能绕过读取",
+                sections: [
+                  {
+                    heading: "## 活跃力量与各自运动",
+                    replacement: "不能绕过读取",
+                  },
+                ],
               },
             ],
           }
@@ -143,7 +148,12 @@ describe("chapter pipeline", { timeout: 20000 }, () => {
   ])("editor %s returns unchanged prose", async (decision) => {
     const p = await setup((id) =>
       id === "wenxue-bianji"
-        ? { decision, changes: [], return_reason: "需要重新处理场景压力。" }
+        ? {
+            decision,
+            edits: [],
+            problems: [],
+            return_reason: "需要重新处理场景压力。",
+          }
         : undefined,
     );
     const run = await startChapter(p.fs, { chapter: 1 }, p.ctx);
@@ -159,10 +169,22 @@ describe("chapter pipeline", { timeout: 20000 }, () => {
       id === "wenxue-bianji"
         ? {
             decision: "LOCAL_EDIT",
-            edited_text: `${FAUX_PROSE}他把信封收得更紧。`,
-            changes: [
-              { kind: "fact", before: "甲", after: "乙", reason: "事实" },
-              { kind: "literary", before: "丙", after: "丁", reason: "文学" },
+            problems: [],
+            edits: [
+              {
+                kind: "fact",
+                anchor_before: "驿吏",
+                anchor_after: "木牌，",
+                replacement: "翻开",
+                reason: "事实",
+              },
+              {
+                kind: "literary",
+                anchor_before: "信封",
+                anchor_after: "胸口。",
+                replacement: "贴着",
+                reason: "文学",
+              },
             ],
           }
         : undefined,
@@ -279,7 +301,7 @@ describe("chapter pipeline", { timeout: 20000 }, () => {
     bad = {
       path: "项目/项目章程.md",
       base_sha256: await p.fs.sha256("项目/项目章程.md"),
-      new_content: "unauthorized",
+      sections: [{ heading: "## 项目身份", replacement: "unauthorized" }],
     };
     const before = await p.fs.sha256("项目/项目章程.md");
     const run = await approve(

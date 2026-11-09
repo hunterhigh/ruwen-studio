@@ -2,7 +2,16 @@ import { createHash } from "node:crypto";
 import { Agent } from "@earendil-works/pi-agent-core";
 import type { Usage } from "@earendil-works/pi-ai";
 import { compile } from "@earendil-works/pi-schema";
-import { checks, handoff, state } from "@ruwen/core";
+import {
+  applyEditorialEdits,
+  applySectionEdits,
+  checks,
+  type EditorialEdit,
+  handoff,
+  type SectionEdit,
+  state,
+} from "@ruwen/core";
+import { editingPolicy, roleGenerationPolicy } from "./models.ts";
 import { assemblePrompt } from "./prompts/manifest.ts";
 import { ROLES } from "./roles/index.ts";
 import {
@@ -21,6 +30,7 @@ import {
   type RoleResult,
   RoleTimeoutError,
   type RoleTool,
+  RoleTruncatedError,
   RoleTurnLimitError,
 } from "./types.ts";
 
@@ -128,6 +138,7 @@ async function validateOutput(
   id: RoleId,
   output: Data,
   input: Data,
+  readBodies: Map<string, Data>,
 ): Promise<void> {
   if (id === "chuangyi-xietiaoyuan") {
     const errors = await handoff.validateHandoff(
@@ -150,27 +161,44 @@ async function validateOutput(
         );
     }
   if (id === "wenxue-bianji") {
-    if (
-      Array.isArray(output.changes) &&
-      output.changes.length &&
-      typeof output.edited_text !== "string"
-    )
-      throw new RoleOutputError("Change records require edited prose");
+    if (!Array.isArray(output.edits) || !Array.isArray(output.problems))
+      throw new RoleOutputError(
+        "Editor requires anchored edits and problem records",
+      );
     if (
       output.decision !== "LOCAL_EDIT" &&
       (typeof output.return_reason !== "string" ||
         !output.return_reason.trim() ||
-        output.edited_text !== undefined)
+        output.edits.length !== 0)
     )
       throw new RoleOutputError(
         "Returned edits require a reason and cannot silently rewrite prose",
       );
-    if (
-      typeof output.edited_text === "string" &&
-      output.edited_text !== input.prose &&
-      (!Array.isArray(output.changes) || !output.changes.length)
-    )
-      throw new RoleOutputError("Substantive edits require change records");
+    applyEditorialEdits(
+      String(input.prose),
+      output.edits as unknown as EditorialEdit[],
+      editingPolicy(),
+    );
+  }
+  if (id === "jiyi-weihuyuan" && Array.isArray(output.patches)) {
+    const seen = new Set<string>();
+    for (const patch of output.patches) {
+      if (!object(patch) || typeof patch.path !== "string")
+        throw new RoleOutputError("Invalid memory patch");
+      const read = readBodies.get(patch.path);
+      if (!read || read.sha256 !== patch.base_sha256)
+        throw new RoleOutputError(
+          "Memory resource was not read in this role run or hash differs",
+        );
+      if (seen.has(patch.path))
+        throw new RoleOutputError("Duplicate memory patch path");
+      seen.add(patch.path);
+      applySectionEdits(
+        String(read.content),
+        patch.sections as unknown as SectionEdit[],
+        editingPolicy(),
+      );
+    }
   }
   if (["qingjie-heyanyuan", "xianshi-heyanyuan"].includes(id)) {
     if (
@@ -225,9 +253,11 @@ export async function runRole(
   context: RoleContext,
 ): Promise<RoleResult> {
   const reads = new Map<string, { id: string; path: string; sha256: string }>();
+  const readBodies = new Map<string, Data>();
   const ctx: RoleContext = {
     ...context,
     onResourceRead: (resource, role) => {
+      readBodies.set(String(resource.path), resource);
       reads.set(String(resource.path), {
         id: String(resource.id),
         path: String(resource.path),
@@ -246,6 +276,16 @@ export async function runRole(
   const user = spec.buildUserMessage(input);
   const prompt = await assemblePrompt(spec, ctx.upstreamRoot);
   const { model, thinkingLevel } = ctx.runtime.resolve(spec);
+  const maxTokens = ctx.maxTokens ?? roleGenerationPolicy(id).maxTokens;
+  if (
+    !Number.isInteger(maxTokens) ||
+    maxTokens < 1 ||
+    (["xiaoshuo-zuozhe", "wenxue-bianji"].includes(id) && maxTokens < 32768) ||
+    maxTokens > model.maxTokens
+  )
+    throw new RoleOutputError(
+      "Role output cap exceeds model limit or is invalid",
+    );
   const usage: Usage[] = [];
   const started = performance.now();
   const tools = roleTools(id, ctx);
@@ -254,6 +294,7 @@ export async function runRole(
   let turns = 0;
   let limitReached = false;
   let timedOut = false;
+  let lastValidationError: string | undefined;
   const maxTurns = Math.max(
     1,
     Math.min(spec.maxTurns, ctx.maxTurns ?? spec.maxTurns),
@@ -266,7 +307,12 @@ export async function runRole(
       description: "提交最终结构化结果并结束本岗位。",
       parameters: format.schema,
       async execute(_call, value) {
-        await validateOutput(id, value, input);
+        try {
+          await validateOutput(id, value, input, readBodies);
+        } catch (error) {
+          lastValidationError = (error as Error).message;
+          throw error;
+        }
         output = structuredClone(value);
         submitted = true;
         return {
@@ -299,12 +345,14 @@ export async function runRole(
       return ctx.runtime.models.streamSimple(selected, context, {
         ...options,
         cacheRetention: "long",
-        maxTokens: ctx.maxTokens ?? 8000,
+        maxTokens,
         maxRetries: 0,
       });
     },
     getApiKey: (provider) => ctx.runtime.apiKey?.(provider),
-    beforeToolCall: async ({ toolCall }, signal) => {
+    beforeToolCall: async ({ toolCall, assistantMessage }, signal) => {
+      if (assistantMessage.stopReason === "length")
+        return { block: true, terminate: true, reason: "role_truncated" };
       if (signal?.aborted || submitted)
         return {
           block: true,
@@ -322,6 +370,7 @@ export async function runRole(
     },
     finishTurn: (turn) => {
       turns++;
+      if (turn.message.stopReason === "length") return { action: "end" };
       if (submitted) return { action: "end" };
       if (
         submitName &&
@@ -393,6 +442,10 @@ export async function runRole(
       const message = [...runtime.state.messages]
         .reverse()
         .find((m) => m.role === "assistant");
+      if (message?.role === "assistant" && message.stopReason === "length")
+        throw new RoleTruncatedError(
+          "Role output was truncated at max_tokens; no retry",
+        );
       if (
         message?.role === "assistant" &&
         ["error", "aborted"].includes(message.stopReason)
@@ -426,7 +479,7 @@ export async function runRole(
         throw new RoleTurnLimitError("Role exceeded its turn budget");
     }
     throw new RoleOutputError(
-      "Role did not submit a valid result after one correction",
+      `Role did not submit a valid result after one correction${lastValidationError ? `: ${redact(lastValidationError)}` : ""}`,
     );
   } catch (error) {
     runtime.abort();

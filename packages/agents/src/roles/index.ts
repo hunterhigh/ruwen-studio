@@ -176,13 +176,23 @@ const outputs: Record<
     name: "submit_edit",
     schema: obj({
       decision: oneOf(["LOCAL_EDIT", "RESTAGE", "RETURN_CONSTRUCTION"]),
-      edited_text: opt(bounded(100_000)),
-      changes: arr(
+      edits: arr(
         obj({
+          anchor_before: bounded(200),
+          anchor_after: bounded(200),
+          replacement: bounded(1600),
           kind: oneOf(["fact", "literary"]),
-          before: bounded(6000),
-          after: bounded(6000),
           reason: bounded(1200),
+        }),
+        { maxItems: 64 },
+      ),
+      problems: arr(
+        obj({
+          location: str({ minLength: 1, maxLength: 1000 }),
+          category: str({ minLength: 1, maxLength: 1000 }),
+          condition: str({ minLength: 1, maxLength: 1000 }),
+          handling: str({ minLength: 1, maxLength: 1000 }),
+          result: str({ minLength: 1, maxLength: 1000 }),
         }),
         { maxItems: 64 },
       ),
@@ -233,7 +243,20 @@ const outputs: Record<
       invalidated: list(),
       scope_changes: list(),
       next_chapter_state: bounded(2200),
-      patches,
+      patches: arr(
+        obj({
+          path: str({ minLength: 1, maxLength: 300 }),
+          base_sha256: str({ pattern: "^[a-f0-9]{64}$" }),
+          sections: arr(
+            obj({
+              heading: str({ minLength: 1, maxLength: 200 }),
+              replacement: bounded(4000),
+            }),
+            { minItems: 1, maxItems: 8 },
+          ),
+        }),
+        { maxItems: 32 },
+      ),
     }),
   },
 };

@@ -90,6 +90,7 @@ export class RoleExecutionError extends Error {
   partial?: RoleResult;
 }
 export class RoleOutputError extends RoleExecutionError {}
+export class RoleTruncatedError extends RoleExecutionError {}
 export class RoleTurnLimitError extends RoleOutputError {}
 export class RoleAbortError extends RoleExecutionError {}
 export class RoleTimeoutError extends RoleAbortError {}

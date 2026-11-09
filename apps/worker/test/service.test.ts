@@ -1,10 +1,40 @@
 import { randomUUID } from "node:crypto";
+import { createFauxRuntime } from "@ruwen/agents";
 import { PostgresFS } from "@ruwen/db";
 import { loadRun } from "@ruwen/pipeline";
 import { afterEach, expect, it } from "vitest";
+import { defaultFauxResponse } from "../../../packages/agents/src/faux.ts";
 import { fixture, waitStatus } from "./helpers.ts";
 
 const cleanups: (() => Promise<void>)[] = [];
+it("length failure persists incurred usage once and never promotes truncated prose", async () => {
+  const runtime = createFauxRuntime([
+    (context) => ({ ...defaultFauxResponse(context), stopReason: "length" }),
+  ]);
+  const p = await fixture({ runtime: () => runtime }, true);
+  cleanups.push(() => p.service.stop());
+  const id = await p.service.enqueueChapter(p.fs, { chapter: 1 });
+  await waitStatus(p.service, id, "FAILED");
+  const row = await p.service.db.pool.query<{
+    usage: { output: number }[];
+    status: string;
+    cost_usd: string;
+  }>("SELECT usage,status,cost_usd FROM role_runs WHERE run_id=$1", [id]);
+  expect(row.rowCount).toBe(1);
+  expect(row.rows[0]?.status).toBe("failed");
+  expect(row.rows[0]?.usage[0]?.output).toBeGreaterThan(0);
+  expect(row.rows[0]?.cost_usd).not.toBeNull();
+  expect(runtime.faux.state.callCount).toBe(1);
+  expect(
+    (
+      await p.service.db.pool.query(
+        "SELECT role_run_id FROM role_cost_events WHERE role_run_id IN (SELECT id FROM role_runs WHERE run_id=$1)",
+        [id],
+      )
+    ).rowCount,
+  ).toBe(1);
+  expect(await p.fs.exists("chapters/chapter-001.md")).toBe(false);
+}, 30000);
 it("role_runs persists the provider cacheRead/cacheWrite counters and additive migrations are idempotent", async () => {
   const p = await fixture({}, true);
   cleanups.push(() => p.service.stop());

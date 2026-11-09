@@ -86,7 +86,13 @@ export async function assemblePrompt(
     spec.output.kind === "text"
       ? "只输出候选正文，不输出说明。"
       : `最终结果必须调用 ${spec.output.toolName} 提交；不得仅用普通消息代替。`;
-  const content = `${fragments.join("\n\n")}\n\n${PLATFORM_NOTE}\n\nCURRENT_ROLE:${spec.id}\n${format}\n`;
+  const editing =
+    spec.id === "wenxue-bianji"
+      ? "\n平台提交格式：LOCAL_EDIT仅提交edits锚点替换，不返回整章。anchor_before与anchor_after是保留的原稿边界文本，分别必须唯一；空字符串分别表示篇首、篇尾；只替换两者之间的内容。锚点最多200字，单项删除/插入最多1600字，总替换量（各项删除/插入较大者之和）最多原稿15%，具体配置可能更低。RESTAGE/RETURN_CONSTRUCTION的edits必须为空并给return_reason。每个文学问题以location、category、condition、handling、result记录在problems；无问题时为空。"
+      : spec.id === "jiyi-weihuyuan"
+        ? "\n平台提交格式：先按需读取资源；patches只引用本次实际读取的path与base_sha256。每项sections按完整Markdown标题heading替换其正文replacement，保留标题及其他小节；标题必须存在且唯一，不得引入同级或更高标题。每资源最多8小节，每小节最多4000字；不返回整份new_content。"
+        : "";
+  const content = `${fragments.join("\n\n")}\n\n${PLATFORM_NOTE}\n\nCURRENT_ROLE:${spec.id}${editing}\n${format}\n`;
   return {
     content,
     sha256: createHash("sha256").update(content, "utf8").digest("hex"),

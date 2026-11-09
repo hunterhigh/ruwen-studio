@@ -6,7 +6,8 @@ import {
 } from "@earendil-works/pi-ai";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
 import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
-import type { ModelRuntime, RoleSpec } from "./types.ts";
+import type { EditPolicy } from "@ruwen/core";
+import type { ModelRuntime, RoleId, RoleSpec } from "./types.ts";
 
 interface Route {
   provider: string;
@@ -16,8 +17,33 @@ interface Route {
 interface Routes {
   tiers: Record<string, Route>;
   roleOverrides: Record<string, Route>;
+  roles: Record<RoleId, { maxTokens: number; basis: string }>;
+  editing: EditPolicy;
 }
 const routePath = new URL("../../../config/models.json", import.meta.url);
+export function roleGenerationPolicy(id: RoleId) {
+  const policy = (JSON.parse(readFileSync(routePath, "utf8")) as Routes).roles[
+    id
+  ];
+  if (
+    !policy ||
+    !Number.isInteger(policy.maxTokens) ||
+    policy.maxTokens < 1 ||
+    !policy.basis?.trim()
+  )
+    throw new Error("Role token policy is not configured");
+  return policy;
+}
+export function editingPolicy(): EditPolicy {
+  const policy = (JSON.parse(readFileSync(routePath, "utf8")) as Routes)
+    .editing;
+  if (
+    !policy ||
+    !(policy.maxChangedRatio > 0 && policy.maxChangedRatio <= 0.15)
+  )
+    throw new Error("Edit ratio must be positive and no greater than 15%");
+  return policy;
+}
 export function resolveRoute(spec: RoleSpec): Route {
   const routes = JSON.parse(readFileSync(routePath, "utf8")) as Routes;
   const route = routes.roleOverrides[spec.id] ?? routes.tiers[spec.modelTier];

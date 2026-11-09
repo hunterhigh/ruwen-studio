@@ -13,3 +13,11 @@ export * as ledgers from "./ledgers/index.ts";
 export * as packet from "./packet/index.ts";
 export * as registry from "./registry/index.ts";
 export * as state from "./state/index.ts";
+export {
+  applyEditorialEdits,
+  applySectionEdits,
+  type EditorialEdit,
+  type EditPolicy,
+  markdownSection,
+  type SectionEdit,
+} from "./text-edits.ts";

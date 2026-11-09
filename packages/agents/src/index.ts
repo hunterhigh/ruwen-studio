@@ -1,5 +1,10 @@
 export { createFauxRuntime, FAUX_PROSE, fauxOutput } from "./faux.ts";
-export { createRealRuntime, resolveRoute } from "./models.ts";
+export {
+  createRealRuntime,
+  editingPolicy,
+  resolveRoute,
+  roleGenerationPolicy,
+} from "./models.ts";
 export {
   assemblePrompt,
   defaultUpstreamRoot,

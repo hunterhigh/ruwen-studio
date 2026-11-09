@@ -16,5 +16,60 @@
       "thinkingLevel": "off"
     }
   },
-  "roleOverrides": {}
+  "roleOverrides": {},
+  "roles": {
+    "chuangyi-xietiaoyuan": {
+      "maxTokens": 8192,
+      "basis": "短委托与纠正；预留思考额度"
+    },
+    "xiangmu-zhiliyuan": {
+      "maxTokens": 16384,
+      "basis": "治理预览与有界补丁，含思考余量"
+    },
+    "waibu-zhishi-guwen": {
+      "maxTokens": 24576,
+      "basis": "证据与不确定性报告，含思考余量"
+    },
+    "biaoxian-shejishi": {
+      "maxTokens": 24576,
+      "basis": "表现预览与推理，含思考余量"
+    },
+    "gushi-gousishi": {
+      "maxTokens": 32768,
+      "basis": "故事构思和开放问题，含自适应思考余量"
+    },
+    "zhangjie-qingjing-bianyiyuan": {
+      "maxTokens": 16384,
+      "basis": "2200字情境与结构化约束，含自适应思考余量"
+    },
+    "xiaoshuo-zuozhe": {
+      "maxTokens": 65536,
+      "basis": "长章正文与自适应思考共用max_tokens；以64k为P3待测起点"
+    },
+    "qinggan-duzhe": {
+      "maxTokens": 8192,
+      "basis": "有限定位与阅读反应，默认关闭思考"
+    },
+    "wenxue-bianji": {
+      "maxTokens": 32768,
+      "basis": "锚点修改、问题记录与自适应思考共用max_tokens；至少32k"
+    },
+    "qingjie-heyanyuan": {
+      "maxTokens": 8192,
+      "basis": "有限承诺核验，默认关闭思考"
+    },
+    "xianshi-heyanyuan": {
+      "maxTokens": 8192,
+      "basis": "有限硬设定核验，默认关闭思考"
+    },
+    "jiyi-weihuyuan": {
+      "maxTokens": 24576,
+      "basis": "按需读取后的小节补丁与思考余量"
+    }
+  },
+  "editing": {
+    "maxChangedRatio": 0.15,
+    "maxReplacementChars": 1600,
+    "maxSectionChars": 4000
+  }
 }

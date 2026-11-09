@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
   type Data,
+  editingPolicy,
   listAuthorizedResources,
   RoleAbortError,
   type RoleContext,
@@ -11,12 +12,16 @@ import {
   runRole,
 } from "@ruwen/agents";
 import {
+  applyEditorialEdits,
+  applySectionEdits,
   approval,
   checks,
   commitMemoryPreview,
   createMemoryPreview,
+  type EditorialEdit,
   type ProjectFS,
   packet,
+  type SectionEdit,
   state,
 } from "@ruwen/core";
 
@@ -475,19 +480,21 @@ export async function startChapter(
         String(edited.return_reason),
         ctx,
       );
-    const prose =
-      typeof edited.edited_text === "string"
-        ? edited.edited_text
-        : author.output;
+    if (!Array.isArray(edited.edits) || Object.hasOwn(edited, "edited_text"))
+      throw new Error("Editor output requires anchored edits");
+    const applied = applyEditorialEdits(
+      author.output,
+      edited.edits as unknown as EditorialEdit[],
+      editingPolicy(),
+    );
+    const prose = applied.text;
     if (checks.candidateProseErrors(prose).length)
       throw new Error(
         "Edited prose contains governance or compliance language",
       );
     run.paths.candidate = `authoring-ruwen-v5/candidates/${id}-candidate.md`;
     await fs.write(run.paths.candidate, prose);
-    const changes = Array.isArray(edited.changes)
-      ? edited.changes.filter(object)
-      : [];
+    const changes = applied.changes;
     await write(
       fs,
       `${runDirectory(id)}/fact-changes.json`,
@@ -688,7 +695,7 @@ export async function generateMemoryPreview(
       ctx,
     );
     const memory = asData(memoryResult.output);
-    const patches = Array.isArray(memory.patches)
+    const requestedPatches = Array.isArray(memory.patches)
       ? memory.patches.filter(object)
       : [];
     const allowed = new Map(
@@ -697,18 +704,31 @@ export async function generateMemoryPreview(
         resource.sha256,
       ]),
     );
-    for (const patch of patches)
-      if (
-        typeof patch.path !== "string" ||
-        typeof patch.new_content !== "string" ||
-        !allowed.has(fs.path(patch.path)) ||
-        patch.base_sha256 !== allowed.get(fs.path(patch.path)) ||
-        patch.base_sha256 !== (await fs.sha256(patch.path))
-      )
-        throw new Error(
-          "Memory patch resource was not read in this role run or became stale",
-        );
     run.paths.memory_preview = await fs.transaction(async (tx) => {
+      const patches: Data[] = [];
+      for (const patch of requestedPatches) {
+        if (
+          typeof patch.path !== "string" ||
+          !Array.isArray(patch.sections) ||
+          Object.hasOwn(patch, "new_content") ||
+          !allowed.has(tx.path(patch.path)) ||
+          patch.base_sha256 !== allowed.get(tx.path(patch.path)) ||
+          patch.base_sha256 !== (await tx.sha256(patch.path))
+        )
+          throw new Error(
+            "Memory patch resource was not read in this role run or became stale",
+          );
+        const original = await tx.readText(patch.path);
+        patches.push({
+          path: patch.path,
+          base_sha256: patch.base_sha256 ?? null,
+          new_content: applySectionEdits(
+            original,
+            patch.sections as unknown as SectionEdit[],
+            editingPolicy(),
+          ),
+        });
+      }
       const expected = `authoring-ruwen-v5/reports/memory-${id}.json`;
       if (await tx.exists(expected)) {
         const existing = await parse(tx, expected);

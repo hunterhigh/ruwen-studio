@@ -60,5 +60,7 @@ jobs:
           cache: pnpm
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
+      - name: Verify approved upstream prompt sources
+        run: pnpm check:prompt-sources
       - name: Lint, typecheck and test with faux models
         run: pnpm lint && pnpm typecheck && pnpm test

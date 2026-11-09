@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import EmbeddedPostgres from "embedded-postgres";
 import type { TestProject } from "vitest/node";
+import { verifyPromptSources } from "../packages/agents/src/security/prompt-sources.ts";
 import { Database } from "../packages/db/src/index.ts";
 
 declare module "vitest" {
@@ -13,6 +14,8 @@ declare module "vitest" {
   }
 }
 export default async function setup(project: TestProject) {
+  // Fail before fixtures/Python or a database start can obscure an upstream byte mismatch.
+  await verifyPromptSources();
   let cluster: EmbeddedPostgres | undefined;
   let directory: string | undefined;
   let url = process.env.TEST_DATABASE_URL;

@@ -22,9 +22,12 @@ const conceptual: RoleId[] = [
 ];
 export const skillRoot = (id: RoleId) =>
   `${PLUGIN}/skills/${conceptual.includes(id) ? "ruwen-gushi-gousi" : "ruwen-zhangjie-xiezuo"}`;
-function references(root: string): string[] {
+function references(
+  root: string,
+  upstreamRoot = defaultUpstreamRoot,
+): string[] {
   const walk = (relative: string): string[] =>
-    readdirSync(path.join(defaultUpstreamRoot, root, "references", relative), {
+    readdirSync(path.join(upstreamRoot, root, "references", relative), {
       withFileTypes: true,
     })
       .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
@@ -41,7 +44,10 @@ function references(root: string): string[] {
       });
   return walk("");
 }
-export const rolePromptFiles = (id: RoleId): RoleSpec["promptFiles"] => {
+export const rolePromptFiles = (
+  id: RoleId,
+  upstreamRoot = defaultUpstreamRoot,
+): RoleSpec["promptFiles"] => {
   const root = skillRoot(id),
     own = { path: `${root}/references/roles/${id}.md` };
   if (id === "qinggan-duzhe") return [own];
@@ -53,7 +59,7 @@ export const rolePromptFiles = (id: RoleId): RoleSpec["promptFiles"] => {
     { path: `${root}/CREATIVE-SOUL.md` },
     { path: `${PLUGIN}/shared/information-contract.md` },
     { path: `${PLUGIN}/shared/creative-communication-contract.md` },
-    ...references(root).map((path) => ({ path })),
+    ...references(root, upstreamRoot).map((path) => ({ path })),
     own,
   ];
 };

@@ -19,6 +19,7 @@
     "test:e2e": "pnpm build:web && playwright test",
     "demo:db": "node scripts/demo-db.ts",
     "typecheck": "tsc --noEmit",
+    "check:prompt-sources": "node scripts/check-prompt-sources.ts",
     "test": "vitest run",
     "test:upstream": "python -I -B scripts/verify-upstream.py"
   },

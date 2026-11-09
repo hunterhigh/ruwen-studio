@@ -1,7 +1,9 @@
 export { createFauxRuntime, FAUX_PROSE, fauxOutput } from "./faux.ts";
 export {
   createRealRuntime,
+  DEFAULT_ROLE_TIMEOUT_MS,
   editingPolicy,
+  ROLE_OUTPUT_ATTEMPTS,
   resolveRoute,
   roleGenerationPolicy,
 } from "./models.ts";

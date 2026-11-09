@@ -3,7 +3,9 @@ import {
   assemblePrompt,
   authorizedResourceInputs,
   type Data,
+  DEFAULT_ROLE_TIMEOUT_MS,
   type ModelRuntime,
+  ROLE_OUTPUT_ATTEMPTS,
   ROLES,
   RoleAbortError,
   RoleExecutionError,
@@ -16,6 +18,7 @@ import { Database, PostgresFS } from "@ruwen/db";
 import {
   approveCandidate,
   approveMemory,
+  CHAPTER_ROLES,
   type ChapterRequest,
   type ChapterRun,
   cancelRun,
@@ -44,11 +47,15 @@ export interface Task {
   ownerId: string;
   runId: string;
   decision?: UserApproval;
+  lockDeferrals?: number;
 }
 export interface WorkerOptions {
   runtime: () => ModelRuntime;
   queue?: string;
   heartbeatSeconds?: number;
+  concurrency?: number;
+  roleTimeoutMs?: number;
+  queueMarginSeconds?: number;
   onBoundary?: (
     kind: "checkpoint" | "role_intent" | "role_response" | "role_completed",
     name: string,
@@ -69,13 +76,57 @@ const terminal = [
   "FAILED_PRECONDITION",
   "CANCELLED",
 ];
+export function queueExpirySeconds(
+  roleTimeoutMs: number,
+  roleCount: number,
+  attempts: number,
+  marginSeconds: number,
+) {
+  if (
+    !Number.isFinite(roleTimeoutMs) ||
+    roleTimeoutMs <= 0 ||
+    !Number.isInteger(roleCount) ||
+    roleCount < 1 ||
+    !Number.isInteger(attempts) ||
+    attempts < 1 ||
+    !Number.isInteger(marginSeconds) ||
+    marginSeconds < 0
+  )
+    throw new Error("Invalid queue time budget");
+  const seconds =
+    Math.ceil((roleTimeoutMs * roleCount * attempts) / 1000) + marginSeconds;
+  if (!Number.isSafeInteger(seconds))
+    throw new Error("Queue time budget is too large");
+  return seconds;
+}
 export class WorkerService {
   readonly db: Database;
   readonly boss: PgBoss;
   readonly queue: string;
+  readonly scheduling: {
+    concurrency: number;
+    roleTimeoutMs: number;
+    expireInSeconds: number;
+  };
   private options: WorkerOptions;
   private active = new Map<string, AbortController>();
   constructor(connectionString: string, options: WorkerOptions) {
+    const concurrency = options.concurrency ?? 4;
+    if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 4)
+      throw new Error(
+        "Worker concurrency must be between 1 and 4 for the 12-connection project pool",
+      );
+    const roleTimeoutMs = options.roleTimeoutMs ?? DEFAULT_ROLE_TIMEOUT_MS;
+    this.scheduling = {
+      concurrency,
+      roleTimeoutMs,
+      expireInSeconds: queueExpirySeconds(
+        roleTimeoutMs,
+        Object.keys(CHAPTER_ROLES).length,
+        ROLE_OUTPUT_ATTEMPTS,
+        options.queueMarginSeconds ?? 120,
+      ),
+    };
     this.db = new Database(connectionString);
     this.boss = new PgBoss({
       connectionString,
@@ -94,13 +145,19 @@ export class WorkerService {
       await this.boss.createQueue(this.queue, {
         retryLimit: 5,
         retryDelay: 1,
-        expireInSeconds: 3600,
+        expireInSeconds: this.scheduling.expireInSeconds,
         heartbeatSeconds: this.options.heartbeatSeconds ?? 20,
+      });
+      await this.boss.updateQueue(this.queue, {
+        expireInSeconds: this.scheduling.expireInSeconds,
       });
       if (consume)
         await this.boss.work<Task>(
           this.queue,
-          { pollingIntervalSeconds: 0.5 },
+          {
+            pollingIntervalSeconds: 0.5,
+            localConcurrency: this.scheduling.concurrency,
+          },
           async (jobs) => {
             for (const job of jobs) await this.handle(job.data, job.signal);
           },
@@ -432,12 +489,29 @@ export class WorkerService {
       : control.signal;
     let timer: ReturnType<typeof setInterval> | undefined;
     let polling: Promise<void> | undefined;
+    let locked = false;
+    let released = false;
     try {
       // Session lock serializes a project's jobs without holding an SQL transaction over model I/O.
-      await connection.query(
-        "SELECT pg_advisory_lock(hashtextextended($1,0))",
+      const lock = await connection.query<{ locked: boolean }>(
+        "SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS locked",
         [`ruwen:project:${task.projectId}`],
       );
+      locked = lock.rows[0]?.locked === true;
+      if (!locked) {
+        connection.release();
+        released = true;
+        const deferrals = (task.lockDeferrals ?? 0) + 1;
+        const delayMs = Math.min(30_000, 250 * 2 ** Math.min(deferrals - 1, 7));
+        const queued = await this.boss.sendAfter(
+          this.queue,
+          { ...task, lockDeferrals: deferrals },
+          { singletonKey: `${task.runId}:${task.kind}` },
+          new Date(Date.now() + delayMs),
+        );
+        if (!queued) throw new Error("Could not defer busy project job");
+        return;
+      }
       const row = await fs.transaction((tx) =>
         tx.sql<{
           project_key: string;
@@ -482,6 +556,7 @@ export class WorkerService {
         runtime: this.options.runtime(),
         runId: task.runId,
         signal,
+        timeoutMs: this.scheduling.roleTimeoutMs,
         executeRole: (id, input, ctx, run) =>
           this.cachedRole(fs, run, id, input, ctx),
         onCheckpoint: (tx, run) => this.checkpoint(tx, run),
@@ -571,14 +646,16 @@ export class WorkerService {
     } finally {
       if (timer) clearInterval(timer);
       await polling;
-      this.active.delete(task.runId);
+      if (this.active.get(task.runId) === control)
+        this.active.delete(task.runId);
       try {
-        await connection.query(
-          "SELECT pg_advisory_unlock(hashtextextended($1,0))",
-          [`ruwen:project:${task.projectId}`],
-        );
+        if (locked)
+          await connection.query(
+            "SELECT pg_advisory_unlock(hashtextextended($1,0))",
+            [`ruwen:project:${task.projectId}`],
+          );
       } finally {
-        connection.release();
+        if (!released) connection.release();
       }
     }
   }

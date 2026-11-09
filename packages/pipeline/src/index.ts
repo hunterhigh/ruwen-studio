@@ -26,6 +26,14 @@ import {
   state,
 } from "@ruwen/core";
 
+export const CHAPTER_ROLES = {
+  author: "xiaoshuo-zuozhe",
+  reader: "qinggan-duzhe",
+  editor: "wenxue-bianji",
+  plot: "qingjie-heyanyuan",
+  reality: "xianshi-heyanyuan",
+  memory: "jiyi-weihuyuan",
+} as const;
 export type RunStatus =
   | "REQUESTED"
   | "READINESS_OK"
@@ -423,7 +431,7 @@ export async function startChapter(
     const author = await call(
       fs,
       run,
-      "xiaoshuo-zuozhe",
+      CHAPTER_ROLES.author,
       { packet: await text(fs, String(run.paths.packet)) },
       ctx,
     );
@@ -442,7 +450,7 @@ export async function startChapter(
     const reading = await call(
       fs,
       run,
-      "qinggan-duzhe",
+      CHAPTER_ROLES.reader,
       {
         prose: author.output,
         chapter: run.chapter,
@@ -458,7 +466,7 @@ export async function startChapter(
         await call(
           fs,
           run,
-          "wenxue-bianji",
+          CHAPTER_ROLES.editor,
           { prose: author.output, reading: asData(reading.output) },
           ctx,
         )
@@ -511,7 +519,7 @@ export async function startChapter(
         await call(
           fs,
           run,
-          "qingjie-heyanyuan",
+          CHAPTER_ROLES.plot,
           { prose, locked_events: lockedEvents, locked_order: lockedOrder },
           ctx,
         )
@@ -528,7 +536,7 @@ export async function startChapter(
       );
     const hardRules = await readAuthorizedResource(
       { ...ctx, fs },
-      "xianshi-heyanyuan",
+      CHAPTER_ROLES.reality,
       "xiaoyan-yingsheding",
     );
     const reality = asData(
@@ -536,7 +544,7 @@ export async function startChapter(
         await call(
           fs,
           run,
-          "xianshi-heyanyuan",
+          CHAPTER_ROLES.reality,
           { prose, hard_rules: [hardRules] },
           ctx,
         )
@@ -644,7 +652,7 @@ export async function approveCandidate(
         Boolean(run.targetBeforeSha256),
         decision.expectedTargetSha256,
       );
-      const editorPath = run.roles["wenxue-bianji"]?.path;
+      const editorPath = run.roles[CHAPTER_ROLES.editor]?.path;
       if (!editorPath)
         throw new Error("Approved candidate has no editorial report");
       const editorial = asData((await parse(tx, editorPath)).output as Data);
@@ -696,12 +704,12 @@ export async function generateMemoryPreview(
     const prose = await text(fs, run.target);
     const resources = await listAuthorizedResources(
       { ...ctx, fs },
-      "jiyi-weihuyuan",
+      CHAPTER_ROLES.memory,
     );
     const memoryResult = await call(
       fs,
       run,
-      "jiyi-weihuyuan",
+      CHAPTER_ROLES.memory,
       {
         approved_prose: prose,
         resources: resources.map((resource) => ({

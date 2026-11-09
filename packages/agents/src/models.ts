@@ -14,6 +14,8 @@ interface Route {
   modelId: string;
   thinkingLevel: ThinkingLevel;
 }
+export const DEFAULT_ROLE_TIMEOUT_MS = 600_000;
+export const ROLE_OUTPUT_ATTEMPTS = 2;
 interface Routes {
   tiers: Record<string, Route>;
   roleOverrides: Record<string, Route>;

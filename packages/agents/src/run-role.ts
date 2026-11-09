@@ -11,7 +11,12 @@ import {
   type SectionEdit,
   state,
 } from "@ruwen/core";
-import { editingPolicy, roleGenerationPolicy } from "./models.ts";
+import {
+  DEFAULT_ROLE_TIMEOUT_MS,
+  editingPolicy,
+  ROLE_OUTPUT_ATTEMPTS,
+  roleGenerationPolicy,
+} from "./models.ts";
 import { assemblePrompt } from "./prompts/manifest.ts";
 import { ROLES } from "./roles/index.ts";
 import {
@@ -425,7 +430,7 @@ export async function runRole(
   const timeout = setTimeout(() => {
     timedOut = true;
     abort();
-  }, ctx.timeoutMs ?? 600_000);
+  }, ctx.timeoutMs ?? DEFAULT_ROLE_TIMEOUT_MS);
   ctx.signal?.addEventListener("abort", abort, { once: true });
   const redact = (value: string) => {
     const key = ctx.runtime.apiKey?.(model.provider);
@@ -445,7 +450,7 @@ export async function runRole(
     readResources: [...reads.values()],
   });
   try {
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt < ROLE_OUTPUT_ATTEMPTS; attempt++) {
       if (ctx.signal?.aborted) throw new RoleAbortError("Role cancelled");
       await Promise.race([
         runtime.prompt(

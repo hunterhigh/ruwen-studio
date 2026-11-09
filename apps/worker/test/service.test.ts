@@ -1,12 +1,122 @@
 import { randomUUID } from "node:crypto";
-import { createFauxRuntime } from "@ruwen/agents";
+import {
+  createFauxRuntime,
+  DEFAULT_ROLE_TIMEOUT_MS,
+  ROLE_OUTPUT_ATTEMPTS,
+} from "@ruwen/agents";
 import { PostgresFS } from "@ruwen/db";
-import { loadRun } from "@ruwen/pipeline";
+import { CHAPTER_ROLES, loadRun } from "@ruwen/pipeline";
 import { afterEach, expect, it } from "vitest";
-import { defaultFauxResponse } from "../../../packages/agents/src/faux.ts";
+import {
+  defaultFauxResponse,
+  requestRole,
+} from "../../../packages/agents/src/faux.ts";
+import { queueExpirySeconds } from "../src/service.ts";
 import { fixture, waitStatus } from "./helpers.ts";
 
 const cleanups: (() => Promise<void>)[] = [];
+it("queue expiry derives from actual role timeout, chapter role count, output attempts and margin, including existing queues", async () => {
+  const p = await fixture({ roleTimeoutMs: 1501, queueMarginSeconds: 123 });
+  cleanups.push(() => p.service.stop());
+  const roles = Object.keys(CHAPTER_ROLES).length;
+  const expected =
+    Math.ceil((1501 * roles * ROLE_OUTPUT_ATTEMPTS) / 1000) + 123;
+  expect(queueExpirySeconds(1501, roles, ROLE_OUTPUT_ATTEMPTS, 123)).toBe(
+    expected,
+  );
+  expect(
+    (await p.service.boss.getQueue(p.service.queue))?.expireInSeconds,
+  ).toBe(expected);
+  expect(
+    queueExpirySeconds(
+      DEFAULT_ROLE_TIMEOUT_MS,
+      roles,
+      ROLE_OUTPUT_ATTEMPTS,
+      120,
+    ),
+  ).toBe(7320);
+  await p.service.boss.updateQueue(p.service.queue, { expireInSeconds: 3600 });
+  await p.service.stop();
+  cleanups.pop();
+  const replacement = await fixture({
+    queue: p.service.queue,
+    roleTimeoutMs: 1501,
+    queueMarginSeconds: 123,
+  });
+  cleanups.push(() => replacement.service.stop());
+  expect(
+    (await replacement.service.boss.getQueue(replacement.service.queue))
+      ?.expireInSeconds,
+  ).toBe(expected);
+});
+it("one process runs distinct projects concurrently; a busy project defers without blocked pool connections or duplicate costs", async () => {
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let held = false;
+  const p = await fixture(
+    {
+      concurrency: 3,
+      runtime: () =>
+        createFauxRuntime(
+          Array.from({ length: 100 }, () => async (context) => {
+            if (!held && requestRole(context) === "xiaoshuo-zuozhe") {
+              held = true;
+              await gate;
+            }
+            return defaultFauxResponse(context);
+          }),
+        ),
+    },
+    true,
+  );
+  cleanups.push(() => p.service.stop());
+  const other = await fixture();
+  cleanups.push(() => other.service.stop());
+  const first = await p.service.enqueueChapter(p.fs, { chapter: 1 });
+  try {
+    await expect.poll(() => held, { timeout: 5000 }).toBe(true);
+    const busy = await p.service.enqueueChapter(p.fs, { chapter: 1 });
+    const parallel = await p.service.enqueueChapter(other.fs, { chapter: 1 });
+    await waitStatus(p.service, parallel, "AWAITING_CANDIDATE_APPROVAL");
+    expect(
+      (
+        await p.service.db.pool.query(
+          "SELECT id FROM role_runs WHERE run_id=$1",
+          [busy],
+        )
+      ).rowCount,
+    ).toBe(0);
+    const deferred = await p.service.db.pool.query<{ n: string }>(
+      "SELECT count(*) n FROM pgboss.job WHERE name=$1 AND data->>'runId'=$2 AND (data->>'lockDeferrals')::int >= 1",
+      [p.service.queue, busy],
+    );
+    expect(Number(deferred.rows[0]?.n)).toBeGreaterThan(0);
+    expect(
+      (
+        await p.service.db.pool.query(
+          "SELECT pid FROM pg_stat_activity WHERE wait_event='advisory' AND query LIKE '%pg_advisory_lock%'",
+        )
+      ).rowCount,
+    ).toBe(0);
+    release();
+    await waitStatus(p.service, first, "AWAITING_CANDIDATE_APPROVAL");
+    await waitStatus(p.service, busy, "AWAITING_CANDIDATE_APPROVAL");
+    for (const id of [first, busy, parallel]) {
+      expect(
+        (
+          await p.service.db.pool.query(
+            "SELECT role_run_id FROM role_cost_events WHERE role_run_id IN (SELECT id FROM role_runs WHERE run_id=$1)",
+            [id],
+          )
+        ).rowCount,
+      ).toBe(5);
+    }
+  } finally {
+    release();
+  }
+}, 30000);
 it("length failure persists incurred usage once and never promotes truncated prose", async () => {
   const runtime = createFauxRuntime([
     (context) => ({ ...defaultFauxResponse(context), stopReason: "length" }),

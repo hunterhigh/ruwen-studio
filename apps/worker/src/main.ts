@@ -1,6 +1,10 @@
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { createFauxRuntime, createRealRuntime } from "@ruwen/agents";
+import {
+  createFauxRuntime,
+  createRealRuntime,
+  DEFAULT_ROLE_TIMEOUT_MS,
+} from "@ruwen/agents";
 import { WorkerService } from "./service.ts";
 
 const env = fileURLToPath(new URL("../../../.env", import.meta.url));
@@ -9,6 +13,9 @@ if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
 if (!["faux", "real"].includes(process.env.MODEL_MODE ?? ""))
   throw new Error("MODEL_MODE must explicitly be faux or real");
 const worker = new WorkerService(process.env.DATABASE_URL, {
+  concurrency: Number(process.env.WORKER_CONCURRENCY ?? 4),
+  roleTimeoutMs: Number(process.env.ROLE_TIMEOUT_MS ?? DEFAULT_ROLE_TIMEOUT_MS),
+  queueMarginSeconds: Number(process.env.QUEUE_MARGIN_SECONDS ?? 120),
   runtime: () =>
     process.env.MODEL_MODE === "faux"
       ? createFauxRuntime()

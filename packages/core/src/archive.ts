@@ -3,6 +3,7 @@ import { crc32 } from "node:zlib";
 import * as yauzl from "yauzl";
 import * as yazl from "yazl";
 import type { ProjectFS } from "./fs/project-fs.ts";
+import { assertPublicArtifact } from "./security/artifacts.ts";
 
 const LIMITS = {
   archiveBytes: 32 * 1024 * 1024,
@@ -57,6 +58,7 @@ export async function exportProjectZip(fs: ProjectFS): Promise<Uint8Array> {
           throw new Error("Nonportable project path collision");
         names.add(folded);
         const bytes = await tx.read(p);
+        assertPublicArtifact(p, bytes);
         total += bytes.length;
         if (bytes.length > LIMITS.fileBytes || total > LIMITS.totalBytes)
           throw new Error("Project exceeds archive limits");
@@ -159,6 +161,7 @@ export async function importProjectZip(
             const data = Buffer.concat(chunks);
             if (crc32(data) !== entry.crc32)
               throw new Error("ZIP checksum mismatch");
+            assertPublicArtifact(p, data);
             result.push({ p, data });
             zip.readEntry();
           })().catch(reject);

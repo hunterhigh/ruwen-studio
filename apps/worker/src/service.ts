@@ -19,6 +19,8 @@ import {
   checks,
   handoff,
   type ProjectFS,
+  publicRoleResult,
+  publicTranscript,
   state,
 } from "@ruwen/core";
 import { Database, PostgresFS } from "@ruwen/db";
@@ -43,6 +45,7 @@ import {
 import { PgBoss } from "pg-boss";
 import { runtimeSettings } from "../../../config/settings.ts";
 import { streamSink } from "./stream-events.ts";
+import { persistPrivatePrompt } from "./private-prompts.ts";
 
 type Kind =
   | "chapter"
@@ -420,12 +423,14 @@ export class WorkerService {
             "Role inputs changed during recovery; automatic rerun blocked",
           );
         if (existing.status === "completed" && existing.result)
-          return existing.result;
+          return publicRoleResult(existing.result) as unknown as RoleResult;
         if (existing.status === "failed" && existing.result) {
           const error = new RoleExecutionError(
             "Previous role failed; automatic rerun blocked",
           );
-          error.partial = existing.result;
+          error.partial = publicRoleResult(
+            existing.result,
+          ) as unknown as RoleResult;
           throw error;
         }
         throw new InterruptedRoleError(
@@ -454,7 +459,10 @@ export class WorkerService {
     await this.options.onBoundary?.("role_intent", id, run.id);
     let result: RoleResult;
     try {
-      result = await runRole(id, input, ctx);
+      result = await runRole(id, input, {
+        ...ctx,
+        onPrompt: (prompt) => persistPrivatePrompt(fs, prompt),
+      });
     } catch (error) {
       if (error instanceof RoleExecutionError && error.partial)
         await this.saveRole(fs, run.id, id, error.partial, "failed");
@@ -496,10 +504,6 @@ export class WorkerService {
           result.output.problems,
         );
       }
-      await tx.sql(
-        "INSERT INTO prompts(sha256,content) VALUES($1,$2) ON CONFLICT DO NOTHING",
-        [result.promptSha256, result.systemPrompt],
-      );
       const changed = await tx.sql<{ id: string }>(
         "UPDATE role_runs SET status=$3,model=$4,prompt_sha256=$5,result=$6,transcript=$7,usage=$8,cost_usd=$9,cache_read_tokens=$10,cache_write_tokens=$11,finished_at=now() WHERE run_id=$1 AND role_id=$2 AND status='running' RETURNING id",
         [
@@ -508,8 +512,8 @@ export class WorkerService {
           status,
           result.model,
           result.promptSha256,
-          JSON.stringify(result),
-          JSON.stringify(result.transcript),
+          JSON.stringify(publicRoleResult(result)),
+          JSON.stringify(publicTranscript(result.transcript)),
           JSON.stringify(result.usage),
           result.costTotal,
           result.usage.reduce((sum, usage) => sum + usage.cacheRead, 0),
@@ -802,7 +806,7 @@ export class WorkerService {
       if (ctx.signal?.aborted) throw new RoleAbortError("Dispatch cancelled");
       await fs.transaction(async (tx) => {
         const output = `authoring-ruwen-v5/reports/dispatch/${id}.json`;
-        await tx.write(output, JSON.stringify(result));
+        await tx.write(output, JSON.stringify(publicRoleResult(result)));
         await tx.sql(
           "INSERT INTO previews(id,project_id,kind,payload,status) VALUES($1,$2,$3,$4,'pending') ON CONFLICT DO NOTHING",
           [id, fs.projectId, role, JSON.stringify(result.output)],

@@ -22,6 +22,7 @@ import {
   type EditorialEdit,
   type ProjectFS,
   packet,
+  publicRoleResult,
   type SectionEdit,
   state,
 } from "@ruwen/core";
@@ -254,7 +255,6 @@ async function storeResult(
   ctx: PipelineContext,
 ): Promise<void> {
   const p = `${runDirectory(run.id)}/${id}.json`;
-  const prompt = `authoring-ruwen-v5/reports/prompts/${result.promptSha256}.txt`;
   run.roles[id] = {
     path: p,
     cost: result.costTotal,
@@ -283,9 +283,7 @@ async function storeResult(
       );
       run.literaryProblemsRecorded = result.output.problems.length > 0;
     }
-    await write(tx, p, result);
-    if (!(await tx.exists(prompt)))
-      await tx.createExclusive(prompt, result.systemPrompt);
+    await write(tx, p, publicRoleResult(result));
     await write(tx, runPath(run.id), run);
   });
 }

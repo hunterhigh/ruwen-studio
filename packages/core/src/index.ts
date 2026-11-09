@@ -13,6 +13,12 @@ export * as candidateProblems from "./ledgers/candidate-problems.ts";
 export * as ledgers from "./ledgers/index.ts";
 export * as packet from "./packet/index.ts";
 export * as registry from "./registry/index.ts";
+export {
+  assertPublicArtifact,
+  migrateProjectPrompts,
+  publicRoleResult,
+  publicTranscript,
+} from "./security/artifacts.ts";
 export * as state from "./state/index.ts";
 export {
   applyEditorialEdits,

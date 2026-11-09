@@ -8,6 +8,7 @@ import {
   checks,
   type EditorialEdit,
   handoff,
+  publicTranscript,
   type SectionEdit,
   state,
 } from "@ruwen/core";
@@ -295,6 +296,7 @@ export async function runRole(
   const input = await prepareInput(id, rawInput, ctx);
   const user = spec.buildUserMessage(input);
   const prompt = await assemblePrompt(spec, ctx.upstreamRoot);
+  await ctx.onPrompt?.(prompt);
   const { model, thinkingLevel } = ctx.runtime.resolve(spec);
   const maxTokens = ctx.maxTokens ?? roleGenerationPolicy(id).maxTokens;
   if (
@@ -441,9 +443,8 @@ export async function runRole(
     usage: structuredClone(usage),
     costTotal: usage.reduce((total, item) => total + item.cost.total, 0),
     promptSha256: prompt.sha256,
-    systemPrompt: prompt.content,
-    transcript: JSON.parse(
-      redact(JSON.stringify(runtime.state.messages)),
+    transcript: publicTranscript(
+      JSON.parse(redact(JSON.stringify(runtime.state.messages))),
     ) as RoleResult["transcript"],
     model: `${model.provider}/${model.id}`,
     durationMs: performance.now() - started,

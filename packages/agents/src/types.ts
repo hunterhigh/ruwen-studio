@@ -65,6 +65,8 @@ export interface RoleContext {
   projectId?: string;
   runtime: ModelRuntime;
   upstreamRoot?: string;
+  /** Server-only platform store; never a project file or browser callback. */
+  onPrompt?: (prompt: { sha256: string; content: string }) => Promise<void>;
   signal?: AbortSignal;
   timeoutMs?: number;
   maxTurns?: number;
@@ -81,7 +83,6 @@ export interface RoleResult {
   usage: Usage[];
   costTotal: number;
   promptSha256: string;
-  systemPrompt: string;
   transcript: AgentMessage[];
   model: string;
   durationMs: number;

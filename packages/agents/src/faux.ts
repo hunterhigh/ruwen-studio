@@ -182,7 +182,48 @@ function inputFrom(context: TranscriptContext): Data {
 }
 export const defaultFauxResponse = (context: TranscriptContext) => {
   const id = requestRole(context);
-  const output = fauxOutput(id, inputFrom(context));
+  const input = inputFrom(context);
+  if (id === "jiyi-weihuyuan") {
+    const targets = Array.isArray(input.resources) ? input.resources : [];
+    const target = targets.find(
+      (value) =>
+        value &&
+        typeof value === "object" &&
+        !Array.isArray(value) &&
+        value.path === "世界/当前态势.md",
+    );
+    if (target && typeof target === "object" && !Array.isArray(target)) {
+      let resource: Data | undefined;
+      for (const message of context.messages)
+        if (
+          message.role === "toolResult" &&
+          message.toolName === "read_resource"
+        )
+          for (const block of message.content)
+            if (block.type === "text") {
+              try {
+                const value: unknown = JSON.parse(block.text);
+                if (
+                  value &&
+                  typeof value === "object" &&
+                  !Array.isArray(value) &&
+                  "path" in value &&
+                  value.path === target.path
+                )
+                  resource = value as Data;
+              } catch {
+                /* faux sees only returned tool results */
+              }
+            }
+      if (!resource)
+        return fauxAssistantMessage(
+          fauxToolCall("read_resource", { id: target.id ?? "" }),
+          { stopReason: "toolUse" },
+        );
+      input.resources = [resource];
+    }
+  }
+  const output = fauxOutput(id, input);
   const spec = ROLES[id];
   return spec.output.kind === "text"
     ? fauxAssistantMessage(String(output))

@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
-  authorizedResourceInputs,
   type Data,
+  listAuthorizedResources,
   RoleAbortError,
   type RoleContext,
   RoleExecutionError,
@@ -667,26 +667,35 @@ export async function generateMemoryPreview(
   };
   try {
     const prose = await text(fs, run.target);
-    const resources = await authorizedResourceInputs(
+    const resources = await listAuthorizedResources(
       { ...ctx, fs },
       "jiyi-weihuyuan",
     );
-    const memory = asData(
-      (
-        await call(
-          fs,
-          run,
-          "jiyi-weihuyuan",
-          { approved_prose: prose, resources },
-          ctx,
-        )
-      ).output,
+    const memoryResult = await call(
+      fs,
+      run,
+      "jiyi-weihuyuan",
+      {
+        approved_prose: prose,
+        resources: resources.map((resource) => ({
+          id: resource.id,
+          path: resource.path,
+          type: resource.type,
+          scope: resource.scope,
+          sha256: resource.source_sha256,
+        })),
+      },
+      ctx,
     );
+    const memory = asData(memoryResult.output);
     const patches = Array.isArray(memory.patches)
       ? memory.patches.filter(object)
       : [];
     const allowed = new Map(
-      resources.map((resource) => [String(resource.path), resource.sha256]),
+      (memoryResult.readResources ?? []).map((resource) => [
+        String(resource.path),
+        resource.sha256,
+      ]),
     );
     for (const patch of patches)
       if (
@@ -696,7 +705,9 @@ export async function generateMemoryPreview(
         patch.base_sha256 !== allowed.get(fs.path(patch.path)) ||
         patch.base_sha256 !== (await fs.sha256(patch.path))
       )
-        throw new Error("Memory role preview is based on stale resources");
+        throw new Error(
+          "Memory patch resource was not read in this role run or became stale",
+        );
     run.paths.memory_preview = await fs.transaction(async (tx) => {
       const expected = `authoring-ruwen-v5/reports/memory-${id}.json`;
       if (await tx.exists(expected)) {

@@ -257,7 +257,7 @@ const fields: Record<RoleId, readonly string[]> = {
   ],
   "xiaoshuo-zuozhe": ["packet"],
   "qinggan-duzhe": ["prose", "chapter", "previous_tail"],
-  "wenxue-bianji": ["prose", "reading", "brief"],
+  "wenxue-bianji": ["prose", "reading"],
   "qingjie-heyanyuan": ["prose", "locked_events", "locked_order"],
   "xianshi-heyanyuan": ["prose", "hard_rules"],
   "jiyi-weihuyuan": ["approved_prose", "resources"],

@@ -78,6 +78,35 @@ const approve = (
     p.ctx,
   );
 describe("chapter pipeline", { timeout: 20000 }, () => {
+  it("memory patch must bind a resource actually read during this role run, even if its hash is known", async () => {
+    let hash = "";
+    const p = await setup((id) =>
+      id === "jiyi-weihuyuan"
+        ? {
+            new_facts: [],
+            state_changes: [],
+            invalidated: [],
+            scope_changes: [],
+            next_chapter_state: "待确认",
+            patches: [
+              {
+                path: "世界/当前态势.md",
+                base_sha256: hash,
+                new_content: "不能绕过读取",
+              },
+            ],
+          }
+        : undefined,
+    );
+    hash = await p.fs.sha256("世界/当前态势.md");
+    const run = await approve(
+      p,
+      await startChapter(p.fs, { chapter: 1 }, p.ctx),
+    );
+    expect(run.status).toBe("FAILED");
+    expect(run.error).toContain("not read");
+    expect(await p.fs.sha256("世界/当前态势.md")).toBe(hash);
+  });
   it("inv-candidate-not-canon / inv-editor-original / two independent approvals", async () => {
     const p = await setup();
     const before = await p.fs.sha256("世界/当前态势.md");

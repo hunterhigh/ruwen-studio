@@ -50,7 +50,7 @@ export async function readAuthorizedResource(
     resource.source_sha256 !== createHash("sha256").update(bytes).digest("hex")
   )
     throw new Error("资源版本已变化");
-  return {
+  const result: Data = {
     id: resource.id,
     path: resource.path,
     sha256: resource.source_sha256,
@@ -58,6 +58,8 @@ export async function readAuthorizedResource(
       .decode(bytes)
       .replace(/\r\n?/g, "\n"),
   };
+  ctx.onResourceRead?.(result, role);
+  return result;
 }
 export async function authorizedResourceInputs(
   ctx: RoleContext,

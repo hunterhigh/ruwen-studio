@@ -7,6 +7,8 @@
 
 > 2026-11-09用户调整：暂缓API配置和P3真实模型验收，先继续P4；P3保持未完成，依据见ADR-004。其他不变量与人工批准门不变。
 
+> 2026-11-09审查修正：按A1→A3→A2→A4→B1→B2→B3逐项测试、提交，完成后停下供人类确认，再配置API执行P3；P3完成前不得开始P5。本次人类定案优先于本文旧示意接口。
+
 ---
 
 ## 0. 给 Codex 的执行规则
@@ -53,7 +55,7 @@
 - 岗位没有 bash、没有通用文件系统，只有为它定制的少量工具；
 - 批准由网页上的用户操作生成，服务端绑定目标哈希。
 
-因此 SKILL.md 里的路由与自律类文字**不进入**岗位提示词；进入提示词的只有岗位文件、CREATIVE-SOUL（相应部分）、相关共享契约和输出格式说明。
+上游提示词以原文载入，只统一换行，不拆小节或改写。除小说作者、情感读者外的10岗依次载入所属SKILL.md、完整CREATIVE-SOUL、两个shared合同、非roles/diagnostics参考文件和自身岗位文件，保留frontmatter与首尾空白；只追加平台执行附注与输出格式。小说作者仍只接收作者资料包、自身岗位文件和既有作者核心（系统与资料包各一次）；情感读者只有自身岗位文件、正文和最少阅读定位。项目材料可见性以SKILL规定为准，平台不因完整系统说明而扩宽工具或跨岗材料。见ADR-003的审查补记。
 
 ---
 
@@ -239,7 +241,7 @@ P0 时确认 pi-ai 1.5.0 的模型目录里有哪些模型 ID，再填默认值�
 | 文学编辑 `wenxue-bianji` | 正文 + 读者反应 | `load_diagnostic(name)`：只能从 4 个诊断文件中选一个；每次运行最多调用 2 次 · `submit_edit` | `{ decision: "LOCAL_EDIT"\|"RESTAGE"\|"RETURN_CONSTRUCTION", edited_text?: string, changes: [{ kind: "fact"\|"literary", before: string, after: string, reason: string }], return_reason?: string }`。原稿由编排代码在调用前保存（I12）。 |
 | 情节核验员 `qingjie-heyanyuan` | 编辑后正文 + generation field 中"必须发生的可观察事件和用户锁定顺序" | `submit_verdict` | `{ pass: boolean, issues: [{ promise: string, problem: "missing"\|"changed"\|"order", evidence: string }] }` |
 | 现实核验员 `xianshi-heyanyuan` | 编辑后正文 + 相关硬设定（`校验/硬设定规则.md` 中经注册表允许的部分） | `submit_verdict` | `{ pass: boolean, issues: [{ category: "identity"\|"time_space"\|"knowledge_source"\|"physics"\|"institution"\|"ability"\|"canon", evidence: string, rule_ref: string }] }` |
-| 记忆维护员 `jiyi-weihuyuan` | 用户批准的正文 + 注册表中 `readers` 含此岗位的资料 | `read_resource(id)`（受 I7 约束）· `submit_memory_preview` | `{ new_facts, state_changes, invalidated, scope_changes, next_chapter_state, patches: [{ path, base_sha256, new_content }] }` |
+| 记忆维护员 `jiyi-weihuyuan` | 用户批准正文 + 可读资源元数据（id/path/type/scope/sha256），不预装正文 | `read_resource(id)`按需且受I7约束；只允许对本次实际读取且哈希匹配的资源提出补丁 | 先产出变更预览；预览批准后才提交。格式随后续A2小节替换契约更新 |
 
 ### 6.4 构思岗位
 

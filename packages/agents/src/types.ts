@@ -70,6 +70,7 @@ export interface RoleContext {
   maxTokens?: number;
   onDelta?: (delta: string, role: RoleId) => void;
   onRequest?: (context: TranscriptContext, role: RoleId) => void;
+  onResourceRead?: (resource: Data, role: RoleId) => void;
   search?: SearchProvider;
   searchApproved?: boolean;
 }
@@ -82,6 +83,7 @@ export interface RoleResult {
   transcript: AgentMessage[];
   model: string;
   durationMs: number;
+  readResources: { id: string; path: string; sha256: string }[];
 }
 export type RoleTool = AgentTool<Schema<Data>, Data>;
 export class RoleExecutionError extends Error {

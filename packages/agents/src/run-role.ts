@@ -1,10 +1,15 @@
+import { createHash } from "node:crypto";
 import { Agent } from "@earendil-works/pi-agent-core";
 import type { Usage } from "@earendil-works/pi-ai";
 import { compile } from "@earendil-works/pi-schema";
 import { checks, handoff, state } from "@ruwen/core";
 import { assemblePrompt } from "./prompts/manifest.ts";
 import { ROLES } from "./roles/index.ts";
-import { readAuthorizedResource, roleTools } from "./tools/index.ts";
+import {
+  listAuthorizedResources,
+  readAuthorizedResource,
+  roleTools,
+} from "./tools/index.ts";
 import {
   type Data,
   RoleAbortError,
@@ -29,11 +34,7 @@ async function prepareInput(
   const safe: Data = { ...input };
   for (const key of ["resources", "approved_resources"])
     if (
-      [
-        "jiyi-weihuyuan",
-        "zhangjie-qingjing-bianyiyuan",
-        "biaoxian-shejishi",
-      ].includes(id) &&
+      ["zhangjie-qingjing-bianyiyuan", "biaoxian-shejishi"].includes(id) &&
       Array.isArray(safe[key])
     ) {
       const records: Data[] = [];
@@ -69,6 +70,36 @@ async function prepareInput(
   )
     throw new RoleOutputError("Memory role requires approved prose");
   if (id === "jiyi-weihuyuan") {
+    if (
+      [
+        "candidate",
+        "candidate_prose",
+        "unapproved_prose",
+        "candidate_inferences",
+        "unapproved_inferences",
+      ].some((key) => Object.hasOwn(input, key))
+    )
+      throw new RoleOutputError(
+        "Unapproved candidate or inference cannot enter memory input",
+      );
+    const resources = await listAuthorizedResources(ctx, id);
+    const supplied = Array.isArray(input.resources) ? input.resources : [];
+    safe.resources = supplied.map((record) => {
+      if (!object(record) || typeof record.id !== "string")
+        throw new RoleOutputError(
+          "Memory inputs require registered resource IDs",
+        );
+      const resource = resources.find((resource) => resource.id === record.id);
+      if (!resource)
+        throw new RoleOutputError("Memory metadata resource is not authorized");
+      return {
+        id: resource.id,
+        path: resource.path,
+        type: resource.type,
+        scope: resource.scope,
+        sha256: resource.source_sha256,
+      };
+    });
     const current = await state.loadState(ctx.fs);
     const approved = current.last_approved_prose;
     if (
@@ -191,8 +222,20 @@ async function validateOutput(
 export async function runRole(
   id: RoleId,
   rawInput: Data,
-  ctx: RoleContext,
+  context: RoleContext,
 ): Promise<RoleResult> {
+  const reads = new Map<string, { id: string; path: string; sha256: string }>();
+  const ctx: RoleContext = {
+    ...context,
+    onResourceRead: (resource, role) => {
+      reads.set(String(resource.path), {
+        id: String(resource.id),
+        path: String(resource.path),
+        sha256: String(resource.sha256),
+      });
+      context.onResourceRead?.(resource, role);
+    },
+  };
   if (!Object.hasOwn(ROLES, id)) throw new RoleOutputError("Unknown role");
   if (ctx.signal?.aborted)
     throw new RoleAbortError("Role cancelled before start");
@@ -240,6 +283,9 @@ export async function runRole(
     tools.map((tool) => [tool.name, compile(tool.parameters)]),
   );
   const runtime = new Agent({
+    sessionId: createHash("sha256")
+      .update(`${ctx.fs.root}\0${ctx.projectKey}\0${id}\0${prompt.sha256}`)
+      .digest("hex"),
     initialState: {
       model,
       thinkingLevel,
@@ -252,6 +298,7 @@ export async function runRole(
       ctx.onRequest?.(structuredClone(context), id);
       return ctx.runtime.models.streamSimple(selected, context, {
         ...options,
+        cacheRetention: "long",
         maxTokens: ctx.maxTokens ?? 8000,
         maxRetries: 0,
       });
@@ -330,6 +377,7 @@ export async function runRole(
     ) as RoleResult["transcript"],
     model: `${model.provider}/${model.id}`,
     durationMs: performance.now() - started,
+    readResources: [...reads.values()],
   });
   try {
     for (let attempt = 0; attempt < 2; attempt++) {

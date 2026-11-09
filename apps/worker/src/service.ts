@@ -401,7 +401,7 @@ export class WorkerService {
         [result.promptSha256, result.systemPrompt],
       );
       const changed = await tx.sql<{ id: string }>(
-        "UPDATE role_runs SET status=$3,model=$4,prompt_sha256=$5,result=$6,transcript=$7,usage=$8,cost_usd=$9,finished_at=now() WHERE run_id=$1 AND role_id=$2 AND status='running' RETURNING id",
+        "UPDATE role_runs SET status=$3,model=$4,prompt_sha256=$5,result=$6,transcript=$7,usage=$8,cost_usd=$9,cache_read_tokens=$10,cache_write_tokens=$11,finished_at=now() WHERE run_id=$1 AND role_id=$2 AND status='running' RETURNING id",
         [
           runId,
           id,
@@ -412,6 +412,8 @@ export class WorkerService {
           JSON.stringify(result.transcript),
           JSON.stringify(result.usage),
           result.costTotal,
+          result.usage.reduce((sum, usage) => sum + usage.cacheRead, 0),
+          result.usage.reduce((sum, usage) => sum + usage.cacheWrite, 0),
         ],
       );
       if (changed.rows[0])

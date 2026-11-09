@@ -5,6 +5,37 @@ import { afterEach, expect, it } from "vitest";
 import { fixture, waitStatus } from "./helpers.ts";
 
 const cleanups: (() => Promise<void>)[] = [];
+it("role_runs persists the provider cacheRead/cacheWrite counters and additive migrations are idempotent", async () => {
+  const p = await fixture({}, true);
+  cleanups.push(() => p.service.stop());
+  const id = await p.service.enqueueChapter(p.fs, { chapter: 1 });
+  await waitStatus(p.service, id, "AWAITING_CANDIDATE_APPROVAL");
+  const rows = await p.service.db.pool.query<{
+    cache_read_tokens: string;
+    cache_write_tokens: string;
+    usage: { cacheRead: number; cacheWrite: number }[];
+  }>(
+    "SELECT cache_read_tokens,cache_write_tokens,usage FROM role_runs WHERE run_id=$1",
+    [id],
+  );
+  expect(rows.rowCount).toBe(5);
+  expect(
+    rows.rows.every(
+      (row) =>
+        Number(row.cache_read_tokens) ===
+          row.usage.reduce((sum, usage) => sum + usage.cacheRead, 0) &&
+        Number(row.cache_write_tokens) ===
+          row.usage.reduce((sum, usage) => sum + usage.cacheWrite, 0),
+    ),
+  ).toBe(true);
+  expect(rows.rows.some((row) => Number(row.cache_write_tokens) > 0)).toBe(
+    true,
+  );
+  await p.service.db.migrate();
+  expect(
+    (await p.service.db.pool.query("SELECT id FROM ruwen_migrations")).rowCount,
+  ).toBe(2);
+}, 30000);
 afterEach(async () => {
   for (const fn of cleanups.splice(0)) await fn();
 });

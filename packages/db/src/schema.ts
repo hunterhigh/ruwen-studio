@@ -156,6 +156,12 @@ export const roleRuns = pgTable(
     transcript: jsonb("transcript"),
     usage: jsonb("usage"),
     costUsd: numeric("cost_usd", { precision: 20, scale: 10 }),
+    cacheRead: bigint("cache_read_tokens", { mode: "number" })
+      .notNull()
+      .default(0),
+    cacheWrite: bigint("cache_write_tokens", { mode: "number" })
+      .notNull()
+      .default(0),
     startedAt: time("started_at"),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
   },

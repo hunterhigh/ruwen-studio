@@ -39,6 +39,7 @@ import {
   type UserApproval,
 } from "@ruwen/pipeline";
 import { PgBoss } from "pg-boss";
+import { runtimeSettings } from "../../../config/settings.ts";
 
 type Kind =
   | "chapter"
@@ -57,6 +58,7 @@ export interface Task {
 }
 export interface WorkerOptions {
   runtime: () => ModelRuntime;
+  runtimeForRequest?: (request: Data) => ModelRuntime;
   queue?: string;
   heartbeatSeconds?: number;
   concurrency?: number;
@@ -117,7 +119,8 @@ export class WorkerService {
   private options: WorkerOptions;
   private active = new Map<string, AbortController>();
   constructor(connectionString: string, options: WorkerOptions) {
-    const concurrency = options.concurrency ?? 4;
+    const concurrency =
+      options.concurrency ?? runtimeSettings().execution.concurrency;
     if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 4)
       throw new Error(
         "Worker concurrency must be between 1 and 4 for the 12-connection project pool",
@@ -130,7 +133,8 @@ export class WorkerService {
         roleTimeoutMs,
         Object.keys(CHAPTER_ROLES).length,
         ROLE_OUTPUT_ATTEMPTS,
-        options.queueMarginSeconds ?? 120,
+        options.queueMarginSeconds ??
+          runtimeSettings().execution.queueMarginSeconds,
       ),
     };
     this.db = new Database(connectionString);
@@ -581,10 +585,14 @@ export class WorkerService {
       const ctx: PipelineContext = {
         projectId: fs.projectId,
         projectKey: stored.project_key,
-        runtime: this.options.runtime(),
+        runtime:
+          this.options.runtimeForRequest?.(stored.request) ??
+          this.options.runtime(),
         runId: task.runId,
         signal,
-        timeoutMs: this.scheduling.roleTimeoutMs,
+        ...(this.options.roleTimeoutMs === undefined
+          ? {}
+          : { timeoutMs: this.scheduling.roleTimeoutMs }),
         executeRole: (id, input, ctx, run) =>
           this.cachedRole(fs, run, id, input, ctx),
         onCheckpoint: (tx, run) => this.checkpoint(tx, run),

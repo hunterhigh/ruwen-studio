@@ -2,5 +2,17 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "name": "web"
+  "name": "web",
+  "dependencies": {
+    "@better-auth/drizzle-adapter": "1.7.18",
+    "@ruwen/agents": "workspace:*",
+    "@ruwen/core": "workspace:*",
+    "@ruwen/db": "workspace:*",
+    "@ruwen/pipeline": "workspace:*",
+    "better-auth": "1.7.18",
+    "next": "16.4.5",
+    "nodemailer": "10.4.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  }
 }

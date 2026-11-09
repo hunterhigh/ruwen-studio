@@ -14,15 +14,22 @@ interface Route {
   modelId: string;
   thinkingLevel: ThinkingLevel;
 }
-export const DEFAULT_ROLE_TIMEOUT_MS = 600_000;
 export const ROLE_OUTPUT_ATTEMPTS = 2;
 interface Routes {
   tiers: Record<string, Route>;
   roleOverrides: Record<string, Route>;
-  roles: Record<RoleId, { maxTokens: number; basis: string }>;
+  roles: Record<
+    RoleId,
+    { maxTokens: number; timeoutMs: number; basis: string }
+  >;
   editing: EditPolicy;
 }
 const routePath = new URL("../../../config/models.json", import.meta.url);
+export const DEFAULT_ROLE_TIMEOUT_MS = Math.max(
+  ...Object.values(
+    (JSON.parse(readFileSync(routePath, "utf8")) as Routes).roles,
+  ).map((role) => role.timeoutMs),
+);
 export function roleGenerationPolicy(id: RoleId) {
   const policy = (JSON.parse(readFileSync(routePath, "utf8")) as Routes).roles[
     id
@@ -31,6 +38,8 @@ export function roleGenerationPolicy(id: RoleId) {
     !policy ||
     !Number.isInteger(policy.maxTokens) ||
     policy.maxTokens < 1 ||
+    !Number.isFinite(policy.timeoutMs) ||
+    policy.timeoutMs <= 0 ||
     !policy.basis?.trim()
   )
     throw new Error("Role token policy is not configured");
@@ -86,4 +95,18 @@ export function createRealRuntime(): ModelRuntime {
           : undefined;
     },
   };
+}
+/** Catalog lookup for offline replay; it never resolves credentials or performs a request. */
+export function resolveCatalogModel(spec: RoleSpec) {
+  const route = resolveRoute(spec),
+    models = createModels();
+  models.setProvider(anthropicProvider());
+  models.setProvider(openaiProvider());
+  const model = models.getModel(route.provider, route.modelId);
+  if (
+    !model ||
+    !getSupportedThinkingLevels(model).includes(route.thinkingLevel)
+  )
+    throw new Error("Invalid replay catalog route");
+  return { model, thinkingLevel: route.thinkingLevel };
 }

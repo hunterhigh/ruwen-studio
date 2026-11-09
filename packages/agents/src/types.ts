@@ -51,7 +51,7 @@ export interface RoleSpec {
   maxTurns: number;
 }
 export interface ModelRuntime {
-  mode: "faux" | "real";
+  mode: "faux" | "real" | "record" | "replay";
   models: Models;
   resolve(role: RoleSpec): { model: Model<Api>; thinkingLevel: ThinkingLevel };
   apiKey?(provider: string): string | undefined;
@@ -76,6 +76,7 @@ export interface RoleContext {
   searchApproved?: boolean;
 }
 export interface RoleResult {
+  runtimeMode?: ModelRuntime["mode"];
   output: Data | string;
   usage: Usage[];
   costTotal: number;

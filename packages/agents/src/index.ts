@@ -15,6 +15,18 @@ export {
 export { ROLES } from "./roles/index.ts";
 export { runRole } from "./run-role.ts";
 export {
+  createApplicationRuntime,
+  MODEL_MODES,
+  type ModelMode,
+} from "./runtime/index.ts";
+export {
+  createScenarioRuntime,
+  FAUX_SCENARIOS,
+  type FauxScenario,
+  PREVIEW_PROSE,
+} from "./runtime/scenarios.ts";
+export { stableRequestHash } from "./runtime/tapes.ts";
+export {
   authorizedResourceInputs,
   listAuthorizedResources,
   readAuthorizedResource,

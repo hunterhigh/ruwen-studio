@@ -12,7 +12,6 @@ import {
   state,
 } from "@ruwen/core";
 import {
-  DEFAULT_ROLE_TIMEOUT_MS,
   editingPolicy,
   ROLE_OUTPUT_ATTEMPTS,
   roleGenerationPolicy,
@@ -430,13 +429,14 @@ export async function runRole(
   const timeout = setTimeout(() => {
     timedOut = true;
     abort();
-  }, ctx.timeoutMs ?? DEFAULT_ROLE_TIMEOUT_MS);
+  }, ctx.timeoutMs ?? roleGenerationPolicy(id).timeoutMs);
   ctx.signal?.addEventListener("abort", abort, { once: true });
   const redact = (value: string) => {
     const key = ctx.runtime.apiKey?.(model.provider);
     return key ? value.split(key).join("[REDACTED]") : value;
   };
   const snapshot = (): RoleResult => ({
+    runtimeMode: ctx.runtime.mode,
     output: output ?? "",
     usage: structuredClone(usage),
     costTotal: usage.reduce((total, item) => total + item.cost.total, 0),

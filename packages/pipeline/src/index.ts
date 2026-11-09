@@ -81,6 +81,7 @@ export interface ChapterRun {
   literaryProblemsRecorded?: boolean;
 }
 export interface ChapterRequest {
+  simulation?: string;
   chapter: string | number;
   manifest?: string;
   target?: string;

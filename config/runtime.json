@@ -1,0 +1,37 @@
+{
+  "calibration": { "status": "pending_p3", "label": "待 P3 实测" },
+  "execution": {
+    "concurrency": 4,
+    "queueMarginSeconds": 120
+  },
+  "faux": {
+    "scenario": "normal",
+    "initialDelayMs": 300,
+    "characterDelayMs": 2
+  },
+  "billing": {
+    "costMarkup": 2,
+    "creditsPerUsd": 10000,
+    "defaultReservations": {
+      "chapter": 100000,
+      "ideation": 25000,
+      "memory": 25000
+    },
+    "signupCredits": 100000,
+    "plans": [
+      { "id": "preview", "name": "试用", "credits": 100000 },
+      { "id": "monthly", "name": "月度方案", "credits": 1000000 }
+    ]
+  },
+  "release": {
+    "p3GatePassed": false,
+    "realChargingEnabled": false,
+    "inviteOnly": true
+  },
+  "preview": { "invitationCode": "RUWEN-PREVIEW", "sessionHours": 24 },
+  "stream": {
+    "pollIntervalMs": 250,
+    "heartbeatMs": 15000,
+    "maxConnectionMs": 120000
+  }
+}

@@ -23,3 +23,7 @@ stopReason=length立即抛RoleTruncatedError，不纠正、不自动重试，也
 ## 替代与验证
 
 保留整章/整文件输出会继续浪费额度且难以保证改动边界，因此不采用。按行号补丁会受换行和行漂移影响，因此使用唯一原文边界与明确标题。新增text-edits及output-limits测试覆盖确定性应用、Unicode预算、单项/总量/重叠、CRLF保留、截断不执行工具且只调用一次、faux锚点错误与缺失小节；既有pipeline、隔离、批准、强杀恢复测试继续运行。
+
+## A4路由复核（2026-11-09）
+
+默认改为目录中已有的Opus 5.5/high、Sonnet 5.5/medium、Haiku 5.5/off。三者的forceAdaptiveThinking均为true、目录maxTokens均128000；当前各岗上限不变且全部在模型额度内。Opus/Sonnet 5.5支持的思考级别不含off，因此维持high/medium；Haiku 5.5允许off。model-catalog测试逐个验证ID、思考模式、adaptive标志和该路由下的岗位额度。不改变OQ-003的P3人工闸门，不调用真实API。

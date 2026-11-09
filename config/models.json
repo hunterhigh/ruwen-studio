@@ -2,17 +2,17 @@
   "tiers": {
     "strong": {
       "provider": "anthropic",
-      "modelId": "claude-opus-4-6",
+      "modelId": "claude-opus-5-5",
       "thinkingLevel": "high"
     },
     "standard": {
       "provider": "anthropic",
-      "modelId": "claude-sonnet-4-6",
+      "modelId": "claude-sonnet-5-5",
       "thinkingLevel": "medium"
     },
     "cheap": {
       "provider": "anthropic",
-      "modelId": "claude-haiku-4-5",
+      "modelId": "claude-haiku-5-5",
       "thinkingLevel": "off"
     }
   },

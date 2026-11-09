@@ -2,6 +2,12 @@ import { readFileSync } from "node:fs";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
 import { describe, expect, it } from "vitest";
+import {
+  ROLE_IDS,
+  ROLES,
+  resolveRoute,
+  roleGenerationPolicy,
+} from "../src/index.ts";
 
 interface Routing {
   tiers: Record<
@@ -25,6 +31,16 @@ describe("provisional model routes", () => {
       expect(model).toBeDefined();
       if (!model) throw new Error(`Unknown model: ${route.modelId}`);
       expect(getSupportedThinkingLevels(model)).toContain(route.thinkingLevel);
+      expect(route.modelId).toBe(
+        `claude-${tier === "strong" ? "opus" : tier === "standard" ? "sonnet" : "haiku"}-5-5`,
+      );
+      expect(model.compat?.forceAdaptiveThinking).toBe(true);
+      for (const id of ROLE_IDS.filter(
+        (id) => resolveRoute(ROLES[id]).modelId === model.id,
+      ))
+        expect(roleGenerationPolicy(id).maxTokens).toBeLessThanOrEqual(
+          model.maxTokens,
+        );
     });
   }
 });

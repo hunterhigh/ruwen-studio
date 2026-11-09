@@ -6,7 +6,7 @@
 |---|---|---|
 | OQ-001 | 三个 @earendil-works 包 1.5.0 是否可获取？ | 已解决：npm 安装成功，锁定精确版本；源码仓库为 earendil-works/pi，无需 badlogic/pi-mono fallback。 |
 | OQ-002 | Windows 换行改变模板批准哈希，初跑 2 failures + 12 errors。 | 已解决：基线使用 git archive；P1 固定时钟与同一路径，对原始字节进行严格差分；静态模板快照自动核对固定提交。见 ADR-001/002。 |
-| OQ-003 | 默认模型与加价系数。 | P0 暂用 Anthropic Opus 4.6 / Sonnet 4.6 / Haiku 4.5，三个 ID 及 thinkingLevel 通过 pi 目录检查。未验证真实可用性或文学效果。P3 实测后由用户决定，价格参数留空。 |
+| OQ-003 | 默认模型与加价系数。 | A4按人类审查改为claude-opus-5-5 / claude-sonnet-5-5 / claude-haiku-5-5，分别high / medium / off；已安装pi-ai 1.5.0目录确认三个模型均forceAdaptiveThinking且maxTokens=128000，所选思考级别均受支持。A2各岗位8192–65536额度均在上限内，含思考余量（Haiku当前off）。不推断真实API可用性、费用或文学效果；P3实测后由人类最终决定，价格参数留空。 |
 | OQ-004 | I6 新上下文与协调员持久会话如何兼容？ | P2 每轮重建 Agent，只按岗位读取矩阵重放必要会话；不得复用下游历史或将原话与干净委托同时给接收岗位。完整上下文哨兵测试在 P2，P0 仅证明两个新 Agent 不共享历史。 |
 | OQ-005 | 上游creative_brief接收者不含章节情境编译员。 | 保留白名单；P4独立enqueueCompile从已批准资源生成待批预览，不直接更新projection。完整构思对话/批准界面在P5，见ADR-003/005。 |
 | OQ-006 | 计划称 packet 预算截断，实际源码超预算直接拒绝。 | 已明确：P1 按源码逐字节一致、超预算拒绝；不能自动截断来通过测试。见接口清单。 |

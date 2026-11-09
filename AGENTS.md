@@ -6,7 +6,7 @@
 
 ## 硬规则
 
-- 按 `docs/PLAN.md` 第 12 节的阶段顺序执行；P0、P3、P5 结束后停下，写阶段报告，等待人类确认。
+- 按 `docs/PLAN.md` 第12节与ADR-008执行：OQ-017 → P5网页 → P6计费 → P7 staging → P3真实模型上线前闸门 → 公开上线。当前不配置模型key、不调用真实模型；每阶段完成后写报告并停下确认，P5完成后供人类在预览环境试用。P3未通过可开发和staging，但生产仅限邀请码注册且禁止真实收费。
 - 第 2 节的不变量（I1–I13）不得削弱；与实现冲突时记入 `docs/OPEN_QUESTIONS.md` 并停下。
 - 永远不修改 `vendor/ruwen/`。
 - 不给任何模型岗位 bash、代码执行或任意文件访问能力；岗位工具只能操作当前项目、受注册表 `readers` 约束。
@@ -25,3 +25,10 @@ pnpm test                 # 单元 + 差分 + 契约测试（差分测试需要 
 pnpm --filter cli dev chapter run --project fixtures/demo-project --chapter 1 --faux
 pnpm --filter web dev
 ```
+
+## 当前并行边界（2026-11-09）
+
+- 另一个线程在`feat/backend-parallel`负责`.github/`、`packages/pipeline/src/ideation/`、`packages/billing`、构思侧worker任务及v4.1迁移；本线程不得修改这些部分。
+- 构思页面依据对方推送的`docs/contracts/ideation-service.md`接入；契约未到先做章节页面，不猜造服务接口。P6本线程只做计费界面和接入，账本、支付适配器、webhook由对方实现。
+- 新的大块工作开始前先拉取`origin/main`；共享`apps/worker/src/service.ts`和`packages/agents`只做增量改动，避免覆盖对方工作。
+- P3前：生产注册仅邀请码，真实收费开关默认关闭；不得因开发阶段使用faux或record/replay而视为闸门通过。

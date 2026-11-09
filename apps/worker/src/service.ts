@@ -44,8 +44,9 @@ import {
 } from "@ruwen/pipeline";
 import { PgBoss } from "pg-boss";
 import { runtimeSettings } from "../../../config/settings.ts";
-import { streamSink } from "./stream-events.ts";
 import { persistPrivatePrompt } from "./private-prompts.ts";
+import { recordRoleSecurityEvents } from "./security-events.ts";
+import { streamSink } from "./stream-events.ts";
 
 type Kind =
   | "chapter"
@@ -504,6 +505,7 @@ export class WorkerService {
           result.output.problems,
         );
       }
+      await recordRoleSecurityEvents(tx, runId, id, result);
       const changed = await tx.sql<{ id: string }>(
         "UPDATE role_runs SET status=$3,model=$4,prompt_sha256=$5,result=$6,transcript=$7,usage=$8,cost_usd=$9,cache_read_tokens=$10,cache_write_tokens=$11,finished_at=now() WHERE run_id=$1 AND role_id=$2 AND status='running' RETURNING id",
         [

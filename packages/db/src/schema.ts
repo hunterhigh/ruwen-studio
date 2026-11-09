@@ -333,3 +333,23 @@ export const webRateLimits = pgTable("web_rate_limits", {
     .defaultNow(),
   attempts: bigint("attempts", { mode: "number" }).notNull().default(1),
 });
+export const securityEvents = pgTable(
+  "security_events",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => pipelineRuns.id, { onDelete: "cascade" }),
+    roleId: text("role_id").notNull(),
+    kind: text("kind").notNull(),
+    score: integer("score").notNull(),
+    createdAt: time("created_at"),
+  },
+  (t) => [uniqueIndex("security_event_once").on(t.runId, t.roleId, t.kind)],
+);

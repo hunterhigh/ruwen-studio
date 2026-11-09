@@ -29,10 +29,12 @@ import {
   PREVIEW_PROSE,
   ROLE_IDS,
   RoleOutputError,
+  RoleSecurityError,
   RoleTruncatedError,
   runRole,
 } from "../src/index.ts";
 import { stableRequestHash } from "../src/runtime/tapes.ts";
+import { deploymentCanary } from "../src/security/notes.ts";
 
 let project: Awaited<ReturnType<typeof temporaryProject>>;
 let packet: string;
@@ -159,6 +161,9 @@ it("records complete responses and usage locally then replays offline; a changed
     ),
   );
   expect(file.request.context.messages).toHaveLength(2);
+  expect(file.version).toBe(2);
+  expect(JSON.stringify(file)).not.toContain(process.env.RUWEN_CANARY);
+  expect(file.request.context.messages[0]).toHaveProperty("prompt_sha256");
   expect(file.response.usage).toEqual(first.usage[0]);
   const offline = createFauxRuntime([]);
   const replay = createApplicationRuntime({
@@ -188,6 +193,53 @@ it("records complete responses and usage locally then replays offline; a changed
     ),
   ).rejects.toThrow();
   expect(offline.faux.state.callCount).toBe(0);
+});
+it("a blocked record never saves the canary or full system message, and recording inside a user project is refused", async () => {
+  const filesBefore = new Set(
+    await readdir(path.join(workspace, ".local/model-recordings")),
+  );
+  const record = createApplicationRuntime({
+    mode: "record",
+    workspaceRoot: workspace,
+    upstream: createFauxRuntime([fauxAssistantMessage(deploymentCanary())]),
+  });
+  await expect(
+    runRole(
+      "xiaoshuo-zuozhe",
+      { packet: "独立的安全录制测试" },
+      {
+        fs: project.fs,
+        projectKey: "test-project",
+        runtime: record,
+      },
+    ),
+  ).rejects.toBeInstanceOf(RoleSecurityError);
+  const added = (
+    await readdir(path.join(workspace, ".local/model-recordings"))
+  ).filter((file) => !filesBefore.has(file));
+  expect(added).toHaveLength(1);
+  const body = await readFile(
+    path.join(workspace, ".local/model-recordings", added[0] ?? ""),
+    "utf8",
+  );
+  expect(body).not.toContain(deploymentCanary());
+  expect(JSON.parse(body).request.context.messages[0]).not.toHaveProperty(
+    "content",
+  );
+  const upstream = createFauxRuntime([]);
+  const unsafe = createApplicationRuntime({
+    mode: "record",
+    workspaceRoot: project.fs.root,
+    upstream,
+  });
+  await expect(
+    runRole(
+      "xiaoshuo-zuozhe",
+      { packet: "测试" },
+      { fs: project.fs, projectKey: "test-project", runtime: unsafe },
+    ),
+  ).rejects.toThrow("outside the user project");
+  expect(upstream.faux.state.callCount).toBe(0);
 });
 it("stable request hashes ignore random tool IDs and timestamps, preserve argument IDs, and exclude credentials", () => {
   const model = { id: "m", provider: "p", api: "a" };

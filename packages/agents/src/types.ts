@@ -11,7 +11,7 @@ import type {
   Usage,
 } from "@earendil-works/pi-ai";
 import type { Schema } from "@earendil-works/pi-schema";
-import type { ProjectFS } from "@ruwen/core";
+import type { ProjectFS, SecurityEvent } from "@ruwen/core";
 
 export type Json =
   | null
@@ -52,6 +52,7 @@ export interface RoleSpec {
 }
 export interface ModelRuntime {
   mode: "faux" | "real" | "record" | "replay";
+  privateStorageRoot?: string;
   models: Models;
   resolve(role: RoleSpec): { model: Model<Api>; thinkingLevel: ThinkingLevel };
   apiKey?(provider: string): string | undefined;
@@ -87,12 +88,14 @@ export interface RoleResult {
   model: string;
   durationMs: number;
   readResources: { id: string; path: string; sha256: string }[];
+  securityEvents?: SecurityEvent[];
 }
 export type RoleTool = AgentTool<Schema<Data>, Data>;
 export class RoleExecutionError extends Error {
   partial?: RoleResult;
 }
 export class RoleOutputError extends RoleExecutionError {}
+export class RoleSecurityError extends RoleExecutionError {}
 export class RoleTruncatedError extends RoleExecutionError {}
 export class RoleTurnLimitError extends RoleOutputError {}
 export class RoleAbortError extends RoleExecutionError {}

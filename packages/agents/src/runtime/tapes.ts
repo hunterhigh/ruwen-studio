@@ -9,6 +9,12 @@ import {
   normalizeContext,
   type TranscriptContext,
 } from "@earendil-works/pi-ai";
+import { LeakDetector } from "@ruwen/core";
+import { deploymentCanary } from "../security/notes.ts";
+import {
+  INTERNAL_REFUSAL,
+  SECURITY_ROLE_FAILURE,
+} from "../security/role-security.ts";
 import type { ModelRuntime } from "../types.ts";
 import { forwardStream } from "./stream.ts";
 
@@ -22,6 +28,30 @@ const ordered = (value: unknown): unknown => {
     );
   return value;
 };
+type StoredContext = Omit<TranscriptContext, "messages"> & {
+  messages: Record<string, unknown>[];
+};
+function privateContext(
+  context: TranscriptContext | StoredContext,
+): StoredContext {
+  return {
+    ...context,
+    messages: context.messages.map((item) => {
+      const message = item as unknown as Record<string, unknown>;
+      if (message.role !== "system") return structuredClone(message);
+      return {
+        role: "system",
+        prompt_sha256:
+          message.content === undefined &&
+          typeof message.prompt_sha256 === "string"
+            ? message.prompt_sha256
+            : createHash("sha256")
+                .update(JSON.stringify(message.content))
+                .digest("hex"),
+      };
+    }),
+  };
+}
 function safeOptions(options: ModelsSimpleStreamOptions = {}) {
   const {
     apiKey: _key,
@@ -42,7 +72,7 @@ function safeOptions(options: ModelsSimpleStreamOptions = {}) {
 /** Ignore transport-only timing, usage and random tool IDs while preserving all semantic content. */
 export function stableRequestHash(
   model: { id: string; provider: string; api: string },
-  context: TranscriptContext,
+  context: TranscriptContext | StoredContext,
   options: ModelsSimpleStreamOptions = {},
 ) {
   const ids = new Map<string, string>();
@@ -51,7 +81,8 @@ export function stableRequestHash(
     if (!ids.has(value)) ids.set(value, `tool-${ids.size}`);
     return ids.get(value);
   };
-  const messages = JSON.parse(JSON.stringify(context.messages)) as Record<
+  const stored = privateContext(context);
+  const messages = JSON.parse(JSON.stringify(stored.messages)) as Record<
     string,
     unknown
   >[];
@@ -85,7 +116,7 @@ export function stableRequestHash(
                 ? "faux"
                 : model.api,
           },
-          context: { ...context, messages },
+          context: { ...stored, messages },
           options: safeOptions(options),
         }),
       ),
@@ -93,11 +124,11 @@ export function stableRequestHash(
     .digest("hex");
 }
 interface Tape {
-  version: 1;
+  version: 2;
   requestHash: string;
   request: {
     model: { id: string; provider: string; api: string };
-    context: TranscriptContext;
+    context: StoredContext;
     options: Record<string, unknown>;
   };
   response: AssistantMessage;
@@ -129,7 +160,7 @@ export function tapeRuntime(
         async () => {
           const tape = JSON.parse(await readFile(file, "utf8")) as Tape;
           if (
-            tape.version !== 1 ||
+            tape.version !== 2 ||
             tape.requestHash !== hash ||
             stableRequestHash(
               tape.request.model,
@@ -164,11 +195,39 @@ export function tapeRuntime(
     return forwardStream(upstream(selected, context, options), {
       signal: options?.signal,
       finish: async (response) => {
+        const system = context.messages
+          .filter((message) => message.role === "system")
+          .map((message) =>
+            typeof message.content === "string"
+              ? message.content
+              : message.content
+                  .filter((block) => block.type === "text")
+                  .map((block) => (block.type === "text" ? block.text : ""))
+                  .join("\n"),
+          )
+          .join("\n");
+        const guard = new LeakDetector(
+          system,
+          deploymentCanary(),
+          context.messages
+            .filter((message) => ["user", "toolResult"].includes(message.role))
+            .map((message) => message.content),
+        );
+        const saved = structuredClone(response);
+        if (guard.check(response)) {
+          saved.content = [{ type: "text", text: INTERNAL_REFUSAL }];
+          saved.errorMessage = SECURITY_ROLE_FAILURE;
+          saved.stopReason = "error";
+        }
         const tape: Tape = {
-          version: 1,
+          version: 2,
           requestHash: hash,
-          request: { model, context, options: safeOptions(options) },
-          response,
+          request: {
+            model,
+            context: privateContext(context),
+            options: safeOptions(options),
+          },
+          response: saved,
         };
         let content = JSON.stringify(tape, null, 2);
         if (secret) content = content.split(secret).join("[REDACTED]");
@@ -207,6 +266,7 @@ export function tapeRuntime(
   return {
     ...base,
     mode,
+    privateStorageRoot: directory,
     models,
     ...(mode === "replay" ? { apiKey: () => undefined } : {}),
   };

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import path from "node:path";
 import { Agent } from "@earendil-works/pi-agent-core";
 import type { Usage } from "@earendil-works/pi-ai";
 import { compile } from "@earendil-works/pi-schema";
@@ -8,7 +9,6 @@ import {
   checks,
   type EditorialEdit,
   handoff,
-  publicTranscript,
   type SectionEdit,
   state,
 } from "@ruwen/core";
@@ -19,6 +19,12 @@ import {
 } from "./models.ts";
 import { assemblePrompt } from "./prompts/manifest.ts";
 import { ROLES } from "./roles/index.ts";
+import {
+  CONTENT_REFUSAL,
+  INTERNAL_REFUSAL,
+  RoleSecurity,
+  SECURITY_ROLE_FAILURE,
+} from "./security/role-security.ts";
 import {
   listAuthorizedResources,
   readAuthorizedResource,
@@ -33,6 +39,7 @@ import {
   RoleOutputError,
   RoleProviderError,
   type RoleResult,
+  RoleSecurityError,
   RoleTimeoutError,
   type RoleTool,
   RoleTruncatedError,
@@ -288,6 +295,16 @@ export async function runRole(
     },
   };
   if (!Object.hasOwn(ROLES, id)) throw new RoleOutputError("Unknown role");
+  if (ctx.runtime.privateStorageRoot) {
+    const relative = path.relative(
+      path.resolve(ctx.fs.root),
+      path.resolve(ctx.runtime.privateStorageRoot),
+    );
+    if (!relative || (!relative.startsWith("..") && !path.isAbsolute(relative)))
+      throw new RoleOutputError(
+        "Private recording storage must remain outside the user project",
+      );
+  }
   if (ctx.signal?.aborted)
     throw new RoleAbortError("Role cancelled before start");
   const spec = ROLES[id];
@@ -297,6 +314,7 @@ export async function runRole(
   const user = spec.buildUserMessage(input);
   const prompt = await assemblePrompt(spec, ctx.upstreamRoot);
   await ctx.onPrompt?.(prompt);
+  const security = new RoleSecurity(prompt.content, user);
   const { model, thinkingLevel } = ctx.runtime.resolve(spec);
   const maxTokens = ctx.maxTokens ?? roleGenerationPolicy(id).maxTokens;
   if (
@@ -311,6 +329,16 @@ export async function runRole(
   const usage: Usage[] = [];
   const started = performance.now();
   const tools = roleTools(id, ctx);
+  for (const tool of tools) {
+    if (!["read_resource", "list_resources", "web_search"].includes(tool.name))
+      continue;
+    const execute = tool.execute;
+    tool.execute = async (...args) => {
+      const result = await execute(...args);
+      security.detector.addMaterial(result);
+      return result;
+    };
+  }
   let output: Data | string | undefined;
   let submitted = false;
   let turns = 0;
@@ -329,6 +357,8 @@ export async function runRole(
       description: "提交最终结构化结果并结束本岗位。",
       parameters: format.schema,
       async execute(_call, value) {
+        if (security.inspect(value))
+          throw new RoleSecurityError(SECURITY_ROLE_FAILURE);
         try {
           await validateOutput(id, value, input, readBodies);
         } catch (error) {
@@ -373,6 +403,9 @@ export async function runRole(
     },
     getApiKey: (provider) => ctx.runtime.apiKey?.(provider),
     beforeToolCall: async ({ toolCall, assistantMessage }, signal) => {
+      security.observe(assistantMessage);
+      if (security.failure)
+        return { block: true, terminate: true, reason: "security_boundary" };
       if (assistantMessage.stopReason === "length")
         return { block: true, terminate: true, reason: "role_truncated" };
       if (signal?.aborted || submitted)
@@ -392,6 +425,7 @@ export async function runRole(
     },
     finishTurn: (turn) => {
       turns++;
+      if (security.failure) return { action: "end" };
       if (turn.message.stopReason === "length") return { action: "end" };
       if (submitted) return { action: "end" };
       if (
@@ -408,13 +442,15 @@ export async function runRole(
     },
   });
   runtime.subscribe((event) => {
-    if (event.type === "message_end" && event.message.role === "assistant")
+    if (event.type === "message_end" && event.message.role === "assistant") {
       usage.push(structuredClone(event.message.usage));
+      security.observe(event.message);
+    }
     if (
       event.type === "message_update" &&
       event.assistantMessageEvent.type === "text_delta"
     )
-      ctx.onDelta?.(event.assistantMessageEvent.delta, id);
+      security.delta(event.assistantMessageEvent.delta);
   });
   let rejectAbort: ((reason: Error) => void) | undefined;
   const aborted = new Promise<never>((_resolve, reject) => {
@@ -443,15 +479,24 @@ export async function runRole(
     usage: structuredClone(usage),
     costTotal: usage.reduce((total, item) => total + item.cost.total, 0),
     promptSha256: prompt.sha256,
-    transcript: publicTranscript(
+    transcript: security.transcript(
       JSON.parse(redact(JSON.stringify(runtime.state.messages))),
     ) as RoleResult["transcript"],
     model: `${model.provider}/${model.id}`,
     durationMs: performance.now() - started,
     readResources: [...reads.values()],
+    securityEvents: structuredClone(security.events),
   });
+  const complete = () => {
+    if (security.inspect(output))
+      throw new RoleSecurityError(SECURITY_ROLE_FAILURE);
+    const result = snapshot();
+    security.publish(ctx, id);
+    return result;
+  };
   try {
     for (let attempt = 0; attempt < ROLE_OUTPUT_ATTEMPTS; attempt++) {
+      security.beginAttempt();
       if (ctx.signal?.aborted) throw new RoleAbortError("Role cancelled");
       await Promise.race([
         runtime.prompt(
@@ -464,6 +509,30 @@ export async function runRole(
       const message = [...runtime.state.messages]
         .reverse()
         .find((m) => m.role === "assistant");
+      if (security.failure) {
+        output = "";
+        if (id === "chuangyi-xietiaoyuan") {
+          output = INTERNAL_REFUSAL;
+          const result = snapshot();
+          ctx.onDelta?.(INTERNAL_REFUSAL, id);
+          return result;
+        }
+        throw new RoleSecurityError(SECURITY_ROLE_FAILURE);
+      }
+      if (id === "chuangyi-xietiaoyuan" && message?.role === "assistant") {
+        const reply = message.content
+          .filter((block) => block.type === "text")
+          .map((block) => (block.type === "text" ? block.text : ""))
+          .join("")
+          .trim();
+        if ([INTERNAL_REFUSAL, CONTENT_REFUSAL].includes(reply)) {
+          security.record(
+            reply === INTERNAL_REFUSAL ? "internal_refusal" : "content_refusal",
+          );
+          output = reply;
+          return complete();
+        }
+      }
       if (message?.role === "assistant" && message.stopReason === "length")
         throw new RoleTruncatedError(
           "Role output was truncated at max_tokens; no retry",
@@ -493,10 +562,10 @@ export async function runRole(
           .trim();
         if (prose && !checks.candidateProseErrors(prose).length) {
           output = prose;
-          return snapshot();
+          return complete();
         }
       }
-      if (submitted) return snapshot();
+      if (submitted) return complete();
       if (limitReached)
         throw new RoleTurnLimitError("Role exceeded its turn budget");
     }
@@ -504,6 +573,8 @@ export async function runRole(
       `Role did not submit a valid result after one correction${lastValidationError ? `: ${redact(lastValidationError)}` : ""}`,
     );
   } catch (error) {
+    if (security.failure || security.inspect((error as Error).message))
+      output = "";
     runtime.abort();
     let grace: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -516,8 +587,9 @@ export async function runRole(
     } finally {
       if (grace) clearTimeout(grace);
     }
-    const failure =
-      error instanceof RoleExecutionError
+    const failure = security.failure
+      ? new RoleSecurityError(SECURITY_ROLE_FAILURE)
+      : error instanceof RoleExecutionError
         ? error
         : new RoleProviderError(redact((error as Error).message));
     failure.partial = snapshot();

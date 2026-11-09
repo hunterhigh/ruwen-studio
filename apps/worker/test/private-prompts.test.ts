@@ -1,5 +1,10 @@
 import { assemblePrompt, ROLES } from "@ruwen/agents";
-import { exportProjectZip, importProjectZip, LocalDirFS } from "@ruwen/core";
+import {
+  exportProjectZip,
+  importProjectZip,
+  LeakDetector,
+  LocalDirFS,
+} from "@ruwen/core";
 import { afterEach, expect, it } from "vitest";
 import { temporaryProject } from "../../../packages/core/test/helpers.ts";
 import { fixture } from "./helpers.ts";
@@ -58,5 +63,18 @@ it("faux worker saves prompts only to the platform table; project/ZIP/service re
     expect(body).not.toContain(forbidden);
     expect(body).not.toContain(process.env.RUWEN_CANARY);
     expect(body).not.toContain('"systemPrompt"');
+  }
+  const material = roleRows.rows.flatMap((row) =>
+    row.transcript.filter((message: { role: string }) =>
+      ["user", "toolResult"].includes(message.role),
+    ),
+  );
+  for (const row of roleRows.rows) {
+    const guard = new LeakDetector(
+      row.content,
+      process.env.RUWEN_CANARY ?? "",
+      material,
+    );
+    for (const body of surfaces) expect(guard.check(body)).toBeUndefined();
   }
 });

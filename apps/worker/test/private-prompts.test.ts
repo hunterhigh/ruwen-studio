@@ -56,6 +56,7 @@ it("faux worker saves prompts only to the platform table; project/ZIP/service re
   }
   for (const body of surfaces) {
     expect(body).not.toContain(forbidden);
+    expect(body).not.toContain(process.env.RUWEN_CANARY);
     expect(body).not.toContain('"systemPrompt"');
   }
 });

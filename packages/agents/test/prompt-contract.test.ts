@@ -23,6 +23,7 @@ import {
   PLUGIN,
   skillRoot,
 } from "../src/prompts/manifest.ts";
+import { securityNote } from "../src/security/notes.ts";
 
 const source = async (p: string) =>
   (await readFile(path.join(defaultUpstreamRoot, p), "utf8")).replace(
@@ -65,10 +66,11 @@ it.each(
     previous = position;
   }
   expect(
-    prompt.endsWith(
+    prompt.includes(
       `${spec.output.kind === "text" ? "只输出候选正文，不输出说明。" : `最终结果必须调用 ${spec.output.toolName} 提交；不得仅用普通消息代替。`}\n`,
     ),
   ).toBe(true);
+  expect(prompt.endsWith(`\n${securityNote(id)}`)).toBe(true);
   expect(prompt.indexOf(PLATFORM_NOTE)).toBeGreaterThan(previous);
   if (!["xiaoshuo-zuozhe", "qinggan-duzhe"].includes(id)) {
     expect(prompt.startsWith(await source(`${skillRoot(id)}/SKILL.md`))).toBe(

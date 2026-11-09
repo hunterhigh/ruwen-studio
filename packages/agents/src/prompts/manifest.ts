@@ -3,6 +3,7 @@ import { readdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { securityNote } from "../security/notes.ts";
 import type { RoleId, RoleSpec } from "../types.ts";
 
 export const PLUGIN = "01-完整插件/ruwen-xiezuo-xitong";
@@ -92,7 +93,7 @@ export async function assemblePrompt(
       : spec.id === "jiyi-weihuyuan"
         ? "\n平台提交格式：先按需读取资源；patches只引用本次实际读取的path与base_sha256。每项sections按完整Markdown标题heading替换其正文replacement，保留标题及其他小节；标题必须存在且唯一，不得引入同级或更高标题。每资源最多8小节，每小节最多4000字；不返回整份new_content。"
         : "";
-  const content = `${fragments.join("\n\n")}\n\n${PLATFORM_NOTE}\n\nCURRENT_ROLE:${spec.id}${editing}\n${format}\n`;
+  const content = `${fragments.join("\n\n")}\n\n${PLATFORM_NOTE}\n\nCURRENT_ROLE:${spec.id}${editing}\n${format}\n\n${securityNote(spec.id)}`;
   return {
     content,
     sha256: createHash("sha256").update(content, "utf8").digest("hex"),

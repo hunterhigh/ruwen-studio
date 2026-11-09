@@ -114,8 +114,38 @@ export class PostgresFS implements ProjectFS {
       return Promise.reject(new Error("Transaction is already closed"));
     return this.client ? fn(this) : this.transaction(fn);
   }
+  private useRead<T>(fn: (tx: PostgresFS) => Promise<T>): Promise<T> {
+    if (this.closed)
+      return Promise.reject(new Error("Transaction is already closed"));
+    if (this.client) return fn(this);
+    // Ownership and file bytes share an MVCC snapshot; no row lock waits behind writers.
+    return this.db.transaction(
+      async (client) => {
+        const access = await client.query(
+          "SELECT id FROM projects WHERE id=$1 AND owner_id=$2",
+          [this.projectId, this.ownerId],
+        );
+        if (!access.rowCount)
+          throw new TenantAccessError(
+            "Project does not exist or belongs to another user",
+          );
+        const tx = new PostgresFS(
+          this.db,
+          this.projectId,
+          this.ownerId,
+          client,
+        );
+        try {
+          return await fn(tx);
+        } finally {
+          tx.closed = true;
+        }
+      },
+      { readOnly: true },
+    );
+  }
   read(value: string): Promise<Uint8Array> {
-    return this.use(async (tx) => {
+    return this.useRead(async (tx) => {
       const p = this.path(value);
       const result = await tx.sql<{ content: Buffer }>(
         "SELECT content FROM project_files WHERE project_id=$1 AND path=$2",
@@ -165,7 +195,7 @@ export class PostgresFS implements ProjectFS {
     return this.put(value, data, true);
   }
   exists(value: string): Promise<boolean> {
-    return this.use(async (tx) =>
+    return this.useRead(async (tx) =>
       Boolean(
         (
           await tx.sql(
@@ -177,7 +207,7 @@ export class PostgresFS implements ProjectFS {
     );
   }
   list(prefix = ""): Promise<string[]> {
-    return this.use(async (tx) => {
+    return this.useRead(async (tx) => {
       const p = this.path(prefix);
       const result = await tx.sql<{ path: string }>(
         "SELECT path FROM project_files WHERE project_id=$1 AND ($2='' OR path=$2 OR left(path,length($2)+1)=$2||'/')",
@@ -200,7 +230,7 @@ export class PostgresFS implements ProjectFS {
     });
   }
   sha256(value: string): Promise<string> {
-    return this.use(async (tx) => {
+    return this.useRead(async (tx) => {
       const result = await tx.sql<{ sha256: string }>(
         "SELECT sha256 FROM project_files WHERE project_id=$1 AND path=$2",
         [this.projectId, this.path(value)],

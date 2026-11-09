@@ -1,0 +1,78 @@
+{
+  "upstreamCommit": "9835470fa07b216c85602915a38063b0d7c937b5",
+  "unit": "Unicode code points, including whitespace; LF normalized upstream",
+  "roles": [
+    {
+      "id": "chuangyi-xietiaoyuan",
+      "characters": 8311,
+      "utf8Bytes": 21311,
+      "sha256": "406bcd8cdee11d0357ea7c6483224bee1775a2d88dc5b6ff039233a0f1352613"
+    },
+    {
+      "id": "xiangmu-zhiliyuan",
+      "characters": 8321,
+      "utf8Bytes": 21327,
+      "sha256": "f84326e52e1f452d8face132e789da8598457e4ba4e01fe791c6c82ea51531e9"
+    },
+    {
+      "id": "waibu-zhishi-guwen",
+      "characters": 8309,
+      "utf8Bytes": 21299,
+      "sha256": "dc5a4d7684851909a5c8dd168e0c21e8285125b1410ec2426f98d79c0b2a0e69"
+    },
+    {
+      "id": "biaoxian-shejishi",
+      "characters": 8351,
+      "utf8Bytes": 21417,
+      "sha256": "c2869e62e86e57d61e8253646d5a390dc4842fbdd019249cb445081c672ec18a"
+    },
+    {
+      "id": "gushi-gousishi",
+      "characters": 8309,
+      "utf8Bytes": 21307,
+      "sha256": "7e73da9410f4f8e4fa06f5729b64738fc36af810b4bd3127917cc8f93e0f764b"
+    },
+    {
+      "id": "zhangjie-qingjing-bianyiyuan",
+      "characters": 8344,
+      "utf8Bytes": 21350,
+      "sha256": "702e8105100f9e464112cddbb403b05bcf1d5127b1fa0ea395c865cae03bf51c"
+    },
+    {
+      "id": "xiaoshuo-zuozhe",
+      "characters": 511,
+      "utf8Bytes": 1381,
+      "sha256": "d4001514207f226424c87813938ea23c67472c2953aedcc6e36676929595b42c"
+    },
+    {
+      "id": "qinggan-duzhe",
+      "characters": 297,
+      "utf8Bytes": 785,
+      "sha256": "cf38b8722479d46fa4c2033414cfb19990893dfb95ae3e2b1f357402e55ec928"
+    },
+    {
+      "id": "wenxue-bianji",
+      "characters": 5455,
+      "utf8Bytes": 13731,
+      "sha256": "2571ad5def73f10d72c26424dfe3481b463a6e5866ee24471ddde6c63e70afe0"
+    },
+    {
+      "id": "qingjie-heyanyuan",
+      "characters": 5020,
+      "utf8Bytes": 12722,
+      "sha256": "03be3100b4e27cae04a5a42e7b25d47b43429aef100414c4dd33307bbdfaf007"
+    },
+    {
+      "id": "xianshi-heyanyuan",
+      "characters": 5044,
+      "utf8Bytes": 12780,
+      "sha256": "2e3e16debe0a01d43972a0e5b1dd37d298389f2e4af0bd7a3f8d1e7b8523b3ae"
+    },
+    {
+      "id": "jiyi-weihuyuan",
+      "characters": 5207,
+      "utf8Bytes": 13119,
+      "sha256": "f02e21d0498681bd4213aa5d70f3532987fd48585d9ad3307e0ebbb2ec527b10"
+    }
+  ]
+}

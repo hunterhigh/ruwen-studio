@@ -20,6 +20,54 @@ async function create() {
   return new PostgresFS(db, id, owner);
 }
 projectFSContract("PostgresFS", create);
+it("read operations return committed bytes without waiting for a long project write transaction", async () => {
+  const fs = await create();
+  await fs.write("long-write", "committed\r\n");
+  const before = await fs.sha256("long-write");
+  let unlock = () => {},
+    ready = () => {};
+  const gate = new Promise<void>((resolve) => {
+    unlock = resolve;
+  });
+  const entered = new Promise<void>((resolve) => {
+    ready = resolve;
+  });
+  const writer = fs.transaction(async (tx) => {
+    await tx.write("long-write", "uncommitted\n");
+    ready();
+    await gate;
+  });
+  await entered;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const values = await Promise.race([
+      Promise.all([
+        fs.readText("long-write"),
+        fs.exists("long-write"),
+        fs.list(),
+        fs.sha256("long-write"),
+        fs.read("long-write"),
+      ]),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("Read blocked behind write lock")),
+          1500,
+        );
+      }),
+    ]);
+    expect(values[0]).toBe("committed\r\n");
+    expect(values[1]).toBe(true);
+    expect(values[2]).toEqual(["long-write"]);
+    expect(values[3]).toBe(before);
+    expect(new TextDecoder().decode(values[4])).toBe("committed\r\n");
+  } finally {
+    clearTimeout(timer);
+    unlock();
+    await writer;
+  }
+  expect(await fs.readText("long-write")).toBe("uncommitted\n");
+  expect(await fs.sha256("long-write")).not.toBe(before);
+});
 it("Drizzle table columns agree with the applied SQL migration", async () => {
   for (const table of Object.values(schema)) {
     const config = getTableConfig(table);

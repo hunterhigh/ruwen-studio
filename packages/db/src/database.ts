@@ -15,10 +15,17 @@ export class Database {
     });
     this.orm = drizzle(this.pool, { schema });
   }
-  async transaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
+  async transaction<T>(
+    fn: (client: PoolClient) => Promise<T>,
+    options: { readOnly?: boolean } = {},
+  ): Promise<T> {
     const client = await this.pool.connect();
     try {
-      await client.query("BEGIN");
+      await client.query(
+        options.readOnly
+          ? "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY"
+          : "BEGIN",
+      );
       const value = await fn(client);
       await client.query("COMMIT");
       return value;

@@ -3,6 +3,11 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 import type { runDetail } from "../server/api.ts";
 import { post } from "./client.ts";
 import { ProjectNav } from "./ProjectHome.tsx";
+import {
+  applyRoleFrame,
+  emptyRoleStreams,
+  roleStreamText,
+} from "./role-streams.ts";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
 import { useApi } from "./useApi.ts";
 
@@ -200,7 +205,7 @@ function RunReader({
   onChanged: () => void;
 }) {
   const { data, error: loadError, refresh } = useApi<Detail>(`/api/runs/${id}`),
-    [streams, setStreams] = useState<Record<string, string>>({}),
+    [streams, setStreams] = useState(emptyRoleStreams),
     [connected, setConnected] = useState(false),
     [tab, setTab] = useState("reader"),
     [error, setError] = useState(""),
@@ -213,18 +218,30 @@ function RunReader({
     const events = new EventSource(`/api/runs/${id}/events`);
     events.onopen = () => setConnected(true);
     events.onerror = () => setConnected(false);
-    events.addEventListener("delta", (event: MessageEvent<string>) => {
+    const consume = (type: "delta" | "reset", event: MessageEvent<string>) => {
       try {
-        const value = JSON.parse(event.data) as { role: string; text: string };
-        if (typeof value.role === "string" && typeof value.text === "string")
-          setStreams((old) => ({
-            ...old,
-            [value.role]: (old[value.role] ?? "") + value.text,
-          }));
+        const value = JSON.parse(event.data) as { role: string; text?: string };
+        if (ROLES.some(([role]) => role === value.role))
+          setStreams((old) =>
+            applyRoleFrame(old, {
+              sessionId: id,
+              runId: id,
+              role: value.role,
+              id: event.lastEventId,
+              type,
+              text: value.text,
+            }),
+          );
       } catch {
         /* malformed event is ignored; final result is authoritative */
       }
-    });
+    };
+    events.addEventListener("delta", (event: MessageEvent<string>) =>
+      consume("delta", event),
+    );
+    events.addEventListener("reset", (event: MessageEvent<string>) =>
+      consume("reset", event),
+    );
     events.addEventListener("status", (event: MessageEvent<string>) => {
       void refresh();
       onChanged();
@@ -241,7 +258,8 @@ function RunReader({
     (data?.run.candidateSha256 ?? "") +
     (data?.run.memoryPreviewSha256 ?? "");
   const confirmed = confirmedDigest === digest;
-  const prose = data?.prose || streams["xiaoshuo-zuozhe"] || "",
+  const prose =
+      data?.prose || roleStreamText(streams, id, id, "xiaoshuo-zuozhe"),
     paragraphs = prose.split(/\n\s*\n/),
     reading = object(data?.reports["qinggan-duzhe"]?.output),
     reactions = Array.isArray(reading.reactions)

@@ -1,31 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { exportProjectZip, LocalDirFS, type ProjectFS } from "@ruwen/core";
 
-async function signIn(page: Page, email = `${randomUUID()}@test.invalid`) {
-  await page.goto("/sign-in");
-  await page.getByLabel("邮箱", { exact: true }).fill(email);
-  await page.getByLabel("如何称呼你").fill("试读者");
-  await page.getByLabel("邀请码").fill("RUWEN-PREVIEW");
-  await page.getByRole("button", { name: "发送登录链接" }).click();
-  await page.getByRole("button", { name: "打开本浏览器的预览邮件" }).click();
-  await expect(page).toHaveURL(/\/projects$/);
-}
-async function createDemo(page: Page, title: string) {
-  await page
-    .getByRole("button", { name: "新建项目", exact: false })
-    .first()
-    .click();
-  await page.getByLabel("项目名称").fill(title);
-  await page.getByLabel("从哪里开始").selectOption("demo");
-  await page.getByRole("button", { name: "创建项目", exact: true }).click();
-  await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+$/);
-  await expect(
-    page.getByRole("heading", { name: "项目资料已就绪" }),
-  ).toBeVisible();
-  return page.url().split("/").at(-1) ?? "";
-}
+import { createDemo, signIn } from "./helpers.ts";
+
 test("imported user Markdown cannot execute HTML, load images or create non-https links", async ({
   page,
 }) => {

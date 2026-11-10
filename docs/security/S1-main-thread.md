@@ -14,3 +14,7 @@
 复核service.ts、stream-events.ts、run-role.ts及api.ts：流式落盘唯一接线为受保护的RoleContext.onDelta，SSE只从该事件表读取，不转发原始provider事件、thinking或transcript。新增approved-stream.test.ts阻塞provider结束，证明已放行前缀可提前落盘/送达，而不安全尾部及thinking/签名始终不落入事件或实时/重连SSE。岗位失败不能再把暂扣尾部补写出来；安全前缀本身不构成批准正文。
 
 第3项提交前完整lint/typecheck/test全绿：46个文件、445项测试，203.60秒；本项仅测试及约束注释，页面行为不变，全部6项浏览器测试及生产构建已在第2项通过。本机HTTPS预览健康检查200，仍为faux且P3闸门关闭。尝试重置和构思契约的接入留待后续，不把本轮第1–3项完成等同于P5完成。
+
+## reset网页接入（PR #4之后）
+
+章节与构思复用按会话/任务/岗位定位的尝试缓冲，reset立即清空当前尝试，持久化最终结果和费用不受影响。排他游标去重防止重连旧reset清掉新文字。两页补格式更正及安全拒绝的浏览器验证；构思暂用类型化本地假数据，不注册契约路由。详见p5-stream-reset-2026-11-10报告。

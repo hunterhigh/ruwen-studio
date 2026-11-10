@@ -2,5 +2,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "name": "@ruwen/billing"
+  "name": "@ruwen/billing",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@ruwen/db": "workspace:*"
+  }
 }

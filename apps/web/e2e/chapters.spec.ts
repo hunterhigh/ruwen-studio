@@ -90,17 +90,15 @@ test("account can sign out every device using the CSRF-protected session endpoin
     await secondContext.close();
   }
 });
-test("admin risk UI states backend freeze is pending and every dashboard access is audited", async ({
+test("admin risk UI reports enforced freezes and every dashboard access is audited", async ({
   page,
 }, testInfo) => {
   await signIn(page, "preview@ruwen.local");
   await page.getByRole("link", { name: "管理工作室", exact: true }).click();
+  await expect(page.getByText("运行保护已接入", { exact: true })).toBeVisible();
   await expect(
-    page.getByText("冻结执行服务尚未接入", { exact: true }),
+    page.getByRole("heading", { name: "冻结与解冻审计", exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "冻结运行（待后端接入）", exact: true }),
-  ).toBeDisabled();
   await expect(
     page.getByRole("heading", {
       name: "管理访问审计（最近100条）",
@@ -110,7 +108,7 @@ test("admin risk UI states backend freeze is pending and every dashboard access 
   const response = await page.request.get("/api/admin");
   expect(response.status()).toBe(200);
   const payload = await response.json();
-  expect(payload.security.enforcement).toBe("pending_backend");
+  expect(payload.security.enforcement).toBe("active");
   expect(payload.security.audit).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ action: "dashboard_page", outcome: "allowed" }),

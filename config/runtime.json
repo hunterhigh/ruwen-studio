@@ -18,11 +18,28 @@
       "ideation": 25000,
       "memory": 25000
     },
-    "signupCredits": 100000,
+    "signupCredits": 250000,
     "plans": [
-      { "id": "preview", "name": "试用", "credits": 100000 },
-      { "id": "monthly", "name": "月度方案", "credits": 1000000 }
-    ]
+      {
+        "id": "preview",
+        "name": "测试点数包",
+        "credits": 100000,
+        "priceMinor": 500
+      },
+      {
+        "id": "monthly",
+        "name": "大额测试点数包",
+        "credits": 1000000,
+        "priceMinor": 4000
+      }
+    ],
+    "payment": {
+      "sandboxEnabled": false,
+      "provider": "mock",
+      "maxWebhookBytes": 65536,
+      "webhookSkewSeconds": 300,
+      "requestTimeoutMs": 15000
+    }
   },
   "release": {
     "p3GatePassed": false,
@@ -39,6 +56,7 @@
     "maxUploadBytes": 20971520
   },
   "riskReview": {
+    "freezeScore": 5,
     "userChapterConcurrency": 2,
     "projectConcurrency": 1,
     "coordinatorTurnsPerHour": 60,

@@ -12,9 +12,20 @@ import {
   RoleAbortError,
   RoleExecutionError,
   type RoleId,
+  RoleProviderError,
   type RoleResult,
   runRole,
 } from "@ruwen/agents";
+import {
+  assertRunEnabled,
+  currentBank,
+  finishReservation,
+  initializeBilling,
+  projectSql,
+  quoteRun,
+  reserveRun,
+  settleRole,
+} from "@ruwen/billing";
 import {
   assertInputLimits,
   candidateProblems,
@@ -161,6 +172,7 @@ export class WorkerService {
     deploymentCanary();
     try {
       await this.db.migrate();
+      await initializeBilling(this.db);
       await this.boss.start();
       await this.boss.createQueue(this.queue, {
         retryLimit: 5,
@@ -209,16 +221,24 @@ export class WorkerService {
     assertInputLimits(request);
     const id = randomUUID();
     await fs.transaction(async (tx) => {
+      const quote = await quoteRun(
+        projectSql(tx),
+        fs.ownerId,
+        currentBank(),
+        "chapter",
+      );
       await tx.sql(
         "INSERT INTO pipeline_runs(id,project_id,kind,chapter,status,request) VALUES($1,$2,'chapter_run',$3,'REQUESTED',$4)",
         [id, fs.projectId, String(request.chapter), JSON.stringify(request)],
       );
-      await this.send(tx, {
+      await reserveRun(projectSql(tx), id, quote);
+      const queued = await this.send(tx, {
         kind: "chapter",
         projectId: fs.projectId,
         ownerId: fs.ownerId,
         runId: id,
       });
+      if (!queued) throw new Error("Chapter queue did not accept task");
     });
     return id;
   }
@@ -387,6 +407,8 @@ export class WorkerService {
       "UPDATE pipeline_runs SET status=$3,finished_at=CASE WHEN $4 THEN now() ELSE NULL END WHERE id=$1 AND project_id=$2",
       [run.id, fs.projectId, run.status, terminal.includes(run.status)],
     );
+    if (terminal.includes(run.status))
+      await finishReservation(projectSql(fs), fs.ownerId, run.id);
     for (const event of run.events)
       await fs.sql(
         "INSERT INTO pipeline_steps(run_id,step,status,output_ref,started_at,finished_at) VALUES($1,$2,'completed',$3,$4,$4) ON CONFLICT(run_id,step) DO NOTHING",
@@ -445,6 +467,7 @@ export class WorkerService {
           "Role was interrupted with an unknown provider outcome; automatic rerun blocked, manual review required",
         );
       }
+      await assertRunEnabled(projectSql(tx), fs.ownerId, run.id);
       const prompt = await assemblePrompt(ROLES[id], ctx.upstreamRoot);
       await tx.sql(
         "INSERT INTO prompts(sha256,content) VALUES($1,$2) ON CONFLICT DO NOTHING",
@@ -473,7 +496,14 @@ export class WorkerService {
       });
     } catch (error) {
       if (error instanceof RoleExecutionError && error.partial)
-        await this.saveRole(fs, run.id, id, error.partial, "failed");
+        await this.saveRole(
+          fs,
+          run.id,
+          id,
+          error.partial,
+          "failed",
+          error instanceof RoleAbortError || error instanceof RoleProviderError,
+        );
       throw error;
     }
     await this.options.onBoundary?.("role_response", id, run.id);
@@ -487,6 +517,7 @@ export class WorkerService {
     id: RoleId,
     result: RoleResult,
     status: string,
+    usageUnknown = false,
   ) {
     if (!Number.isFinite(result.costTotal) || result.costTotal < 0)
       throw new Error("Invalid reported role cost");
@@ -514,7 +545,7 @@ export class WorkerService {
       }
       await recordRoleSecurityEvents(tx, runId, id, result);
       const changed = await tx.sql<{ id: string }>(
-        "UPDATE role_runs SET status=$3,model=$4,prompt_sha256=$5,result=$6,transcript=$7,usage=$8,cost_usd=$9,cache_read_tokens=$10,cache_write_tokens=$11,finished_at=now() WHERE run_id=$1 AND role_id=$2 AND status='running' RETURNING id",
+        "UPDATE role_runs SET status=$3,model=$4,prompt_sha256=$5,result=$6,transcript=$7,usage=$8,cost_usd=$9,cache_read_tokens=$10,cache_write_tokens=$11,usage_unknown=$12,finished_at=now() WHERE run_id=$1 AND role_id=$2 AND status='running' RETURNING id",
         [
           runId,
           id,
@@ -524,16 +555,19 @@ export class WorkerService {
           JSON.stringify(publicRoleResult(result)),
           JSON.stringify(publicTranscript(result.transcript)),
           JSON.stringify(result.usage),
-          result.costTotal,
+          !usageUnknown && result.usage.length ? result.costTotal : null,
           result.usage.reduce((sum, usage) => sum + usage.cacheRead, 0),
           result.usage.reduce((sum, usage) => sum + usage.cacheWrite, 0),
+          usageUnknown || result.usage.length === 0,
         ],
       );
-      if (changed.rows[0])
+      if (changed.rows[0] && result.usage.length) {
         await tx.sql(
           "INSERT INTO role_cost_events(role_run_id,cost_usd) VALUES($1,$2) ON CONFLICT DO NOTHING",
           [changed.rows[0].id, result.costTotal],
         );
+        await settleRole(projectSql(tx), fs.ownerId, runId, changed.rows[0].id);
+      }
     });
   }
   async handle(task: Task, jobSignal?: AbortSignal) {

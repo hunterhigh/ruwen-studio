@@ -8,6 +8,7 @@
     "dev": "node src/main.ts"
   },
   "dependencies": {
+    "@ruwen/billing": "workspace:*",
     "@ruwen/agents": "workspace:*",
     "@ruwen/core": "workspace:*",
     "@ruwen/db": "workspace:*",

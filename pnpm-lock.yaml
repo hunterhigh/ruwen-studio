@@ -56,6 +56,9 @@ importers:
       '@ruwen/agents':
         specifier: workspace:*
         version: link:../../packages/agents
+      '@ruwen/billing':
+        specifier: workspace:*
+        version: link:../../packages/billing
       '@ruwen/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -101,6 +104,9 @@ importers:
       '@ruwen/agents':
         specifier: workspace:*
         version: link:../../packages/agents
+      '@ruwen/billing':
+        specifier: workspace:*
+        version: link:../../packages/billing
       '@ruwen/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -129,7 +135,11 @@ importers:
         specifier: workspace:*
         version: link:../core
 
-  packages/billing: {}
+  packages/billing:
+    dependencies:
+      '@ruwen/db':
+        specifier: workspace:*
+        version: link:../db
 
   packages/core:
     dependencies:

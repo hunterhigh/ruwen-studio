@@ -6,7 +6,11 @@ import { post } from "./client.ts";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
 import { useApi } from "./useApi.ts";
 export function Admin() {
-  const { data, error: loadError } = useApi<{
+  const {
+      data,
+      error: loadError,
+      refresh,
+    } = useApi<{
       users: number;
       projects: number;
       failures: unknown[];
@@ -48,7 +52,9 @@ export function Admin() {
         </button>
         {code && <SafeMarkdown plain content={code} />}
       </section>
-      {data?.security && <AdminSecurity review={data.security} />}
+      {data?.security && (
+        <AdminSecurity review={data.security} onChanged={refresh} />
+      )}
       <section className="paper-panel">
         <h2>失败任务</h2>
         <SafeMarkdown

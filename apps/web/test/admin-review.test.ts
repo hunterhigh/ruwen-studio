@@ -27,7 +27,7 @@ it("admin audit stores allowed/denied metadata, is append only and its UI never 
     [p.fs.ownerId, p.fs.projectId, run],
   );
   const review = await adminRiskReview(p.service.db);
-  expect(review.enforcement).toBe("pending_backend");
+  expect(review.enforcement).toBe("active");
   expect(review.accounts.find((row) => row.id === p.fs.ownerId)).toMatchObject({
     score: 1,
     events: 1,
@@ -51,9 +51,9 @@ it("admin audit stores allowed/denied metadata, is append only and its UI never 
     ]),
   ).rejects.toThrow("append only");
   const html = renderToStaticMarkup(createElement(AdminSecurity, { review }));
-  expect(html).toContain("冻结执行服务尚未接入");
-  expect(html).toContain("未知 · 冻结服务未接入");
-  expect(html.match(/disabled=""/g)).toHaveLength(2);
+  expect(html).toContain("运行保护已接入");
+  expect(html).toContain("未冻结");
+  expect(html).toContain("人工复核并解冻");
   expect(html).not.toContain("系统提示词全文");
 });
 it("admin APIs enforce role and CSRF, audit reads and invitation creation atomically, and retain no secret payload", async () => {
@@ -101,7 +101,7 @@ it("admin APIs enforce role and CSRF, audit reads and invitation creation atomic
   ).toBe(403);
   const result = await handleApi(req("/api/admin"), services);
   expect(result.status).toBe(200);
-  expect((await result.json()).security.enforcement).toBe("pending_backend");
+  expect((await result.json()).security.enforcement).toBe("active");
   const invitation = await handleApi(
     req("/api/admin/invitations", "POST"),
     services,

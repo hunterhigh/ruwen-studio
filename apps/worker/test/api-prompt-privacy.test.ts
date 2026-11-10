@@ -177,6 +177,11 @@ async function setup(blocked = false) {
 }
 it("every registered HTTP response, file read, export entry and SSE batch excludes private prompt windows and canaries", async () => {
   const { services, fs, id, request, safe, workspaceRoot } = await setup();
+  const checkoutId = randomUUID();
+  await services.worker.db.pool.query(
+    "INSERT INTO billing_checkouts(id,user_id,request_id,provider,plan_id,credits,price_minor,currency,prepared_at) VALUES($1,$2,$3,'mock','preview',100000,500,'USD',now())",
+    [checkoutId, fs.ownerId, randomUUID()],
+  );
   // Exercise every file body before POST routes can change the test run's state.
   for (const p of await fs.list()) {
     const response = await handleApi(
@@ -191,7 +196,9 @@ it("every registered HTTP response, file read, export entry and SSE batch exclud
   for (const route of API_ROUTES) {
     const url = route.pattern
       .replace(":projectId", fs.projectId)
-      .replace(":runId", id);
+      .replace(":runId", id)
+      .replace(":checkoutId", checkoutId)
+      .replace(":accountId", fs.ownerId);
     expect(url).not.toMatch(/:[A-Za-z]/); // New resource parameters need a concrete privacy fixture.
     const response = await handleApi(
       request(url, route.method, route.method === "POST" ? {} : undefined),

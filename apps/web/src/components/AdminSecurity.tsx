@@ -1,9 +1,24 @@
 "use client";
+import { useState } from "react";
 import type { AdminRiskReview } from "../server/admin-review.ts";
+import { post } from "./client.ts";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
-export function AdminSecurity({ review }: { review: AdminRiskReview }) {
+export function AdminSecurity({
+  review,
+  onChanged,
+}: {
+  review: AdminRiskReview;
+  onChanged?: () => Promise<unknown>;
+}) {
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
   const limits = review.designLimits;
   const controls = [
+    [
+      "风险冻结阈值",
+      `${review.enforcedLimits.freezeScore ?? "尚未配置"} 分`,
+      "已执行 · 待 P3 校准",
+    ],
     ["每用户同时运行章节", `${limits.userChapterConcurrency} 个`, "待后端"],
     ["每项目同时运行", `${limits.projectConcurrency} 个`, "已有项目锁"],
     [
@@ -26,17 +41,16 @@ export function AdminSecurity({ review }: { review: AdminRiskReview }) {
         <h2>先看事实，再做处理。</h2>
       </header>
       <div className="notice">
-        <strong>冻结执行服务尚未接入</strong>
+        <strong>运行保护已接入</strong>
         <p>
-          风险分来自现有安全事件。当前只能查看，无法判断账户是否已冻结，也不能执行冻结或解除冻结。
+          安全事件累计达到阈值会冻结后续运行。人工复核并解冻后，保留原事件和审计；后续新事件仍会累计。
         </p>
-        <button type="button" className="button secondary" disabled>
-          冻结运行（待后端接入）
-        </button>{" "}
-        <button type="button" className="button secondary" disabled>
-          解除冻结（待后端接入）
-        </button>
       </div>
+      {error && (
+        <div className="error" role="alert">
+          <SafeMarkdown plain content={error} />
+        </div>
+      )}
       <section className="paper-panel">
         <h3>风控配置对照</h3>
         <p className="fine-print">
@@ -56,7 +70,7 @@ export function AdminSecurity({ review }: { review: AdminRiskReview }) {
           ))}
         </dl>
         <p className="fine-print">
-          冻结阈值、一次性邮箱黑名单、试用点数与用户自行调整日上限：等待后端契约接入。此页不作自动封禁决定。
+          冻结阈值由服务端配置，当前试用点数已入账。一次性邮箱黑名单、会话频率与用户自行调整日上限尚未接入，不把设计配置当作已执行。
         </p>
       </section>
       <section className="paper-panel">
@@ -85,12 +99,54 @@ export function AdminSecurity({ review }: { review: AdminRiskReview }) {
                       ? new Date(account.lastEvent).toLocaleString("zh-CN")
                       : "暂无事件"}
                   </td>
-                  <td>未知 · 冻结服务未接入</td>
+                  <td>
+                    {account.frozenAt ? "已冻结 · 等待人工复核" : "未冻结"}
+                    <button
+                      type="button"
+                      className="text-button"
+                      disabled={busy || !account.frozenAt}
+                      onClick={() => {
+                        if (
+                          !account.frozenAt ||
+                          !window.confirm(
+                            "确认已完成人工复核并解除冻结？历史风险事件与审计会保留。",
+                          )
+                        )
+                          return;
+                        setBusy(true);
+                        setError("");
+                        void post(
+                          `/api/admin/accounts/${account.id}/unfreeze`,
+                          {
+                            confirmed: true,
+                            expectedFrozenAt: account.frozenAt,
+                          },
+                        )
+                          .then(() => onChanged?.())
+                          .catch((caught: Error) => setError(caught.message))
+                          .finally(() => setBusy(false));
+                      }}
+                    >
+                      人工复核并解冻
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      </section>
+      <section className="paper-panel">
+        <h3>冻结与解冻审计</h3>
+        {review.riskAudit.map((entry) => (
+          <p key={entry.id}>
+            {new Date(entry.at).toLocaleString("zh-CN")} ·{" "}
+            <SafeMarkdown inline plain content={entry.userId} /> ·{" "}
+            {entry.action === "freeze" ? "自动冻结" : "人工解冻"} · 累计{" "}
+            {entry.score} 分 ·{" "}
+            <SafeMarkdown inline plain content={entry.actorId ?? "系统"} />
+          </p>
+        ))}
       </section>
       <section className="paper-panel">
         <h3>管理访问审计（最近100条）</h3>

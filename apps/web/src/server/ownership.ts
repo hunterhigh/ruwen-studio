@@ -1,13 +1,46 @@
 import { type Database, PostgresFS } from "@ruwen/db";
 import { HttpError } from "./security.ts";
 export type Resource = { projectId: string } | { runId: string };
+type BillingResource = { checkoutId: string } | { accountId: string };
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 /** Every resource route, SSE subscriber and export calls this before reading or mutating a resource. */
-export async function requireOwnership(
+export function requireOwnership(
   db: Database,
   userId: string,
   resource: Resource,
+): Promise<{
+  project: { id: string; project_key: string; title: string };
+  fs: PostgresFS;
+}>;
+export function requireOwnership(
+  db: Database,
+  userId: string,
+  resource: BillingResource,
+  adminEmails?: string[],
+): Promise<{ id: string }>;
+export async function requireOwnership(
+  db: Database,
+  userId: string,
+  resource: Resource | BillingResource,
+  adminEmails: string[] = [],
 ) {
+  if ("checkoutId" in resource || "accountId" in resource) {
+    const id =
+      "checkoutId" in resource ? resource.checkoutId : resource.accountId;
+    if (!uuid.test(id)) throw new HttpError(404, "资源不存在。");
+    const result =
+      "checkoutId" in resource
+        ? await db.pool.query(
+            "SELECT id FROM billing_checkouts WHERE id=$1 AND user_id=$2",
+            [id, userId],
+          )
+        : await db.pool.query(
+            "SELECT id FROM users WHERE id=$1 AND (id=$2 OR EXISTS(SELECT 1 FROM users actor WHERE actor.id=$2 AND lower(actor.email)=ANY($3::text[])))",
+            [id, userId, adminEmails],
+          );
+    if (!result.rowCount) throw new HttpError(404, "资源不存在。");
+    return { id };
+  }
   const id = "projectId" in resource ? resource.projectId : resource.runId;
   if (!uuid.test(id)) throw new HttpError(404, "资源不存在。");
   const rows =

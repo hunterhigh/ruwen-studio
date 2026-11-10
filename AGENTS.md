@@ -28,14 +28,14 @@ pnpm --filter web dev
 
 ## 当前并行边界（2026-11-09）
 
-- 另一个线程在`feat/backend-parallel`负责`.github/`、`packages/pipeline/src/ideation/`、`packages/billing`、构思侧worker任务及v4.1迁移；本线程不得修改这些部分。
-- 构思页面依据对方推送的`docs/contracts/ideation-service.md`接入；契约未到先做章节页面，不猜造服务接口。P6本线程只做计费界面和接入，账本、支付适配器、webhook由对方实现。
+- 另一个线程在`feat/backend-parallel`负责`.github/`、`packages/pipeline/src/ideation/`、构思侧worker任务及v4.1迁移；本线程不得修改这些部分。
+- 构思页面依据对方推送的`docs/contracts/ideation-service.md`接入；契约未到先做章节页面，不猜造服务接口。2026-11-10人类调整：P6计费核心、支付适配器/webhook、账户界面和风险冻结/人工解冻均由本主线程负责；允许在等待构思后端期间先做P6，P5仍不宣称完成。构思后端分4批PR，每批合并后由本线程注册已实现接口、替换对应假数据并补归属/CSRF/SSE测试；未实现路由不提前注册。
 - 新的大块工作开始前先拉取`origin/main`；共享`apps/worker/src/service.ts`和`packages/agents`只做增量改动，避免覆盖对方工作。
 - P3前：生产注册仅邀请码，真实收费开关默认关闭；不得因开发阶段使用faux或record/replay而视为闸门通过。
 
 ## P5安全要求（2026-11-09人类补充）
 
-- 人类的`docs/security/SECURITY-DESIGN.md`已合并；修改P5前阅读该文档，按正式编号核对：S1-1渲染/CSP，S1-2归属，S1-3 CSRF/会话/限流，S1-4风控及审计；CSP按3.3第4条。S1-4本线程负责界面和网页管理访问审计，冻结执行由并行线程实现，未接入时必须如实标注。
+- 人类的`docs/security/SECURITY-DESIGN.md`已合并；修改P5前阅读该文档，按正式编号核对：S1-1渲染/CSP，S1-2归属，S1-3 CSRF/会话/限流，S1-4风控及审计；CSP按3.3第4条。S1-4按2026-11-10最新分工，由本线程负责界面、风险冻结/人工解冻及管理审计。
 - 用户与模型内容只通过统一SafeMarkdown组件显示：不允许原始HTML或图片，只允许HTTPS链接并加noopener noreferrer nofollow；lint禁止原始HTML注入。
 - HTTPS入口设置CSP与安全响应头。所有资源ID接口、SSE与导出统一requireOwnership，逐路由执行A→B返回404测试；新增路由漏测须使pnpm test/CI失败。
 - 所有应用状态变更校验CSRF；Cookie必须HttpOnly、Secure、SameSite=Lax；登录按IP及邮箱限流。P5阶段报告单列安全自查。

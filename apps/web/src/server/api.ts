@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import path from "node:path";
 import { FAUX_SCENARIOS, ROLE_IDS, type RoleResult } from "@ruwen/agents";
+import { BillingError, createPayments, unfreezeAccount } from "@ruwen/billing";
 import {
   checks,
   exportProjectZip,
@@ -11,11 +12,7 @@ import {
   state,
 } from "@ruwen/core";
 import { type ChapterRun, loadRun, runPath } from "@ruwen/pipeline";
-import {
-  assertRealChargingAllowed,
-  releasePolicy,
-  runtimeSettings,
-} from "../../../../config/settings.ts";
+import { releasePolicy, runtimeSettings } from "../../../../config/settings.ts";
 import {
   type AdminAction,
   adminAllowed,
@@ -23,6 +20,7 @@ import {
   auditAdmin,
 } from "./admin-review.ts";
 import { newMailbox, previewMail, redeemInvitation } from "./auth.ts";
+import { billingAccount } from "./billing-account.ts";
 import { type Resource, requireOwnership } from "./ownership.ts";
 import {
   CSRF_COOKIE,
@@ -41,7 +39,8 @@ import type { WebServices } from "./services.ts";
 export interface RouteDefinition {
   method: string;
   pattern: string;
-  resource?: "projectId" | "runId";
+  resource?: "projectId" | "runId" | "checkoutId" | "accountId";
+  authentication?: "signature";
   foreignCase?: string;
 }
 /** A resource route cannot be added without a 404 fixture; the route coverage test enforces this registry. */
@@ -129,8 +128,30 @@ export const API_ROUTES: readonly RouteDefinition[] = [
   },
   { method: "GET", pattern: "/api/account" },
   { method: "POST", pattern: "/api/billing/checkout" },
+  {
+    method: "POST",
+    pattern: "/api/billing/checkouts/:checkoutId/complete",
+    resource: "checkoutId",
+    foreignCase: "foreign checkout completion",
+  },
+  {
+    method: "POST",
+    pattern: "/api/billing/webhooks/mock",
+    authentication: "signature",
+  },
+  {
+    method: "POST",
+    pattern: "/api/billing/webhooks/lemonsqueezy",
+    authentication: "signature",
+  },
   { method: "GET", pattern: "/api/admin" },
   { method: "POST", pattern: "/api/admin/invitations" },
+  {
+    method: "POST",
+    pattern: "/api/admin/accounts/:accountId/unfreeze",
+    resource: "accountId",
+    foreignCase: "foreign account risk review",
+  },
 ];
 export function json(value: unknown, status = 200, headers: HeadersInit = {}) {
   return Response.json(value, {
@@ -223,7 +244,9 @@ export async function authenticated(request: Request, services: WebServices) {
         null,
         new URL(request.url).pathname.endsWith("/invitations")
           ? "invitation_create"
-          : "dashboard_data",
+          : new URL(request.url).pathname.endsWith("/unfreeze")
+            ? "account_unfreeze"
+            : "dashboard_data",
         false,
       );
     throw new HttpError(401, "请先登录。");
@@ -286,7 +309,7 @@ export async function runDetail(
   const artifact = async (p: string | undefined) =>
     p && (await owned.fs.exists(p)) ? owned.fs.readText(p) : "";
   const roleRows = await services.worker.db.pool.query(
-    "SELECT role_id,status,model,usage,cost_usd,started_at,finished_at FROM role_runs WHERE run_id=$1 ORDER BY started_at",
+    "SELECT role_id,status,model,usage,cost_usd,usage_unknown,started_at,finished_at FROM role_runs WHERE run_id=$1 ORDER BY started_at",
     [id],
   );
   const memoryPreview = await artifact(run.paths.memory_preview);
@@ -402,7 +425,7 @@ async function events(
               [runId, owned.project.id],
             );
             const roles = await services.worker.db.pool.query(
-              "SELECT role_id,status,model,cost_usd,started_at,finished_at FROM role_runs WHERE run_id=$1 ORDER BY started_at",
+              "SELECT role_id,status,model,cost_usd,usage_unknown,started_at,finished_at FROM role_runs WHERE run_id=$1 ORDER BY started_at",
               [runId],
             );
             const snapshot = JSON.stringify({
@@ -450,10 +473,37 @@ export async function handleApi(
   request: Request,
   services: WebServices,
 ): Promise<Response> {
+  let actorId: string | undefined;
+  let resourceRequest = false;
   try {
     const { route, params } = match(request),
       db = services.worker.db,
       url = new URL(request.url);
+    const payments = () =>
+      services.payments ??
+      createPayments(
+        db,
+        services.environment.secret,
+        services.environment.preview,
+      );
+    if (route.authentication === "signature") {
+      const signature = request.headers.get("x-signature") ?? "";
+      if (!/^[a-f0-9]{64}$/i.test(signature))
+        throw new BillingError("UNAUTHENTICATED", 401, "支付通知验证失败。");
+      const raw = new TextDecoder("utf-8", { fatal: true }).decode(
+        await limitedBody(
+          request,
+          runtimeSettings().billing.payment.maxWebhookBytes,
+        ),
+      );
+      return json(
+        await payments().processWebhook(
+          raw,
+          signature,
+          route.pattern.split("/").at(-1) ?? "",
+        ),
+      );
+    }
     if (route.pattern === "/api/health")
       return json({
         ok: true,
@@ -521,28 +571,37 @@ export async function handleApi(
       );
     }
     const user = await authenticated(request, services);
+    actorId = user.id;
+    resourceRequest = !!route.resource;
     const adminAction: AdminAction | undefined = route.pattern.startsWith(
       "/api/admin",
     )
       ? route.pattern.endsWith("/invitations")
         ? "invitation_create"
-        : "dashboard_data"
+        : route.resource === "accountId"
+          ? "account_unfreeze"
+          : "dashboard_data"
       : undefined;
-    const owned = route.resource
-      ? await requireOwnership(db, user.id, {
-          [route.resource]: params[route.resource],
-        } as Resource)
-      : undefined;
-    if (request.method !== "GET") {
-      try {
-        requireCsrf(request, services.environment.baseURL);
-      } catch (error) {
-        if (adminAction) await auditAdmin(db.pool, user.id, adminAction, false);
-        throw error;
-      }
-    }
+    const owned =
+      route.resource === "projectId" || route.resource === "runId"
+        ? await requireOwnership(db, user.id, {
+            [route.resource]: params[route.resource],
+          } as Resource)
+        : undefined;
+    if (route.resource === "checkoutId")
+      await requireOwnership(db, user.id, {
+        checkoutId: params.checkoutId ?? "",
+      });
+    if (route.resource === "accountId")
+      await requireOwnership(
+        db,
+        user.id,
+        { accountId: params.accountId ?? "" },
+        services.adminEmails,
+      );
+    if (request.method !== "GET")
+      requireCsrf(request, services.environment.baseURL);
     if (adminAction && !isAdmin(services, user.email)) {
-      await auditAdmin(db.pool, user.id, adminAction, false);
       throw new HttpError(404, "资源不存在。");
     }
     if (route.pattern === "/api/session")
@@ -757,27 +816,47 @@ export async function handleApi(
     if (route.pattern === "/api/account")
       return json({
         user,
-        balance:
-          (
-            await db.pool.query(
-              "SELECT coalesce(sum(delta_credits),0)::text balance FROM credit_ledger WHERE user_id=$1",
-              [user.id],
-            )
-          ).rows[0]?.balance ?? "0",
-        usage: (
-          await db.pool.query(
-            "SELECT r.id,r.role_id,r.model,r.usage,r.cost_usd,r.started_at,r.result->>'runtimeMode' AS mode,p.title FROM role_runs r JOIN pipeline_runs pr ON pr.id=r.run_id JOIN projects p ON p.id=pr.project_id WHERE p.owner_id=$1 ORDER BY r.started_at DESC LIMIT 100",
-            [user.id],
-          )
-        ).rows,
-        release: releasePolicy(),
-        calibration: runtimeSettings().calibration,
+        ...(await billingAccount(db, user.id, payments().enabled)),
       });
     if (route.pattern === "/api/billing/checkout") {
-      if (!releasePolicy().realChargingEnabled)
-        throw new HttpError(403, "真实收费尚未开放。");
-      assertRealChargingAllowed();
-      throw new HttpError(503, "充值服务尚未开放。");
+      if (!payments().enabled)
+        throw new BillingError(
+          "BILLING_DISABLED",
+          403,
+          "测试支付尚未开放，真实收费保持关闭。",
+        );
+      const data = await body(request);
+      if (
+        Object.keys(data).some(
+          (key) => !["planId", "clientRequestId"].includes(key),
+        )
+      )
+        throw new HttpError(400, "结账参数不被允许。");
+      return json(
+        await payments().create(
+          user.id,
+          string(data.planId),
+          string(data.clientRequestId),
+        ),
+        201,
+      );
+    }
+    if (route.resource === "checkoutId")
+      return json(
+        await payments().completeMock(user.id, params.checkoutId ?? ""),
+      );
+    if (route.resource === "accountId") {
+      const data = await body(request);
+      if (data.confirmed !== true)
+        throw new HttpError(400, "需要明确确认已完成人工复核。");
+      const result = await unfreezeAccount(
+        db,
+        params.accountId ?? "",
+        user.id,
+        string(data.expectedFrozenAt, 80),
+      );
+      await auditAdmin(db.pool, user.id, "account_unfreeze", true);
+      return json(result);
     }
     if (route.pattern.startsWith("/api/admin")) {
       if (!isAdmin(services, user.email))
@@ -811,6 +890,44 @@ export async function handleApi(
     }
     throw new HttpError(404, "接口不存在。");
   } catch (error) {
+    if (actorId && new URL(request.url).pathname.startsWith("/api/admin")) {
+      const pathname = new URL(request.url).pathname;
+      await auditAdmin(
+        services.worker.db.pool,
+        actorId,
+        pathname.endsWith("/unfreeze")
+          ? "account_unfreeze"
+          : pathname.endsWith("/invitations")
+            ? "invitation_create"
+            : "dashboard_data",
+        false,
+      );
+    }
+
+    if (
+      error instanceof HttpError &&
+      [404, 429].includes(error.status) &&
+      actorId &&
+      resourceRequest
+    )
+      await services.worker.db.pool.query(
+        "INSERT INTO security_events(user_id,kind,score) VALUES($1,$2,1)",
+        [actorId, error.status === 404 ? "access_denied" : "rate_limited"],
+      );
+    if (error instanceof BillingError)
+      return json(
+        {
+          ok: false,
+          error: {
+            code: error.code,
+            message: error.message,
+            retryable: false,
+            traceId: randomUUID(),
+            issues: [],
+          },
+        },
+        error.status,
+      );
     return json(
       {
         error:

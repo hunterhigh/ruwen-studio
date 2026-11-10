@@ -159,6 +159,7 @@ export const roleRuns = pgTable(
     transcript: jsonb("transcript"),
     usage: jsonb("usage"),
     costUsd: numeric("cost_usd", { precision: 20, scale: 10 }),
+    usageUnknown: boolean("usage_unknown").notNull().default(false),
     cacheRead: bigint("cache_read_tokens", { mode: "number" })
       .notNull()
       .default(0),
@@ -197,6 +198,7 @@ export const creditLedger = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id),
+    bank: text("bank").notNull().default("live"),
     deltaCredits: bigint("delta_credits", { mode: "bigint" }).notNull(),
     reason: text("reason").notNull(),
     refType: text("ref_type").notNull(),
@@ -204,21 +206,91 @@ export const creditLedger = pgTable(
     createdAt: time("created_at"),
   },
   (t) => [
-    uniqueIndex("credit_ledger_ref").on(t.userId, t.reason, t.refType, t.refId),
+    uniqueIndex("credit_ledger_ref").on(
+      t.userId,
+      t.bank,
+      t.reason,
+      t.refType,
+      t.refId,
+    ),
   ],
 );
-export const creditReservations = pgTable("credit_reservations", {
+export const creditReservations = pgTable(
+  "credit_reservations",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => pipelineRuns.id),
+    amount: bigint("amount", { mode: "bigint" }).notNull(),
+    bank: text("bank").notNull().default("live"),
+    remaining: bigint("remaining", { mode: "bigint" }).notNull().default(0n),
+    costMarkup: numeric("cost_markup").notNull().default("1"),
+    creditsPerUsd: numeric("credits_per_usd").notNull().default("1"),
+    status: text("status").notNull(),
+    createdAt: time("created_at"),
+  },
+  (t) => [uniqueIndex("credit_reservation_run").on(t.runId)],
+);
+export const billingPolicy = pgTable("billing_policy", {
+  id: boolean("id").primaryKey().default(true),
+  signupCredits: bigint("signup_credits", { mode: "bigint" }).notNull(),
+  riskThreshold: integer("risk_threshold").notNull(),
+});
+export const billingAccounts = pgTable("billing_accounts", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id),
+  frozenAt: timestamp("frozen_at", { withTimezone: true }),
+  frozenScore: bigint("frozen_score", { mode: "bigint" }),
+  reviewedScore: bigint("reviewed_score", { mode: "bigint" })
+    .notNull()
+    .default(0n),
+});
+export const accountRiskAudit = pgTable("account_risk_audit", {
   id: id(),
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id),
-  runId: uuid("run_id")
-    .notNull()
-    .references(() => pipelineRuns.id),
-  amount: bigint("amount", { mode: "bigint" }).notNull(),
-  status: text("status").notNull(),
+  actorId: uuid("actor_id").references(() => users.id),
+  action: text("action").notNull(),
+  score: bigint("score", { mode: "bigint" }).notNull(),
   createdAt: time("created_at"),
 });
+export const billingCheckouts = pgTable(
+  "billing_checkouts",
+  {
+    id: uuid("id").primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    requestId: uuid("request_id").notNull(),
+    provider: text("provider").notNull(),
+    planId: text("plan_id").notNull(),
+    credits: bigint("credits", { mode: "bigint" }).notNull(),
+    priceMinor: integer("price_minor").notNull(),
+    currency: text("currency").notNull(),
+    variantId: text("variant_id"),
+    externalUrl: text("external_url"),
+    preparedAt: timestamp("prepared_at", { withTimezone: true }),
+    status: text("status").notNull().default("pending"),
+    orderId: text("order_id"),
+    createdAt: time("created_at"),
+  },
+  (t) => [
+    uniqueIndex("billing_checkouts_user_id_request_id_key").on(
+      t.userId,
+      t.requestId,
+    ),
+    uniqueIndex("billing_checkouts_provider_order_id_key").on(
+      t.provider,
+      t.orderId,
+    ),
+  ],
+);
 export const subscriptions = pgTable("subscriptions", {
   userId: uuid("user_id")
     .primaryKey()
@@ -342,13 +414,13 @@ export const securityEvents = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    projectId: uuid("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
-    runId: uuid("run_id")
-      .notNull()
-      .references(() => pipelineRuns.id, { onDelete: "cascade" }),
-    roleId: text("role_id").notNull(),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "cascade",
+    }),
+    runId: uuid("run_id").references(() => pipelineRuns.id, {
+      onDelete: "cascade",
+    }),
+    roleId: text("role_id"),
     kind: text("kind").notNull(),
     score: integer("score").notNull(),
     createdAt: time("created_at"),

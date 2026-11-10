@@ -200,6 +200,19 @@ it.each([
     [p.id],
   );
   expect(counts.rows.every((row) => row.n === "1")).toBe(true);
+  const settled = await p.service.db.pool.query<{
+    n: string;
+    charged: string;
+    expected: string;
+  }>(
+    "SELECT count(l.id) n,min(l.delta_credits)::text charged,ceil(c.cost_usd*rs.cost_markup*rs.credits_per_usd)::bigint::text expected FROM role_runs r JOIN role_cost_events c ON c.role_run_id=r.id JOIN credit_reservations rs ON rs.run_id=r.run_id LEFT JOIN credit_ledger l ON l.ref_type='role' AND l.ref_id=r.id::text AND l.reason='role_usage' WHERE r.run_id=$1 GROUP BY r.id,c.cost_usd,rs.cost_markup,rs.credits_per_usd",
+    [p.id],
+  );
+  expect(settled.rows).toHaveLength(counts.rows.length);
+  for (const row of settled.rows) {
+    expect(row.n).toBe("1");
+    expect(BigInt(row.charged)).toBe(-BigInt(row.expected));
+  }
   expect(counts.rowCount).toBe(
     p.task.kind === "chapter" || p.task.kind === "candidate" ? 5 : 6,
   );
@@ -265,6 +278,14 @@ it.each([
     role,
   ]);
   expect(cost.rows[0]).toEqual({ status: "running", cost_usd: null });
+  const held = (
+    await p.service.db.pool.query<{ status: string; remaining: string }>(
+      "SELECT status,remaining::text FROM credit_reservations WHERE run_id=$1",
+      [p.id],
+    )
+  ).rows[0];
+  expect(held?.status).toBe("review");
+  expect(BigInt(held?.remaining ?? "0")).toBeGreaterThan(0n);
 }, 40000);
 it("actual pg-boss heartbeat expiry redelivers a killed worker job to a new worker", async () => {
   const p = await setup("AUTHOR_DONE");

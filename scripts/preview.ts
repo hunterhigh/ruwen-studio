@@ -34,6 +34,8 @@ const environment: NodeJS.ProcessEnv = {
   WORKER_QUEUE: "ruwen-local-preview",
   P3_GATE_PASSED: "0",
   REAL_CHARGING_ENABLED: "0",
+  BILLING_SANDBOX_ENABLED: "1",
+  PAYMENT_PROVIDER: "mock",
   NEXT_TELEMETRY_DISABLED: "1",
   ADMIN_EMAILS: process.env.ADMIN_EMAILS ?? "preview@ruwen.local",
 };

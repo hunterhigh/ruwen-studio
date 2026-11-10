@@ -1,7 +1,7 @@
 "use client";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import type { runDetail } from "../server/api.ts";
-import { post } from "./client.ts";
+import { ApiError, post } from "./client.ts";
 import { ProjectNav } from "./ProjectHome.tsx";
 import {
   applyRoleFrame,
@@ -73,6 +73,7 @@ export function ChapterStudio({
     }>("/api/settings");
   const [selected, setSelected] = useState(initialRun ?? ""),
     [error, setError] = useState(""),
+    [preflightCode, setPreflightCode] = useState(""),
     [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!selected && runs.data?.[0]) setSelected(runs.data[0].id);
@@ -84,6 +85,7 @@ export function ChapterStudio({
     event.preventDefault();
     setBusy(true);
     setError("");
+    setPreflightCode("");
     const values = new FormData(event.currentTarget);
     try {
       const result = await post<{ id: string }>(
@@ -99,6 +101,7 @@ export function ChapterStudio({
       history.replaceState(null, "", `?run=${result.id}`);
       await runs.refresh();
     } catch (error) {
+      if (error instanceof ApiError) setPreflightCode(error.code ?? "");
       setError((error as Error).message);
     } finally {
       setBusy(false);
@@ -174,6 +177,9 @@ export function ChapterStudio({
       {(error || runs.error) && (
         <div className="error" role="alert">
           <SafeMarkdown plain content={error || runs.error} />
+          {preflightCode === "INSUFFICIENT_CREDITS" && (
+            <a href="/account">查看账户与点数 →</a>
+          )}
         </div>
       )}
       {selected ? (
@@ -317,7 +323,8 @@ function RunReader({
           </span>
         </div>
         <span className="fine-print">
-          记录成本 ${Number(data?.run.costTotal ?? 0).toFixed(4)} · 待 P3 实测
+          已记录成本小计 ${Number(data?.run.costTotal ?? 0).toFixed(4)} · 待 P3
+          实测
         </span>
       </div>
       {(error || loadError || data?.run.error) && (
@@ -357,7 +364,11 @@ function RunReader({
               </span>
               <strong>{name}</strong>
               <small>
-                {row ? `$${Number(row.cost_usd ?? 0).toFixed(4)}` : "等待"}
+                {row
+                  ? row.cost_usd === null || row.usage_unknown
+                    ? "用量待核对"
+                    : `$${Number(row.cost_usd).toFixed(4)}`
+                  : "等待"}
               </small>
             </li>
           );

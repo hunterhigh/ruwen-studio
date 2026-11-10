@@ -35,6 +35,10 @@ let services: WebServices,
   runId = "";
 let ownedProjectId = "",
   ownedRunId = "";
+let foreignAccountId = "",
+  ownedAccountId = "";
+const foreignCheckoutId = randomUUID(),
+  ownedCheckoutId = randomUUID();
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const request = (
   url: string,
@@ -56,6 +60,7 @@ const request = (
 beforeAll(async () => {
   const p = await fixture();
   projectId = p.fs.projectId;
+  foreignAccountId = p.fs.ownerId;
   runId = await p.service.enqueueChapter(p.fs, { chapter: 1 });
   const environment = {
     baseURL: origin,
@@ -126,6 +131,21 @@ beforeAll(async () => {
   );
   expect(queued.status).toBe(202);
   ownedRunId = (await queued.json()).id as string;
+  ownedAccountId =
+    (
+      await services.worker.db.pool.query<{ owner_id: string }>(
+        "SELECT owner_id FROM projects WHERE id=$1",
+        [ownedProjectId],
+      )
+    ).rows[0]?.owner_id ?? "";
+  for (const [id, owner] of [
+    [foreignCheckoutId, foreignAccountId],
+    [ownedCheckoutId, ownedAccountId],
+  ])
+    await services.worker.db.pool.query(
+      "INSERT INTO billing_checkouts(id,user_id,request_id,provider,plan_id,credits,price_minor,currency,prepared_at) VALUES($1,$2,$3,'mock','preview',100000,500,'USD',now())",
+      [id, owner, randomUUID()],
+    );
 }, 20000);
 afterAll(async () => {
   await services?.worker.stop();
@@ -142,11 +162,14 @@ it("every private route rejects anonymous requests; owner mutations also need CS
     const url = route.pattern
       .replace(":projectId", ownedProjectId)
       .replace(":runId", ownedRunId);
+    const ownUrl = url
+      .replace(":checkoutId", ownedCheckoutId)
+      .replace(":accountId", ownedAccountId);
     expect(
       (
         await handleApi(
           request(
-            url,
+            ownUrl,
             route.method,
             false,
             {},
@@ -161,7 +184,7 @@ it("every private route rejects anonymous requests; owner mutations also need CS
       expect(
         (
           await handleApi(
-            request(url, "POST", true, { "x-csrf-token": "" }, {}),
+            request(ownUrl, "POST", true, { "x-csrf-token": "" }, {}),
             services,
           )
         ).status,
@@ -258,7 +281,9 @@ for (const route of API_ROUTES.filter((item) => item.resource)) {
   it(`I13: A cannot access B: ${route.method} ${route.pattern} (${route.foreignCase})`, async () => {
     const url = route.pattern
       .replace(":projectId", projectId)
-      .replace(":runId", runId);
+      .replace(":runId", runId)
+      .replace(":checkoutId", foreignCheckoutId)
+      .replace(":accountId", foreignAccountId);
     const result = await handleApi(
       request(
         url,
@@ -306,7 +331,8 @@ it("CI route coverage: every resource parameter declares and runs a foreign owne
 });
 it("all mutation routes reject missing CSRF before effects, including billing and login", async () => {
   for (const route of API_ROUTES.filter(
-    (r) => r.method === "POST" && !r.resource,
+    (r) =>
+      r.method === "POST" && !r.resource && r.authentication !== "signature",
   )) {
     const response = await handleApi(
       request(route.pattern, "POST", true, { "x-csrf-token": "" }, {}),

@@ -1,4 +1,12 @@
 let token: Promise<string> | undefined;
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+}
 export async function request<T = unknown>(
   url: string,
   options: RequestInit = {},
@@ -30,10 +38,24 @@ export async function request<T = unknown>(
   const data: unknown = await response.json();
   if (!response.ok) {
     if (response.status === 403) token = undefined;
-    throw new Error(
+    const value =
       data && typeof data === "object" && "error" in data
-        ? String(data.error)
-        : "请求未完成，请重试。",
+        ? data.error
+        : undefined;
+    if (
+      value &&
+      typeof value === "object" &&
+      "message" in value &&
+      typeof value.message === "string"
+    )
+      throw new ApiError(
+        value.message,
+        "code" in value && typeof value.code === "string"
+          ? value.code
+          : undefined,
+      );
+    throw new ApiError(
+      typeof value === "string" ? value : "请求未完成，请重试。",
     );
   }
   return data as T;

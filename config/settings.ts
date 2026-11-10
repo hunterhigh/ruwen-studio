@@ -14,6 +14,11 @@ export function runtimeSettings(): RuntimeSettings {
       settings.billing.signupCredits,
       ...Object.values(settings.billing.defaultReservations),
       ...settings.billing.plans.map((plan) => plan.credits),
+      ...settings.billing.plans.map((plan) => plan.priceMinor),
+      settings.billing.payment.maxWebhookBytes,
+      settings.billing.payment.webhookSkewSeconds,
+      settings.billing.payment.requestTimeoutMs,
+      settings.riskReview.freezeScore,
       settings.stream.pollIntervalMs,
       settings.stream.heartbeatMs,
       settings.stream.maxConnectionMs,
@@ -25,7 +30,16 @@ export function runtimeSettings(): RuntimeSettings {
       settings.release.p3GatePassed,
       settings.release.realChargingEnabled,
       settings.release.inviteOnly,
-    ].every((value) => typeof value === "boolean")
+      settings.billing.payment.sandboxEnabled,
+    ].every((value) => typeof value === "boolean") ||
+    ![
+      settings.billing.signupCredits,
+      ...Object.values(settings.billing.defaultReservations),
+      ...settings.billing.plans.flatMap((plan) => [
+        plan.credits,
+        plan.priceMinor,
+      ]),
+    ].every(Number.isSafeInteger)
   )
     throw new Error(
       "Invalid runtime settings; placeholders must be explicit positive values and release gates must be boolean",

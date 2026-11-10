@@ -1275,6 +1275,36 @@ textarea {
   max-width: 1800px;
   margin: auto;
 }
+.billing-balances,
+.billing-plans {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.billing-balances article,
+.billing-plans article {
+  border: 1px solid var(--line);
+  padding: 20px;
+  min-width: 0;
+}
+.billing-balances strong {
+  font-size: 26px;
+  font-family: var(--story);
+}
+.billing-plans .button {
+  margin-top: 16px;
+}
+.billing-checkout {
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 650px) {
+  .billing-balances,
+  .billing-plans {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .ideation-page > output.notice {
   display: block;
 }

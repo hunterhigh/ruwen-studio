@@ -1,4 +1,5 @@
 import { createApplicationRuntime } from "@ruwen/agents";
+import { createPayments, type PaymentService } from "@ruwen/billing";
 import { WorkerService } from "worker";
 import { runtimeSettings } from "../../../../config/settings.ts";
 import {
@@ -12,6 +13,7 @@ export interface WebServices {
   environment: AuthEnvironment;
   ipProofSecret: string;
   adminEmails: string[];
+  payments?: PaymentService;
 }
 const globalServices = globalThis as typeof globalThis & {
   ruwenWeb?: Promise<WebServices>;
@@ -61,6 +63,7 @@ export function getServices(): Promise<WebServices> {
     if (preview) await seedPreviewInvitation(worker.db);
     return {
       worker,
+      payments: createPayments(worker.db, secret, preview),
       auth: createWebAuth(worker.db, environment),
       environment,
       ipProofSecret: process.env.RUWEN_IP_PROOF_SECRET ?? secret,

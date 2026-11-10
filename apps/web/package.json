@@ -9,6 +9,7 @@
     "start": "node scripts/server.ts"
   },
   "dependencies": {
+    "@ruwen/billing": "workspace:*",
     "@better-auth/drizzle-adapter": "1.7.18",
     "@ruwen/agents": "workspace:*",
     "@ruwen/core": "workspace:*",

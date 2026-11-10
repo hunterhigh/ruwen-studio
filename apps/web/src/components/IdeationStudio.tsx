@@ -74,6 +74,7 @@ export function IdeationStudio({
   const [selected, setSelected] = useState<IdeationSessionId>(
     adapter.initialSessionId,
   );
+  const [sessions, setSessions] = useState(adapter.sessions);
   const [streams, setStreams] = useState(emptyRoleStreams),
     [view, setView] = useState<View>();
   const [selectedPreview, setSelectedPreview] = useState(""),
@@ -91,11 +92,12 @@ export function IdeationStudio({
   const refresh = useCallback(async () => {
     const version = ++sequence.current;
     try {
-      const [session, messages, previews, tasks] = await Promise.all([
+      const [session, messages, previews, tasks, listed] = await Promise.all([
         adapter.api.getIdeationSession({ sessionId: selected }),
         adapter.api.listIdeationMessages({ sessionId: selected }),
         adapter.api.listPreviews({ sessionId: selected }),
         adapter.api.listIdeationTasks({ sessionId: selected }),
+        adapter.api.listIdeationSessions({ limit: 100 }),
       ]);
       const next = {
         session: unwrap(session),
@@ -103,7 +105,10 @@ export function IdeationStudio({
         previews: unwrap(previews).items,
         tasks: unwrap(tasks).items,
       };
-      if (version === sequence.current) setView(next);
+      if (version === sequence.current) {
+        setView(next);
+        setSessions([...unwrap(listed).items]);
+      }
     } catch (caught) {
       if (version === sequence.current)
         setError(caught instanceof UiError ? caught.code : "INTERNAL_ERROR");
@@ -235,7 +240,7 @@ export function IdeationStudio({
                 if (value) setSelected(value.id);
               }}
             >
-              {adapter.sessions.map((session, index) => (
+              {sessions.map((session, index) => (
                 <option key={session.id} value={session.id}>
                   {index < 2 ? session.title : `会话 ${index + 1}`}
                 </option>
@@ -243,7 +248,7 @@ export function IdeationStudio({
             </select>
           </label>
           <ul>
-            {adapter.sessions.map((session) => (
+            {sessions.map((session) => (
               <li key={session.id}>
                 <button
                   type="button"
@@ -253,7 +258,9 @@ export function IdeationStudio({
                 >
                   <SafeMarkdown inline plain content={session.title} />
                   <small>
-                    {session.status === "closed" ? "已关闭 · 只读" : "开放"}
+                    {session.status === "closed"
+                      ? "已关闭 · 停止新对话"
+                      : "开放"}
                   </small>
                 </button>
               </li>
@@ -306,16 +313,21 @@ export function IdeationStudio({
               <button
                 type="button"
                 className="text-button"
-                disabled={busy || closed || !!view.session.currentTurnId}
+                disabled={busy || closed}
                 onClick={() => {
                   if (
                     window.confirm(
-                      "关闭此演示会话？记录仍可阅读，后续构思请新建会话。",
+                      "关闭此演示会话的新对话？已有任务继续，预览仍可阅读和决定。",
                     )
                   )
                     void operation(async () => {
-                      unwrap(await adapter.closeSession(view.session.id));
-                      setNotice("演示会话已关闭，记录保留为只读。");
+                      unwrap(
+                        await adapter.api.closeIdeationSession({
+                          sessionId: view.session.id,
+                          clientRequestId: newRequestId(),
+                        }),
+                      );
+                      setNotice("演示会话已关闭，已有任务和预览仍可操作。");
                     });
                 }}
               >
@@ -479,7 +491,8 @@ export function IdeationStudio({
             <PreviewCard
               key={`${preview.id}:${preview.sha256}:${closed}`}
               preview={preview}
-              busy={busy || !!closed}
+              busy={busy}
+              canRevise={!closed}
               onAction={(kind, text, trialRead) => {
                 void decide(kind, text, trialRead);
               }}
@@ -557,7 +570,7 @@ export function IdeationStudio({
             <button
               className="button secondary"
               type="submit"
-              disabled={busy || closed || !view}
+              disabled={busy || !view}
             >
               编译章节情境（演示）
             </button>
@@ -619,7 +632,7 @@ export function IdeationStudio({
                   <button
                     className="text-button danger"
                     type="button"
-                    disabled={busy || closed}
+                    disabled={busy}
                     onClick={() => {
                       if (
                         window.confirm(

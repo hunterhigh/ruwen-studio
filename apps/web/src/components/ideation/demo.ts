@@ -1,6 +1,7 @@
 import type {
   IdeationActor,
   IdeationApprovalReceipt,
+  IdeationCursor,
   IdeationErrorCode,
   IdeationEvent,
   IdeationEventData,
@@ -268,7 +269,7 @@ export function createIdeationDemo(
   ) {
     const preview = previews.get(request.previewId);
     if (!preview) throw new DemoError("NOT_FOUND");
-    open(preview.sessionId);
+    session(preview.sessionId);
     if (
       preview.sha256 !== request.expectedSha256 ||
       (!allowStale && preview.status === "stale")
@@ -507,6 +508,41 @@ export function createIdeationDemo(
   }
   const page = <T>(items: readonly T[]) => ({ items, nextCursor: null });
   const api: IdeationClient = {
+    listIdeationSessions: (request) =>
+      perform(() => {
+        const limit = request.limit ?? 50;
+        if (
+          !Number.isInteger(limit) ||
+          limit < 1 ||
+          limit > 100 ||
+          (request.after !== undefined && !/^\d+$/.test(request.after)) ||
+          (request.status !== undefined &&
+            !["open", "closed"].includes(request.status))
+        )
+          throw new DemoError("INVALID_ARGUMENT");
+        const eligible = sessions
+          .map((value, index) => ({ value, cursor: BigInt(index + 1) }))
+          .filter(
+            (entry) =>
+              entry.cursor > BigInt(request.after ?? "0") &&
+              (!request.status || entry.value.status === request.status),
+          );
+        const selected = eligible.slice(0, limit);
+        return {
+          items: selected.map((entry) => entry.value),
+          nextCursor:
+            eligible.length > limit
+              ? b<IdeationCursor>(String(selected.at(-1)?.cursor))
+              : null,
+        };
+      }),
+    closeIdeationSession: (request) =>
+      mutate("close", request, () => {
+        const value = session(request.sessionId);
+        if (value.status !== "closed")
+          updateSession(value.id, { status: "closed" });
+        return { ...session(value.id), status: "closed" as const };
+      }),
     createIdeationSession: (request) =>
       mutate("create", request, () => {
         const title = request.title ?? "新的构思";
@@ -588,6 +624,7 @@ export function createIdeationDemo(
     revisePreview: (request) =>
       mutate("revise", request, () => {
         const preview = checkedPreview(request, true);
+        open(preview.sessionId);
         validText(request.content);
         if (session(preview.sessionId).currentTurnId)
           throw new DemoError("TURN_IN_PROGRESS");
@@ -612,7 +649,7 @@ export function createIdeationDemo(
       }),
     requestIdeationCompilation: (request) =>
       mutate("compile", request, () => {
-        open(request.sessionId);
+        session(request.sessionId);
         if (!/^[1-9]\d{0,3}$/.test(request.chapter))
           throw new DemoError("INVALID_ARGUMENT");
         const job = task(
@@ -674,7 +711,7 @@ export function createIdeationDemo(
       mutate("cancel", request, () => {
         const value = tasks.get(request.taskId);
         if (!value) throw new DemoError("NOT_FOUND");
-        open(value.sessionId);
+        session(value.sessionId);
         if (
           ["SUCCEEDED", "CANCELLED", "FAILED", "INTERRUPTED"].includes(
             value.status,
@@ -709,14 +746,6 @@ export function createIdeationDemo(
         );
       }),
   };
-  // Local session list/close affordances await the exact v1.1 signatures. No speculative HTTP mapping.
-  const closeSession = (id: IdeationSessionId) =>
-    perform(() => {
-      const value = open(id);
-      if (value.currentTurnId) throw new DemoError("TURN_IN_PROGRESS");
-      updateSession(id, { status: "closed" });
-      return session(id);
-    });
   function attempt(sessionId: IdeationSessionId, refusal: boolean) {
     if (session(sessionId).status === "closed") return;
     const runId = uuid<IdeationRunId>();
@@ -755,7 +784,6 @@ export function createIdeationDemo(
     },
     runs,
     attempt,
-    closeSession,
     subscribe(listener: (event: IdeationEvent) => void) {
       listeners.add(listener);
       return () => {

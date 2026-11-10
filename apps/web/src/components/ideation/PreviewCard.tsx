@@ -89,10 +89,12 @@ const auditNames = {
 export function PreviewCard({
   preview,
   busy,
+  canRevise = true,
   onAction,
 }: {
   preview: IdeationPreview;
   busy: boolean;
+  canRevise?: boolean;
   onAction: (
     kind: "approve" | "reject" | "revise",
     text: string,
@@ -365,7 +367,7 @@ export function PreviewCard({
             <button
               type="button"
               className="button secondary"
-              disabled={busy || !text.trim()}
+              disabled={busy || !canRevise || !text.trim()}
               onClick={() => onAction("revise", text, false)}
             >
               交回协调员修改

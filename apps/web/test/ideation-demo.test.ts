@@ -41,6 +41,93 @@ afterEach(() => {
   for (const demo of demos.splice(0)) demo.dispose();
   vi.useRealTimers();
 });
+it("v1.1 session listing filters and paginates by immutable creation order; close is idempotent", async () => {
+  const demo = fixture();
+  const first = value(await demo.api.listIdeationSessions({ limit: 1 }));
+  expect(first.items.map((item) => item.id)).toEqual([demo.initialSessionId]);
+  if (!first.nextCursor) throw new Error("Missing cursor");
+  const next = value(
+    await demo.api.listIdeationSessions({ after: first.nextCursor, limit: 1 }),
+  );
+  expect(next.items).toHaveLength(1);
+  expect(next.items[0]?.id).not.toBe(demo.initialSessionId);
+  const request = {
+    sessionId: demo.initialSessionId,
+    clientRequestId: newRequestId(),
+  };
+  const closed = value(await demo.api.closeIdeationSession(request));
+  expect(value(await demo.api.closeIdeationSession(request))).toEqual(closed);
+  expect(
+    value(
+      await demo.api.closeIdeationSession({
+        ...request,
+        clientRequestId: newRequestId(),
+      }),
+    ),
+  ).toEqual(closed);
+  expect(
+    value(await demo.api.listIdeationSessions({ status: "closed" })).items.map(
+      (item) => item.id,
+    ),
+  ).toEqual([closed.id]);
+  expect(
+    value(await demo.api.listIdeationSessions({ status: "open" })).items,
+  ).toHaveLength(1);
+  expect(await demo.api.listIdeationSessions({ limit: 101 })).toMatchObject({
+    ok: false,
+    error: { code: "INVALID_ARGUMENT" },
+  });
+});
+
+it("v1.1 close stops only new coordinator input; accepted turns finish and existing previews remain decidable", async () => {
+  const demo = fixture(),
+    sessionId = demo.initialSessionId;
+  const original = await preview(demo, "file_patch");
+  value(
+    await demo.api.sendIdeationMessage({
+      sessionId,
+      expectedSessionRevision: 0,
+      content: "保留人物的选择。",
+      clientRequestId: newRequestId(),
+    }),
+  );
+  value(
+    await demo.api.closeIdeationSession({
+      sessionId,
+      clientRequestId: newRequestId(),
+    }),
+  );
+  expect(value(await demo.api.getPreview({ previewId: original.id }))).toEqual(
+    original,
+  );
+  expect(
+    await demo.api.revisePreview({
+      previewId: original.id,
+      expectedSha256: original.sha256,
+      content: "想改一处",
+      clientRequestId: newRequestId(),
+    }),
+  ).toMatchObject({ ok: false, error: { code: "SESSION_CLOSED" } });
+  await vi.runAllTimersAsync();
+  expect(value(await demo.api.getIdeationSession({ sessionId }))).toMatchObject(
+    { status: "closed", currentTurnId: null },
+  );
+  expect(
+    value(await demo.api.listIdeationMessages({ sessionId })).items.filter(
+      (item) => item.role === "assistant",
+    ),
+  ).toHaveLength(2);
+  expect(
+    value(await demo.api.approvePreview(approval(original))).previewId,
+  ).toBe(original.id);
+  const handoff = await preview(demo, "handoff");
+  value(
+    await demo.api.rejectPreview({ ...approval(handoff), reason: "暂时放下" }),
+  );
+  expect(
+    value(await demo.api.getPreview({ previewId: handoff.id })).status,
+  ).toBe("rejected");
+});
 
 it.each([
   "handoff",
@@ -176,7 +263,12 @@ it("rejection keeps its reason in the coordinator; session close remains read-on
   expect(
     value(await demo.api.getPreview({ previewId: source.id })).status,
   ).toBe("rejected");
-  value(await demo.closeSession(source.sessionId));
+  value(
+    await demo.api.closeIdeationSession({
+      sessionId: source.sessionId,
+      clientRequestId: newRequestId(),
+    }),
+  );
   expect(
     await demo.api.sendIdeationMessage({
       sessionId: source.sessionId,

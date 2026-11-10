@@ -260,3 +260,42 @@ test("pending billing/freeze errors give safe guidance and the mobile review has
     fullPage: true,
   });
 });
+
+test("v1.1 closed session blocks new messages/revisions but keeps existing preview approval available", async ({
+  page,
+}) => {
+  await signIn(page);
+  const projectId = await createDemo(page, "关闭后的预览决定");
+  await page.goto(`/projects/${projectId}/ideation`);
+  const conversation = page.getByRole("region", {
+    name: "协调员会话",
+    exact: true,
+  });
+  await expect(
+    page.getByText("交给下游的干净委托", { exact: true }),
+  ).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await conversation
+    .getByRole("button", { name: "关闭会话", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("想和协调员说的话", { exact: true }),
+  ).toBeDisabled();
+  const card = page.getByRole("article", { name: "预览详情", exact: true });
+  await card
+    .getByLabel("修改意见或拒绝理由", { exact: true })
+    .fill("关闭后不再开启协调员回合。");
+  await expect(
+    card.getByRole("button", { name: "交回协调员修改", exact: true }),
+  ).toBeDisabled();
+  await card
+    .getByRole("checkbox", {
+      name: "我已阅读此版本，确认这次模拟批准",
+      exact: true,
+    })
+    .check();
+  await card
+    .getByRole("button", { name: "批准委托（演示）", exact: true })
+    .click();
+  await expect(card).toContainText("已模拟批准");
+});

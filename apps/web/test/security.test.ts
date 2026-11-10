@@ -464,12 +464,14 @@ it("production mailbox cannot be accessed and charging stays server-blocked befo
     ).status,
   ).toBe(404);
 });
-it("the sixteen contract-only ideation routes are not registered before backend implementation", async () => {
+it("the eighteen v1.1 contract-only ideation routes are not registered before backend implementation", async () => {
   expect(
     API_ROUTES.some((route) => JSON.stringify(route).includes("ideation")),
   ).toBe(false);
   const id = randomUUID();
   const routes = [
+    ["GET", "sessions"],
+    ["POST", `sessions/${id}/close`],
     ["POST", "sessions"],
     ["GET", `sessions/${id}`],
     ["GET", `sessions/${id}/messages`],

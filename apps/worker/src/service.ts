@@ -625,6 +625,7 @@ export class WorkerService {
         // runRole invokes this only after its output security layer releases text.
         // Never feed provider events, thinking or raw transcripts into the sink.
         onDelta: (delta, role) => stream?.push(delta, role),
+        onAttemptReset: (role, reason) => stream?.reset(role, reason),
         ...(this.options.roleTimeoutMs === undefined
           ? {}
           : { timeoutMs: this.scheduling.roleTimeoutMs }),

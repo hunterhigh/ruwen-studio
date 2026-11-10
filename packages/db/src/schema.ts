@@ -324,6 +324,8 @@ export const webRunEvents = pgTable("web_run_events", {
     .references(() => pipelineRuns.id, { onDelete: "cascade" }),
   roleId: text("role_id").notNull(),
   delta: text("delta").notNull(),
+  eventType: text("event_type").notNull().default("delta"),
+  resetReason: text("reset_reason"),
   createdAt: time("created_at"),
 });
 export const webRateLimits = pgTable("web_rate_limits", {

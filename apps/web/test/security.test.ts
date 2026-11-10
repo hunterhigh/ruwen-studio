@@ -175,7 +175,7 @@ it("every private route rejects anonymous requests; owner mutations also need CS
   expect(projects.map((p) => p.id)).not.toContain(projectId);
   expect((await handleApi(request("/api/admin"), services)).status).toBe(404);
 });
-it("own SSE resumes durable deltas after event ID and never includes another tenant", async () => {
+it("own SSE replays reset barriers and deltas in cursor order and never includes another tenant", async () => {
   const db = services.worker.db;
   await db.pool.query(
     "INSERT INTO web_run_events(project_id,run_id,role_id,delta) VALUES($1,$2,'xiaoshuo-zuozhe','FOREIGN_STREAM_SENTINEL')",
@@ -183,6 +183,10 @@ it("own SSE resumes durable deltas after event ID and never includes another ten
   );
   const first = await db.pool.query<{ id: string }>(
     "INSERT INTO web_run_events(project_id,run_id,role_id,delta) VALUES($1,$2,'xiaoshuo-zuozhe','FIRST_OWN_DELTA') RETURNING id",
+    [ownedProjectId, ownedRunId],
+  );
+  const reset = await db.pool.query<{ id: string }>(
+    "INSERT INTO web_run_events(project_id,run_id,role_id,delta,event_type,reset_reason) VALUES($1,$2,'xiaoshuo-zuozhe','','reset','format_correction') RETURNING id",
     [ownedProjectId, ownedRunId],
   );
   await db.pool.query(
@@ -197,11 +201,30 @@ it("own SSE resumes durable deltas after event ID and never includes another ten
   );
   expect(response.status).toBe(200);
   const reader = response.body?.getReader();
-  const item = await reader?.read();
-  const chunk = new TextDecoder().decode(item?.value);
+  let chunk = "";
+  for (let n = 0; n < 2; n++)
+    chunk += new TextDecoder().decode((await reader?.read())?.value);
   await reader?.cancel();
   expect(chunk).toContain("RESUMED_OWN_DELTA");
+  expect(chunk).toContain("event: reset\n");
+  expect(chunk).toContain('"reason":"format_correction"');
+  expect(chunk.indexOf("event: reset")).toBeLessThan(
+    chunk.indexOf("event: delta"),
+  );
   expect(chunk).not.toMatch(/FIRST_OWN_DELTA|FOREIGN_STREAM_SENTINEL/);
+  const resumed = await handleApi(
+    request(`/api/runs/${ownedRunId}/events`, "GET", true, {
+      "last-event-id": reset.rows[0]?.id ?? "0",
+    }),
+    services,
+  );
+  const resumedReader = resumed.body?.getReader();
+  const resumedChunk = new TextDecoder().decode(
+    (await resumedReader?.read())?.value,
+  );
+  await resumedReader?.cancel();
+  expect(resumedChunk).toContain("RESUMED_OWN_DELTA");
+  expect(resumedChunk).not.toContain("event: reset");
 });
 it("valid CSRF cannot approve or return a queued run before a candidate exists", async () => {
   for (const action of ["return", "approve-candidate", "approve-memory"]) {

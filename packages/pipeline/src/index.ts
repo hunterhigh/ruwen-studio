@@ -1,4 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
+
+export type * from "./ideation/contract.ts";
+
 import {
   type Data,
   editingPolicy,

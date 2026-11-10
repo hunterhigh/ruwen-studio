@@ -45,3 +45,9 @@ task_id固定为project_id与规范化章节号组成的二元键；数据库使
 本机章节网页、安全渲染、归属、CSRF、认证与SSE基线已经接入，见ADR-009及phase-5进行中报告。当前缺少并行线程承诺的`docs/contracts/ideation-service.md`及人类`docs/security/SECURITY-DESIGN.md`：不猜造构思接口，不以临时CSP基线声称完成设计3.3.4验收。文档到达后继续集成和完整安全核对；P5仍未完成，尚不到人类阶段确认或进入P6的时间。外部SMTP/Google配置与真实投递仍需后续实测。
 
 2026-11-10补记：PR #2/#3及SECURITY-DESIGN已合并，上述“等待安全设计”不再成立。正式S1编号和3.3.4逐项对照已更新于phase-5；P5风险展示与管理访问审计已接入，冻结/解冻和其余风控执行仍归并行线程，未宣称完成。构思契约仍未提供；尝试重置事件合并后另行接入，本轮按人类要求先交付第1–3项。
+
+2026-11-10交接更新：安全文档与S0/S0-6已合并；本轮新增构思契约仅含类型/函数签名，合并后主线程可据其用假数据开发构思页，不代表真实构思服务已实现。尝试reset已提供有序落盘/SSE协议；界面清空逻辑由主线程在事件合并后接入。见ADR-011及docs/contracts/ideation-service.md。
+
+## OQ-018 · 表现候选与试写门的顺序（2026-11-10）
+
+PLAN §6.4及早期并行清单把非正典试写放在proposed→candidate之前；上游external-knowledge-and-expression.md明确“通过审计后为candidate；再经隔离非正典试写和用户阅读才可active”，当前core.registry.transition也只要求candidate有闭合审计，active还必须有试写与expression_activate批准。依上游优先规则，构思契约按实际顺序定义，不修改vendor、不扩大作者读取权限；active门的任何条件都不省略。候选不进入正式作者资料包（I8），试写为隔离非正典证据。此轮仅约定接口，具体试写/提交实现仍待契约合并后验证。

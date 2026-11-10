@@ -97,13 +97,16 @@ describe.each(ROLE_IDS)("%s", (id) => {
       defaultFauxResponse,
     ]);
     const requests: TranscriptContext[] = [];
+    const resets: [string, string][] = [];
     const result = await runRole(id, input(id), {
       ...context(runtime),
       onRequest: (ctx) => requests.push(ctx),
+      onAttemptReset: (role, reason) => resets.push([role, reason]),
     });
     expect(runtime.faux.state.callCount).toBe(2);
     expect(result.usage).toHaveLength(2);
     expect(JSON.stringify(requests[1])).toContain("上次输出未通过");
+    expect(resets).toEqual([[id, "format_correction"]]);
   });
   it("rejects two invalid output attempts without silently accepting coercion", async () => {
     const spec = ROLES[id];

@@ -109,9 +109,11 @@ export class RoleSecurity {
     // Count the final kind once; retain distinct events from actual earlier attempts.
     if (this.failure) this.record(this.failure);
   }
-  retry(): void {
+  retry(discardRejected = true): void {
     this.failure = undefined;
-    this.#assistant = [this.#stream.visibleTail()];
+    // Format corrections retain earlier messages in the provider/public transcript,
+    // so retain them in cross-message detection too. Leak corrections remove them.
+    if (discardRejected) this.#assistant = [this.#stream.visibleTail()];
     this.#scanTail = this.detector.tail(this.#assistant);
     this.#seen.clear();
     this.#stream.discard();

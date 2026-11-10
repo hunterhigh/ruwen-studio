@@ -17,14 +17,34 @@ const resultFields = [
 const object = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
-/** A provider system message is never part of a user-visible transcript. */
+/** Strip whole provider thinking blocks, including their signatures, without touching prose. */
+export function withoutThinking<T extends { content: unknown }>(message: T): T {
+  return {
+    ...message,
+    content: Array.isArray(message.content)
+      ? message.content.filter(
+          (block) => !object(block) || block.type !== "thinking",
+        )
+      : message.content,
+  };
+}
+
+/** System messages and thinking are never part of a user-visible transcript. */
 export function publicTranscript(value: unknown): unknown[] {
   return Array.isArray(value)
-    ? value.filter(
-        (message) =>
-          object(message) &&
-          ["user", "assistant", "toolResult"].includes(String(message.role)),
-      )
+    ? value
+        .filter(
+          (message) =>
+            object(message) &&
+            ["user", "assistant", "toolResult"].includes(String(message.role)),
+        )
+        .map((message) =>
+          Object.hasOwn(message, "content")
+            ? withoutThinking(
+                message as Record<string, unknown> & { content: unknown },
+              )
+            : message,
+        )
     : [];
 }
 
@@ -61,9 +81,8 @@ export function assertPublicArtifact(p: string, data: Uint8Array): void {
       (Object.hasOwn(value, "systemPrompt") ||
         Object.hasOwn(value, "system_prompt") ||
         (Array.isArray(value.transcript) &&
-          value.transcript.some(
-            (message) => object(message) && message.role === "system",
-          )))
+          JSON.stringify(publicTranscript(value.transcript)) !==
+            JSON.stringify(value.transcript)))
     )
       throw new Error(
         "Project contains a private role artifact; migrate before export/import",

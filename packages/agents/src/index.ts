@@ -26,6 +26,7 @@ export {
   PREVIEW_PROSE,
 } from "./runtime/scenarios.ts";
 export { stableRequestHash } from "./runtime/tapes.ts";
+export { deploymentCanary } from "./security/notes.ts";
 export {
   authorizedResourceInputs,
   listAuthorizedResources,

@@ -19,6 +19,7 @@ import type { WebServices } from "../../web/src/server/services.ts";
 import { fixture } from "./helpers.ts";
 
 const cleanup: (() => Promise<void>)[] = [];
+const thinkingSentinel = "PRIVATE_THINKING_ONLY_TEST_619fd89c";
 afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) await fn();
 });
@@ -52,7 +53,25 @@ async function setup(blocked = false) {
               }),
             ]),
         }
-      : {},
+      : {
+          runtime: () =>
+            createFauxRuntime(
+              Array.from({ length: 30 }, () => (context) => {
+                const response = defaultFauxResponse(context);
+                return {
+                  ...response,
+                  content: [
+                    {
+                      type: "thinking" as const,
+                      thinking: `${thinkingSentinel} 不要输出 ${deploymentCanary()}`,
+                      thinkingSignature: "PRIVATE_THINKING_SIGNATURE_TEST",
+                    },
+                    ...response.content,
+                  ],
+                };
+              }),
+            ),
+        },
   );
   cleanup.push(() => p.service.stop());
   const origin = "https://localhost:3000",
@@ -147,7 +166,12 @@ async function setup(blocked = false) {
   );
   const safe = (value: unknown) => {
     for (const guard of guards) expect(guard.check(value)).toBeUndefined();
+    expect(JSON.stringify(value)).not.toContain(thinkingSentinel);
+    expect(JSON.stringify(value)).not.toContain(
+      "PRIVATE_THINKING_SIGNATURE_TEST",
+    );
   };
+  safe(rows.rows.map((row) => row.transcript));
   safe(initial);
   return { services, fs, id, request, safe, workspaceRoot };
 }

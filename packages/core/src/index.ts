@@ -18,6 +18,7 @@ export {
   migrateProjectPrompts,
   publicRoleResult,
   publicTranscript,
+  withoutThinking,
 } from "./security/artifacts.ts";
 export {
   assertImportedMaterial,

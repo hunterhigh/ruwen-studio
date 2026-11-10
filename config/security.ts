@@ -16,5 +16,8 @@ export function securityLimits(
     jsonNodes: positive("RUWEN_JSON_MAX_NODES", 50_000),
     archiveDepth: positive("RUWEN_ARCHIVE_MAX_DEPTH", 32),
     archiveRatio: positive("RUWEN_ARCHIVE_MAX_RATIO", 200),
+    // 待 P3 用真实模型校准；仅影响输出重合判定，不改变上下文或资料包预算。
+    chatOverlapChars: positive("RUWEN_CHAT_OVERLAP_CHARS", 30),
+    structuredOverlapChars: positive("RUWEN_STRUCTURED_OVERLAP_CHARS", 60),
   };
 }

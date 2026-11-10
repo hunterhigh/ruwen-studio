@@ -1,16 +1,21 @@
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
-import { LeakDetector } from "@ruwen/core";
+import { LeakDetector, normalizeSecurityText } from "@ruwen/core";
 import { afterEach, expect, it } from "vitest";
 import { temporaryProject } from "../../core/test/helpers.ts";
 import {
   assemblePrompt,
   createFauxRuntime,
+  type Data,
+  fauxOutput,
   ROLES,
   RoleExecutionError,
   RoleSecurityError,
   runRole,
 } from "../src/index.ts";
-import { deploymentCanary } from "../src/security/notes.ts";
+import {
+  deploymentCanary,
+  GENERAL_SECURITY_NOTE,
+} from "../src/security/notes.ts";
 import {
   CONTENT_REFUSAL,
   INTERNAL_REFUSAL,
@@ -28,7 +33,7 @@ async function project() {
 it.each([
   "canary",
   "prompt_overlap",
-])("author %s is blocked before any delta/artifact, without retry and with usage retained", async (kind) => {
+])("author %s publishes no private text or artifact, without retry and with usage retained", async (kind) => {
   const { fs } = await project();
   const source = (await assemblePrompt(ROLES["xiaoshuo-zuozhe"])).content;
   const leak = kind === "canary" ? deploymentCanary() : source.slice(0, 160);
@@ -54,7 +59,8 @@ it.each([
   expect(
     new LeakDetector(source, deploymentCanary()).check(error.partial),
   ).toBeUndefined();
-  expect(deltas).toEqual([]);
+  expect(normalizeSecurityText(deltas.join(""))).toBe("");
+  expect(deltas.join("")).not.toContain(deploymentCanary());
 });
 it("a coordinator leak becomes only the exact refusal with a safe transcript", async () => {
   const { fs } = await project();
@@ -92,20 +98,19 @@ it.each([
   );
   expect(runtime.faux.state.callCount).toBe(1);
 });
-it("structured leakage is rejected before its submit tool; a hidden extra input field grants no exemption", async () => {
+it("repeated structured leakage is rejected before its submit tool; a hidden extra input field grants no exemption", async () => {
   const { fs } = await project();
   const source = (await assemblePrompt(ROLES["qinggan-duzhe"])).content.slice(
     0,
     160,
   );
-  const runtime = createFauxRuntime([
-    fauxAssistantMessage(
-      fauxToolCall("submit_reading", {
-        reactions: [{ anchor: "正文", type: "noticed", note: source }],
-      }),
-      { stopReason: "toolUse" },
-    ),
-  ]);
+  const response = fauxAssistantMessage(
+    fauxToolCall("submit_reading", {
+      reactions: [{ anchor: "正文", type: "noticed", note: source }],
+    }),
+    { stopReason: "toolUse" },
+  );
+  const runtime = createFauxRuntime([response, response]);
   await expect(
     runRole(
       "qinggan-duzhe",
@@ -113,7 +118,7 @@ it("structured leakage is rejected before its submit tool; a hidden extra input 
       { fs, projectKey: "test-project", runtime },
     ),
   ).rejects.toBeInstanceOf(RoleSecurityError);
-  expect(runtime.faux.state.callCount).toBe(1);
+  expect(runtime.faux.state.callCount).toBe(2);
 });
 it("public upstream text genuinely present in user material can be quoted, and injection dialogue is ordinary fiction", async () => {
   const { fs } = await project();
@@ -138,36 +143,47 @@ it("public upstream text genuinely present in user material can be quoted, and i
   expect(result.securityEvents).toEqual([]);
   expect(result.output).toHaveProperty("reactions");
 });
-it("private thinking text is rejected before a read tool can run", async () => {
+it("private thinking is ignored and stripped while authorized tools still execute", async () => {
   const { fs } = await project();
   let calls = 0;
   const runtime = createFauxRuntime([
     fauxAssistantMessage(
       [
-        { type: "thinking", thinking: deploymentCanary() },
+        {
+          type: "thinking",
+          thinking: `${deploymentCanary()}\n${GENERAL_SECURITY_NOTE}`,
+        },
         fauxToolCall("web_search", { query: "驿站制度" }),
       ],
       { stopReason: "toolUse" },
     ),
+    fauxAssistantMessage(
+      fauxToolCall(
+        "submit_research",
+        fauxOutput("waibu-zhishi-guwen", {}) as Data,
+      ),
+      { stopReason: "toolUse" },
+    ),
   ]);
-  await expect(
-    runRole(
-      "waibu-zhishi-guwen",
-      { brief: { known: "驿站" } },
-      {
-        fs,
-        projectKey: "test-project",
-        runtime,
-        searchApproved: true,
-        search: {
-          search: async () => {
-            calls++;
-            return [];
-          },
+  const result = await runRole(
+    "waibu-zhishi-guwen",
+    { brief: { known: "驿站" } },
+    {
+      fs,
+      projectKey: "test-project",
+      runtime,
+      searchApproved: true,
+      search: {
+        search: async () => {
+          calls++;
+          return [];
         },
       },
-    ),
-  ).rejects.toBeInstanceOf(RoleSecurityError);
-  expect(calls).toBe(0);
-  expect(runtime.faux.state.callCount).toBe(1);
+    },
+  );
+  expect(calls).toBe(1);
+  expect(result.securityEvents).toEqual([]);
+  expect(JSON.stringify(result)).not.toContain(deploymentCanary());
+  expect(JSON.stringify(result)).not.toContain('"thinking"');
+  expect(runtime.faux.state.callCount).toBe(2);
 });

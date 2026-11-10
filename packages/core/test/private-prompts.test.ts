@@ -24,7 +24,17 @@ const value = {
   systemPrompt: secret,
   transcript: [
     { role: "system", content: secret },
-    { role: "assistant", content: [] },
+    {
+      role: "assistant",
+      content: [
+        {
+          type: "thinking",
+          thinking: "PRIVATE_THINKING_TEST_593",
+          thinkingSignature: "PRIVATE_SIGNATURE_TEST_593",
+        },
+        { type: "text", text: "可见文字" },
+      ],
+    },
   ],
 };
 async function project() {
@@ -57,6 +67,8 @@ it("moves local legacy copies before deleting them; repeated migration is harmle
   await importProjectZip(restored, await exportProjectZip(fs));
   for (const p of await restored.list()) {
     const body = await restored.readText(p);
+    expect(body).not.toContain("PRIVATE_THINKING_TEST_593");
+    expect(body).not.toContain("PRIVATE_SIGNATURE_TEST_593");
     expect(body).not.toContain(secret);
     for (let n = 0; n <= Array.from(secret).length - 30; n++)
       expect(body).not.toContain(
@@ -65,6 +77,21 @@ it("moves local legacy copies before deleting them; repeated migration is harmle
           .join(""),
       );
   }
+});
+it("rejects a thinking-only legacy report at export until the explicit migration strips it", async () => {
+  const fs = await project();
+  const cleanSystem = {
+    promptSha256: hash,
+    output: "可见输出",
+    transcript: value.transcript.filter((message) => message.role !== "system"),
+  };
+  await fs.write(report, JSON.stringify(cleanSystem));
+  await expect(exportProjectZip(fs)).rejects.toThrow("private role artifact");
+  await migrateProjectPrompts(fs, async () => {
+    throw new Error("No system prompt to capture");
+  });
+  expect(await fs.readText(report)).not.toContain("PRIVATE_THINKING_TEST_593");
+  await expect(exportProjectZip(fs)).resolves.toBeInstanceOf(Uint8Array);
 });
 it("a failed platform store leaves every local legacy byte intact", async () => {
   const fs = await project();

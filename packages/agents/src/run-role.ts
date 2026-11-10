@@ -20,6 +20,7 @@ import {
 } from "./models.ts";
 import { assemblePrompt } from "./prompts/manifest.ts";
 import { ROLES } from "./roles/index.ts";
+import { publicTemplateMaterials } from "./security/public-templates.ts";
 import {
   CONTENT_REFUSAL,
   INTERNAL_REFUSAL,
@@ -316,7 +317,13 @@ export async function runRole(
   const user = spec.buildUserMessage(input);
   const prompt = await assemblePrompt(spec, ctx.upstreamRoot);
   await ctx.onPrompt?.(prompt);
-  const security = new RoleSecurity(prompt.content, user);
+  const security = new RoleSecurity(
+    prompt.content,
+    user,
+    spec.output.kind === "tool" && id !== "chuangyi-xietiaoyuan",
+    await publicTemplateMaterials(ctx.upstreamRoot),
+    (text) => ctx.onDelta?.(text, id),
+  );
   const { model, thinkingLevel } = ctx.runtime.resolve(spec);
   const maxTokens = ctx.maxTokens ?? roleGenerationPolicy(id).maxTokens;
   if (
@@ -406,7 +413,7 @@ export async function runRole(
     getApiKey: (provider) => ctx.runtime.apiKey?.(provider),
     beforeToolCall: async ({ toolCall, assistantMessage }, signal) => {
       security.observe(assistantMessage);
-      if (security.failure)
+      if (security.failure || security.streamFailure)
         return { block: true, terminate: true, reason: "security_boundary" };
       if (assistantMessage.stopReason === "length")
         return { block: true, terminate: true, reason: "role_truncated" };
@@ -427,7 +434,7 @@ export async function runRole(
     },
     finishTurn: (turn) => {
       turns++;
-      if (security.failure) return { action: "end" };
+      if (security.failure || security.streamFailure) return { action: "end" };
       if (turn.message.stopReason === "length") return { action: "end" };
       if (submitted) return { action: "end" };
       if (
@@ -475,42 +482,46 @@ export async function runRole(
     const key = ctx.runtime.apiKey?.(model.provider);
     return key ? value.split(key).join("[REDACTED]") : value;
   };
-  const snapshot = (): RoleResult => ({
-    runtimeMode: ctx.runtime.mode,
-    output: output ?? "",
-    usage: structuredClone(usage),
-    costTotal: usage.reduce((total, item) => total + item.cost.total, 0),
-    promptSha256: prompt.sha256,
-    transcript: security.transcript(
-      JSON.parse(redact(JSON.stringify(runtime.state.messages))),
-    ) as RoleResult["transcript"],
-    model: `${model.provider}/${model.id}`,
-    durationMs: performance.now() - started,
-    readResources: [...reads.values()],
-    securityEvents: structuredClone(security.events),
-  });
+  const snapshot = (): RoleResult => {
+    security.finalizeFailure();
+    return {
+      runtimeMode: ctx.runtime.mode,
+      output: output ?? "",
+      usage: structuredClone(usage),
+      costTotal: usage.reduce((total, item) => total + item.cost.total, 0),
+      promptSha256: prompt.sha256,
+      transcript: security.transcript(
+        JSON.parse(redact(JSON.stringify(runtime.state.messages))),
+      ) as RoleResult["transcript"],
+      model: `${model.provider}/${model.id}`,
+      durationMs: performance.now() - started,
+      readResources: [...reads.values()],
+      securityEvents: structuredClone(security.events),
+    };
+  };
   const complete = () => {
     if (security.inspect(output))
       throw new RoleSecurityError(SECURITY_ROLE_FAILURE);
     const result = snapshot();
-    security.publish(ctx, id);
+    security.publish();
     return result;
   };
   try {
+    let overlapRetried = false;
+    let prompted = false;
+    let correction =
+      "上次输出未通过格式或内容校验。请依据当前岗位的输入与输出契约重新提交，只输出合法结果。";
     for (let attempt = 0; attempt < ROLE_OUTPUT_ATTEMPTS; attempt++) {
-      security.beginAttempt();
+      const attemptStart = runtime.state.messages.length;
       if (ctx.signal?.aborted) throw new RoleAbortError("Role cancelled");
-      await Promise.race([
-        runtime.prompt(
-          attempt === 0
-            ? user
-            : "上次输出未通过格式或内容校验。请依据当前岗位的输入与输出契约重新提交，只输出合法结果。",
-        ),
-        aborted,
-      ]);
+      const nextPrompt = prompted ? correction : user;
+      prompted = true;
+      await Promise.race([runtime.prompt(nextPrompt), aborted]);
       const message = [...runtime.state.messages]
         .reverse()
         .find((m) => m.role === "assistant");
+      if (security.streamFailure)
+        throw new RoleOutputError(security.streamFailure);
       if (security.failure) {
         output = "";
         if (id === "chuangyi-xietiaoyuan") {
@@ -518,6 +529,29 @@ export async function runRole(
           const result = snapshot();
           ctx.onDelta?.(INTERNAL_REFUSAL, id);
           return result;
+        }
+        if (
+          security.failure === "prompt_overlap" &&
+          spec.output.kind === "tool" &&
+          !overlapRetried
+        ) {
+          overlapRetried = true;
+          correction =
+            "上次输出逐字引用了平台规则。请用自己的话表述，不要逐字引用平台规则；依据当前岗位的输入与输出契约重新提交合法结果。";
+          // Never feed rejected excerpts back into provider history or grant them an exemption.
+          const failedAssistant = runtime.state.messages.findIndex(
+            (message, index) =>
+              index >= attemptStart && message.role === "assistant",
+          );
+          runtime.state.messages = runtime.state.messages.slice(
+            0,
+            failedAssistant < 0 ? attemptStart : failedAssistant,
+          );
+          security.retry();
+          submitted = false;
+          output = undefined;
+          attempt--;
+          continue;
         }
         throw new RoleSecurityError(SECURITY_ROLE_FAILURE);
       }

@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import {
   createApplicationRuntime,
   type Data,
+  deploymentCanary,
   MODEL_MODES,
 } from "@ruwen/agents";
 import { runtimeSettings } from "../../../config/settings.ts";
@@ -11,6 +12,7 @@ import { WorkerService } from "./service.ts";
 const env = fileURLToPath(new URL("../../../.env", import.meta.url));
 if (process.env.RUWEN_SKIP_ENV_FILE !== "1" && existsSync(env))
   process.loadEnvFile(env);
+deploymentCanary();
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
 if (!(MODEL_MODES as readonly string[]).includes(process.env.MODEL_MODE ?? ""))
   throw new Error("MODEL_MODE must explicitly be faux, real, record or replay");

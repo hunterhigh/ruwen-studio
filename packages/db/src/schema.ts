@@ -235,6 +235,7 @@ export const ideationRequests = pgTable(
   ],
 );
 export const ideationOutbox = pgTable("ideation_outbox", {
+  queueName: text("queue_name").notNull().default("ruwen-work"),
   runId: uuid("run_id")
     .primaryKey()
     .references(() => ideationTasks.runId),
@@ -250,6 +251,24 @@ export const ideationEvents = pgTable("ideation_events", {
     .references(() => ideationSessions.id),
   runId: uuid("run_id").references(() => ideationTasks.runId),
   data: jsonb("data").notNull(),
+  createdAt: time("created_at"),
+});
+export const ideationPreviews = pgTable("ideation_previews", {
+  id: uuid("id").primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => ideationSessions.id),
+  taskId: uuid("task_id")
+    .notNull()
+    .references(() => ideationTasks.runId),
+  ordinal: bigint("ordinal", { mode: "bigint" }).generatedAlwaysAsIdentity(),
+  kind: text("kind").notNull(),
+  snapshot: text("snapshot").notNull(),
+  sha256: text("sha256").notNull(),
+  status: text("status").notNull().default("pending"),
   createdAt: time("created_at"),
 });
 export const previews = pgTable("previews", {

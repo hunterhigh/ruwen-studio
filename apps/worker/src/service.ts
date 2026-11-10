@@ -61,6 +61,8 @@ import { persistPrivatePrompt } from "./private-prompts.ts";
 import { recordRoleSecurityEvents } from "./security-events.ts";
 import { streamSink } from "./stream-events.ts";
 
+export { createIdeationService } from "./ideation-service.ts";
+
 type Kind =
   | "chapter"
   | "candidate"

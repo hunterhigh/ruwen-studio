@@ -1,6 +1,6 @@
-# 构思服务契约 v1（contract only）
+# 构思服务契约 v1.1（contract only）
 
-日期：2026-11-10。类型与函数签名：`packages/pipeline/src/ideation/contract.ts`，仅类型导出。主线程用`import type { IdeationService, IdeationPreview, IdeationEvent } from "@ruwen/pipeline"`编写假数据适配器；**没有可以调用的真实服务函数、构思路由、队列处理器或数据库实现**。本契约合并后才实现。
+日期：2026-11-10。类型与函数签名：`packages/pipeline/src/ideation/contract.ts`，仅类型导出。主线程用`import type { IdeationService, IdeationPreview, IdeationEvent } from "@ruwen/pipeline"`编写假数据适配器；**没有可以调用的真实服务函数、构思路由、队列处理器或数据库实现**。v1.1补充会话列表/关闭及章节与构思共用的运行前置错误码；v1.1合并后才按第9节实现，事件wire version仍为1。
 
 依据PLAN §6.4/§7.2、上游`ruwen-gushi-gousi/SKILL.md`、`shared/information-contract.md`、`shared/creative-communication-contract.md`与当前core的确定性校验。上游原文不变，I1–I13不变。与计划表格的两处差异见OQ-005、OQ-018及ADR-011。
 
@@ -22,6 +22,12 @@ context scope完整包含project/volume/arc/chapter/scene_type/pov，project是�
 4. 协调员每个模型请求都从数据库重新载入本会话所需消息，构造prepareRequest上下文；不依赖浏览器重放历史。工具限定list_resources、受readers约束的read_resource、propose_handoff。
 5. propose_handoff先调用当前`core.handoff.validateHandoff(value,{rawSource})`执行creation-check；rawSource只从数据库在协调员阶段短暂读取。失败不生成快照，不用人工拼接绕过。成功生成`kind:"handoff"`预览，包含自然语言理解、干净委托、作用域、资源引用及待运行岗位。
 6. 公开委托保留上游精确snake_case字段，approval_ref为null。当前构思分派支持治理、顾问、表现、故事四岗；这是上游creative_brief白名单的子集，不把编辑岗作为构思任务。本契约不改变上游允许的面向当前候选编辑的委托。编译员走独立编译请求，不能把它加进creative_brief.recipient。
+
+`listIdeationSessions(actor,{after?,limit?,status?})`按第1节分页规则列出当前已授权项目的会话，status可选open/closed；省略时包含两种状态，非法过滤值为INVALID_ARGUMENT。先检查projectId归属，再过滤/计数/分页，不能通过过滤或游标读到其他项目的会话；空列表也不免除项目归属校验。
+
+`closeIdeationSession(actor,{sessionId,clientRequestId})`返回`IdeationClosedSession`（status固定closed），HTTP 200。关闭只停止新的协调员输入：后续sendIdeationMessage，以及会创建新协调员用户消息/回合的revisePreview，均返回SESSION_CLOSED（409）。关闭不取消或中断已有任务，不使现有预览stale/superseded，不改变其哈希、批准或已提交文件；已有预览的读取、批准、拒绝、激活及任务查询/取消/事件订阅继续遵守各自原有门。拒绝理由仍只作为会话内决定备注保存，不发起新协调员回合；已接收的协调员任务也可正常收尾。
+
+关闭与发送按服务端事务提交顺序串行决定：先关闭则新发送被拒，先受理发送则该已存在任务不受关闭影响。关闭幂等；同clientRequestId按第4节重放结果，其他请求ID再次关闭已关闭会话也返回closed，不重复修改状态或创建任务。本契约不提供重新打开操作。
 
 **用户原话只出现在协调员会话里。任何下游预览和事件都不包含原话。** 不在快照、任务请求、注册表、审计、错误、SSE、录制或导出中复制用户消息、修改意见、拒绝理由、示例原句或失败历史。下游只拿白名单干净委托及有权读取的项目资料，不读协调员消息表；不能将整个会话DTO作为模型输入。会话消息表不属于项目文件系统或项目ZIP。
 
@@ -95,12 +101,14 @@ data: {"version":1,"type":"reset","id":"104","projectId":"<project UUID>","sessi
 
 ## 6. HTTP映射（待实现）
 
-以下均以`/api/projects/:projectId/ideation`为前缀，**本PR不注册这些路由**。所有写请求校验CSRF；先校验全部ID归属，再做状态/哈希/幂等检查。查询分页使用after/limit。
+以下均以`/api/projects/:projectId/ideation`为前缀，**本PR不注册这些路由**。所有写请求校验CSRF；先校验全部ID归属，再做状态/哈希/幂等检查。查询分页使用after/limit；GET /sessions的可选status也使用查询串，例如`?status=closed&limit=50`。
 
 | 方法与路径 | 服务函数 | 需纳入归属/越权测试的ID |
 |---|---|---|
 | POST /sessions | createIdeationSession | projectId |
+| GET /sessions | listIdeationSessions | projectId、会话列表游标（status过滤不改变归属范围） |
 | GET /sessions/:sessionId | getIdeationSession | projectId,sessionId |
+| POST /sessions/:sessionId/close | closeIdeationSession | projectId,sessionId；clientRequestId仅为当前用户/项目内幂等键 |
 | GET /sessions/:sessionId/messages | listIdeationMessages | projectId,sessionId,消息游标 |
 | POST /sessions/:sessionId/messages | sendIdeationMessage | projectId,sessionId |
 | GET /sessions/:sessionId/previews | listPreviews | projectId,sessionId,预览游标 |
@@ -116,15 +124,15 @@ data: {"version":1,"type":"reset","id":"104","projectId":"<project UUID>","sessi
 | GET /decisions/:decisionId | getIdeationApproval | projectId,decisionId |
 | GET /sessions/:sessionId/events | listIdeationEvents的SSE适配 | projectId,sessionId、所有返回事件的session/run关联 |
 
-读成功200，新消息/修改/编译受理202；批准产生的任务以receipt.startedTaskId查询，文件提交则在同一200响应前完成事务。状态冲突409；写入/队列任务受理失败不能假装202。
+读成功200，关闭成功200，新消息/修改/编译受理202；批准产生的任务以receipt.startedTaskId查询，文件提交则在同一200响应前完成事务。状态冲突409；运行前置拒绝使用第8节共用错误码，不得创建失败占位任务或假装202。
 
 ## 7. 所有ID与归属规则
 
 | 名称/格式 | 权威归属与必须检查的关联 |
 |---|---|
 | userId：认证用户UUID | 仅认证会话提供，不能由body/查询串指定。 |
-| projectId：数据库UUID | projects.owner_id等于当前用户；不能把projectKey当UUID。 |
-| sessionId：UUID | session.project_id等于已授权projectId；不能仅查session UUID存在。 |
+| projectId：数据库UUID | projects.owner_id等于当前用户；创建/列举会话都先校验该项目，列表的status、计数、分页不能扩宽到其他项目；不能把projectKey当UUID。 |
+| sessionId：UUID | session.project_id等于已授权projectId；读取/关闭/消息等操作都检查父子关联，不能仅查session UUID存在。关闭也不能先返回SESSION_CLOSED等状态来泄露外租户会话。 |
 | messageId：UUID | message.session_id/project_id同时匹配本会话/项目；只有协调员会话消息端点可读。 |
 | turnId/taskId/runId：pipeline run UUID | run关联同一项目及会话；校验run kind与操作（协调员/分派/调查/编译）一致。沿用run归属守卫，补会话关联。 |
 | previewId：UUID | preview.project/session/run全部一致；包括supersedesPreviewId链与source/output preview IDs，不能用一个项目的任务包住另一个预览。 |
@@ -134,10 +142,12 @@ data: {"version":1,"type":"reset","id":"104","projectId":"<project UUID>","sessi
 | file/projection/audit/trial路径与sha256 | 只在当前项目FS解析，禁止绝对路径、逃逸、符号链接与跨项目引用。报告证据和目标资源/作用域/哈希匹配，不因路径存在就视为通过。引用的path不是新的无归属下载入口。 |
 | projectKey：上游slug | 从已授权项目读取，只参与上游scope和资源匹配，不能授予平台访问权。 |
 | clientRequestId：客户端UUID | 只用于绑定用户+项目+操作的幂等键，不能定位/授权其他请求。 |
-| 游标：不透明十进制字符串 | 只用于当前授权列表/事件流的排他位置；所有查询仍限定project/session。不得用游标绕过父资源鉴权，也不得从游标查询无归属对象。 |
+| 游标：不透明十进制字符串 | 会话列表限定当前project，消息/任务/预览/事件限定当前project/session，只代表各自列表的排他位置。不得用游标绕过父资源鉴权，也不得从游标查询无归属对象。 |
 | role/type/status/action/sha256/traceId | 静态分类、校验值或关联号，不是授权资源ID；知道它们不授予任何访问。prompts表没有公开查询入口。 |
 
 主线程实现路由时扩展统一requireOwnership的资源定位联合；不能为构思另建一个跳过统一守卫的控制器。每条新增路由都加入API_ROUTES及动态A→B=404测试，另测混搭同租户不同项目/会话/任务/预览和嵌套资源ID。未知、非法格式、其他租户或错父子关联统一NOT_FOUND/404，先于状态冲突；不能通过错误码、计数、幂等响应、SSE重连或导出探知其他项目。重放与分页也重查归属。
+
+v1.1必须把GET /sessions及POST /sessions/:sessionId/close加入同一越权覆盖：外租户项目的列表（含open/closed过滤、空结果和游标）为404；关闭外租户会话、同租户错项目会话、非法/未知会话均为404。被拒关闭不能改变目标状态或任何任务/预览，重复关闭的幂等分支也不能跳过归属校验。
 
 ## 8. 错误码
 
@@ -145,10 +155,12 @@ data: {"version":1,"type":"reset","id":"104","projectId":"<project UUID>","sessi
 |---|---|
 | 401 | UNAUTHENTICATED |
 | 404 | NOT_FOUND（包括非法ID、外租户、错父子关联） |
-| 403 | CSRF_INVALID |
+| 403 | CSRF_INVALID、BILLING_DISABLED（收费关闭时的付费功能） |
 | 400 | INVALID_ARGUMENT |
+| 402 | INSUFFICIENT_CREDITS（可用余额不足以预留本次运行） |
 | 413 | INPUT_LIMIT_EXCEEDED |
 | 422 | CREATION_CHECK_FAILED、OUTPUT_BLOCKED |
+| 423 | ACCOUNT_FROZEN（风控冻结，待人工复核） |
 | 409 | TURN_IN_PROGRESS、SESSION_CLOSED、RESOURCE_STALE、PREVIEW_STALE、ALREADY_DECIDED、APPROVAL_REQUIRED、APPROVAL_CONSUMED、IDEMPOTENCY_CONFLICT、SEARCH_UNAVAILABLE、CLOSURE_AUDIT_REQUIRED、NONCANONICAL_TRIAL_REQUIRED、PRECONDITION_FAILED、CANCELLED、INTERRUPTED、READERS_DENIED |
 | 429 | RATE_LIMITED |
 | 503 | PROVIDER_UNAVAILABLE |
@@ -156,6 +168,14 @@ data: {"version":1,"type":"reset","id":"104","projectId":"<project UUID>","sessi
 
 错误只有code、安全文案、retryable、traceId和field/rule问题列表。field是服务端认可的字段位置，rule为固定代码，不能附原始值、原话、系统提示词、标记、thinking、SQL或provider异常。retryable不是自动重试授权：模型调用仍遵守成本、检查点、用户确认与已定义的一次纠正规则。
 
+### 章节与构思共用的运行前置检查（v1.1）
+
+`RunStartErrorCode`及HTTP映射类型`RunStartErrorStatus`由`@ruwen/pipeline`统一类型导出，只有INSUFFICIENT_CREDITS→402、ACCOUNT_FROZEN→423、BILLING_DISABLED→403这三项；IdeationErrorCode直接复用它们。章节接口以后接入计费/风控时也使用同一组代码和HTTP含义，不另起同义错误码。本轮只补契约，不代表余额预留、冻结或收费逻辑已经接入。
+
+先完成认证和**全部相关资源归属校验**，再执行这组运行前置检查；它们必须发生在创建任务、入队或调用模型之前。外租户/错父子关联仍为NOT_FOUND/404，不能先暴露余额、冻结或收费状态。新运行被这三种错误拒绝时，不创建任务（包括失败占位任务）、不调用模型、不扣费，也不遗留预留/消费或“已受理”结果；检查通过后的预留与任务受理须原子完成，避免竞态超扣。
+
+执行排队任务的实际模型调用前仍要重查归属及适用的前置条件；如果此时被拒，不创建替代任务、不发起该模型调用、不产生新的扣费，并释放未使用的本次预留。原有任务的已发生用量/费用事实不回写或伪造为0。BILLING_DISABLED只用于依赖收费启用的付费功能，不能把默认关闭真实收费解释为禁用faux验证或所有非付费操作。
+
 ## 9. 后续实现验收门
 
-契约合并后，后端才能实现DB持久化、prepareRequest加载、creation-check、用户批准再分派和各预览原子提交。必须以faux证明：完整流程、creation-check拒绝、未批准写入阻断、重复批准/幂等冲突、原话哨兵隔离、无搜索配置、表现审计/试写/激活门、2200字预算、reset顺序与SSE重连、所有资源ID越权及worker检查点恢复。不把当前类型检查或假数据页面当成这些实现已验收。
+v1.1合并后，后端才能实现DB持久化、prepareRequest加载、creation-check、用户批准再分派和各预览原子提交。必须以faux证明：完整流程、creation-check拒绝、未批准写入阻断、重复批准/幂等冲突、原话哨兵隔离、无搜索配置、表现审计/试写/激活门、2200字预算、reset顺序与SSE重连、所有资源ID越权及worker检查点恢复。还须验证会话列表状态过滤/分页不越权、关闭幂等与发送并发顺序、关闭后发送/修改为SESSION_CLOSED且既有预览/任务不变，以及三种运行前置拒绝在鉴权之后且任务/模型调用/扣费均为零；章节接入时复用同组错误码验收。不把当前类型检查或假数据页面当成这些实现已验收。

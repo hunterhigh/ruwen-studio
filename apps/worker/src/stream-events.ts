@@ -1,6 +1,7 @@
 import type { RoleId } from "@ruwen/agents";
 import type { Database } from "@ruwen/db";
 import { runtimeSettings } from "../../../config/settings.ts";
+/** Sole input: security-approved RoleContext.onDelta, never provider events or transcript text. */
 export function streamSink(
   db: Database,
   projectId: string,

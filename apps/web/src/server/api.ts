@@ -380,6 +380,7 @@ async function events(
               role_id: string;
               delta: string;
             }>(
+              // Replay only approved deltas persisted by the worker's onDelta sink.
               "SELECT id,role_id,delta FROM web_run_events WHERE project_id=$1 AND run_id=$2 AND id>$3 ORDER BY id LIMIT 256",
               [owned.project.id, runId, cursor],
             );

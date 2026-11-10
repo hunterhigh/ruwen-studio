@@ -66,6 +66,10 @@ export function exactIdeationRequest(request: object, fields: string[]) {
   if (Object.keys(request).some((key) => !fields.includes(key)))
     ideationFail("INVALID_ARGUMENT");
 }
+export function ideationHash(value: unknown) {
+  if (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value))
+    ideationFail("INVALID_ARGUMENT");
+}
 export function ideationPage(request: IdeationPageRequest) {
   if (
     request.after !== undefined &&

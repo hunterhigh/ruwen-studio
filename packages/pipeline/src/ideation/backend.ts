@@ -127,7 +127,10 @@ export class IdeationBackend extends IdeationSessions {
       `UPDATE ideation_previews p SET status='stale' WHERE p.project_id=$1 AND p.session_id=$2 AND p.status='pending' AND ($4::uuid IS NULL OR p.id=$4) AND (
       p.snapshot::jsonb->>'registrySha256' <> $3 OR
       EXISTS(SELECT 1 FROM jsonb_array_elements(p.snapshot::jsonb->'resources') x LEFT JOIN project_files f ON f.project_id=p.project_id AND f.path=x->>'path' WHERE f.sha256 IS DISTINCT FROM x->>'sha256') OR
-      EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(p.snapshot::jsonb->'patches','[]')) x LEFT JOIN project_files f ON f.project_id=p.project_id AND f.path=CASE WHEN x->>'kind'='sections' THEN x->'resource'->>'path' ELSE x->>'path' END WHERE (x->>'kind'='create' AND f.path IS NOT NULL) OR (x->>'kind'='sections' AND f.sha256 IS DISTINCT FROM x->'resource'->>'sha256'))
+      EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(p.snapshot::jsonb->'patches','[]')) x LEFT JOIN project_files f ON f.project_id=p.project_id AND f.path=CASE WHEN x->>'kind'='sections' THEN x->'resource'->>'path' ELSE x->>'path' END WHERE (x->>'kind'='create' AND f.path IS NOT NULL) OR (x->>'kind'='sections' AND f.sha256 IS DISTINCT FROM x->'resource'->>'sha256')) OR
+      (p.kind='generation_field' AND EXISTS(SELECT 1 FROM pipeline_runs r LEFT JOIN project_files s ON s.project_id=p.project_id AND s.path='authoring-ruwen-v5/state.json' LEFT JOIN project_files m ON m.project_id=p.project_id AND m.path='authoring-ruwen-v5/manifests/author-manifest.json' WHERE r.id=p.task_id AND (s.sha256 IS DISTINCT FROM r.request->>'stateSha256' OR m.sha256 IS DISTINCT FROM r.request->>'manifestSha256'))) OR
+      (p.kind='generation_field' AND EXISTS(SELECT 1 FROM project_files f WHERE f.project_id=p.project_id AND f.path=p.snapshot::jsonb->'projection'->>'path')) OR
+      (p.kind='expression_candidate' AND p.snapshot::jsonb->>'approvalStage'='activation' AND NOT EXISTS(SELECT 1 FROM project_files f WHERE f.project_id=p.project_id AND f.path=p.snapshot::jsonb->'closureAudit'->'report'->>'path' AND f.sha256=p.snapshot::jsonb->'closureAudit'->'report'->>'sha256'))
     ) RETURNING id,sha256,task_id`,
       [actor.projectId, sessionId, current, id ?? null],
     );

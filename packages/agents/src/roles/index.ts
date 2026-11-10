@@ -19,6 +19,7 @@ import {
   type RoleSpec,
   type Tier,
 } from "../types.ts";
+import { expressionReview } from "./expression-review.ts";
 import { ideationNewFiles, ideationSectionPatches } from "./ideation-output.ts";
 
 const bounded = (max = 1600) => str({ maxLength: max });
@@ -127,6 +128,10 @@ const outputs: Record<
       version: str(),
       status: lit("proposed"),
       content: bounded(1200),
+      closure_review: expressionReview,
+      supersedes_resource_id: opt(
+        nullable(str({ pattern: "^[a-z0-9-]{2,64}$" })),
+      ),
       scope,
     }),
   },
@@ -143,7 +148,8 @@ const outputs: Record<
   "zhangjie-qingjing-bianyiyuan": {
     name: "submit_situation",
     schema: obj({
-      generation_field: str({ minLength: 80, maxLength: 2200 }),
+      // JSON Schema counts UTF-16 here; core.projectionErrors enforces exactly <=2200 codepoints.
+      generation_field: str({ minLength: 80, maxLength: 4400 }),
       chapter: str(),
       scope,
       locked_events: list(600),

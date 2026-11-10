@@ -49,6 +49,7 @@ export interface RoleSpec {
     | { kind: "tool"; toolName: string; schema: Schema<Data> };
   modelTier: Tier;
   maxTurns: number;
+  platformFormat?: string;
 }
 export interface ModelRuntime {
   mode: "faux" | "real" | "record" | "replay";
@@ -85,6 +86,8 @@ export interface RoleContext {
   onRequest?: (context: TranscriptContext, role: RoleId) => void;
   /** Coordinator only: reloaded from the authorized server message store before EVERY provider request. */
   loadCoordinatorInput?: () => Promise<Data>;
+  /** Internal isolated expression trial, never supplied by HTTP/model input. */
+  ideationPhase?: "expression_trial";
   beforeProviderRequest?: () => Promise<void>;
   onToolMaterial?: (material: Data, role: RoleId) => void;
   onResourceRead?: (resource: Data, role: RoleId) => void;

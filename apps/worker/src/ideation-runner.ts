@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   assemblePrompt,
   type Data,
-  ROLES,
+  ideationRoleSpec,
   RoleAbortError,
   RoleExecutionError,
   RoleProviderError,
@@ -142,6 +142,8 @@ export class IdeationRunner {
     let eventError: unknown;
     let completedResult: RoleResult | undefined;
     let requestGuardFailure: IdeationFailure | undefined;
+    let createdIntent = false;
+    let providerStarted = false;
     const event = (
       sessionId: string,
       data: Parameters<typeof appendIdeationEvent>[4],
@@ -217,8 +219,9 @@ export class IdeationRunner {
           [job.runId, role],
         );
         if (row.rowCount) throw new IdeationFailure("INTERRUPTED");
-        const prompt = await assemblePrompt(ROLES[role]);
-        const route = runtime.resolve(ROLES[role]);
+        const spec = ideationRoleSpec(role, execution?.phase);
+        const prompt = await assemblePrompt(spec);
+        const route = runtime.resolve(spec);
         await tx.sql(
           "INSERT INTO prompts(sha256,content) VALUES($1,$2) ON CONFLICT DO NOTHING",
           [prompt.sha256, prompt.content],
@@ -244,6 +247,7 @@ export class IdeationRunner {
           status: "RUNNING",
         });
         intent = true;
+        createdIntent = true;
       });
       if (!intent) return;
       await this.options.onBoundary?.("role_intent", role, job.runId);
@@ -279,6 +283,10 @@ export class IdeationRunner {
       let result: RoleResult;
       try {
         result = await runRole(role, initial, {
+          onRequest: () => {
+            providerStarted = true;
+          },
+          ...(execution?.phase ? { ideationPhase: execution.phase } : {}),
           fs,
           projectId: actor.projectId,
           projectKey: String(
@@ -434,7 +442,7 @@ export class IdeationRunner {
               ? "AWAITING_LEARNING_PLAN_APPROVAL"
               : "AWAITING_PREVIEW_APPROVAL";
         await tx.sql(
-          "UPDATE pipeline_runs SET status=$2,finished_at=now() WHERE id=$1",
+          "UPDATE pipeline_runs SET status=$2,finished_at=CASE WHEN $2 IN ('SUCCEEDED','CANCELLED') THEN now() ELSE NULL END WHERE id=$1",
           [job.runId, status],
         );
         if (cancelled || coordinator)
@@ -512,6 +520,12 @@ export class IdeationRunner {
           "UPDATE pipeline_runs SET status=$2,finished_at=now() WHERE id=$1",
           [job.runId, status],
         );
+        // Only this live invocation can prove it never called a provider. A recovered intent cannot.
+        if (createdIntent && !providerStarted)
+          await tx.sql(
+            "UPDATE role_runs SET status='blocked',usage='[]',usage_unknown=false,cost_usd=0,transcript='[]',finished_at=now() WHERE run_id=$1 AND status='running'",
+            [job.runId],
+          );
         await service.options.onTaskTerminal?.(tx, actor, task.id);
         await tx.sql("UPDATE ideation_tasks SET error=$2 WHERE run_id=$1", [
           job.runId,

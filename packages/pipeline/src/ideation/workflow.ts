@@ -31,6 +31,7 @@ import {
   appendIdeationEvent,
   exactIdeationRequest,
   ideationFail,
+  ideationHash,
   ideationText,
   ideationUuid,
   ownedSession,
@@ -69,8 +70,7 @@ export class IdeationWorkflow extends IdeationBackend {
         "confirmed",
       ]);
       if (request.confirmed !== true) ideationFail("APPROVAL_REQUIRED");
-      if (!/^[a-f0-9]{64}$/.test(request.expectedSha256))
-        ideationFail("INVALID_ARGUMENT");
+      ideationHash(request.expectedSha256);
       return this.mutate(tx, actor, "approvePreview", request, async () => {
         if (preview.status !== "pending")
           ideationFail(
@@ -83,7 +83,7 @@ export class IdeationWorkflow extends IdeationBackend {
         await this.options.onTaskTerminal?.(tx, actor, preview.taskId);
         const id = randomUUID(),
           applied = await this.applyPreview(tx, actor, preview, id);
-        return this.commitDecision(tx, actor, preview, id, applied);
+        return this.commitDecision(tx, actor, preview, id, applied, false);
       });
     });
   protected async commitDecision(
@@ -92,6 +92,7 @@ export class IdeationWorkflow extends IdeationBackend {
     preview: IdeationPreview,
     id: string,
     applied: Applied,
+    release = true,
   ) {
     const receipt = {
       id,
@@ -135,7 +136,7 @@ export class IdeationWorkflow extends IdeationBackend {
       approval_status: "approved",
       result: "committed",
     });
-    await this.finishPreviewTask(tx, actor, preview);
+    await this.finishPreviewTask(tx, actor, preview, release);
     await appendIdeationEvent(tx, actor, preview.sessionId, preview.taskId, {
       type: "preview_changed",
       previewId: preview.id,
@@ -153,12 +154,13 @@ export class IdeationWorkflow extends IdeationBackend {
     tx: IdeationTransaction,
     actor: IdeationActor,
     preview: IdeationPreview,
+    release = true,
   ) {
     const changed = await tx.sql(
       "UPDATE pipeline_runs SET status='SUCCEEDED',finished_at=now() WHERE id=$1 AND status IN ('AWAITING_PREVIEW_APPROVAL','AWAITING_LEARNING_PLAN_APPROVAL') RETURNING id",
       [preview.taskId],
     );
-    await this.options.onTaskTerminal?.(tx, actor, preview.taskId);
+    if (release) await this.options.onTaskTerminal?.(tx, actor, preview.taskId);
     if (changed.rowCount)
       await appendIdeationEvent(tx, actor, preview.sessionId, preview.taskId, {
         type: "task_changed",
@@ -567,32 +569,38 @@ export class IdeationWorkflow extends IdeationBackend {
         allowAuthor: true,
         supersedes: null,
       };
-      return this.savePreview(tx, actor, task, {
-        ...base,
-        kind: "expression_candidate",
-        role: "biaoxian-shejishi",
-        summary: "请审阅表现能力提案。",
-        approvalStage: "candidate",
-        resource,
-        patches: [
-          {
-            kind: "create",
-            resourceId: id,
-            path,
-            baseSha256: null,
-            content,
-            afterSha256: hash,
+      return this.saveExpressionProposal(
+        tx,
+        actor,
+        task,
+        {
+          ...base,
+          kind: "expression_candidate",
+          role: "biaoxian-shejishi",
+          summary: "请审阅表现能力提案。",
+          approvalStage: "candidate",
+          resource,
+          patches: [
+            {
+              kind: "create",
+              resourceId: id,
+              path,
+              baseSha256: null,
+              content,
+              afterSha256: hash,
+            },
+          ],
+          registryChanges: [{ resourceId: id, before: null, after }],
+          closureAudit: { status: "pending", report: null, checks: [] },
+          trial: {
+            status: "pending",
+            report: null,
+            sample: null,
+            nonCanonical: true,
           },
-        ],
-        registryChanges: [{ resourceId: id, before: null, after }],
-        closureAudit: { status: "pending", report: null, checks: [] },
-        trial: {
-          status: "pending",
-          report: null,
-          sample: null,
-          nonCanonical: true,
-        },
-      } as unknown as Snapshot<IdeationExpressionPreview>);
+        } as unknown as Snapshot<IdeationExpressionPreview>,
+        result,
+      );
     }
     let patches: Awaited<ReturnType<typeof buildFilePatches>>;
     if (task.stage === "research") {
@@ -638,6 +646,15 @@ export class IdeationWorkflow extends IdeationBackend {
       ...patches,
     } as unknown as Snapshot<IdeationFilePreview>);
   }
+  protected async saveExpressionProposal(
+    tx: IdeationTransaction,
+    actor: IdeationActor,
+    task: IdeationTask,
+    preview: Snapshot<IdeationExpressionPreview>,
+    _result: RoleResult,
+  ) {
+    return this.savePreview(tx, actor, task, preview);
+  }
   getIdeationApproval: IdeationService["getIdeationApproval"] = (
     actor,
     request,
@@ -664,6 +681,7 @@ export class IdeationWorkflow extends IdeationBackend {
         "reason",
       ]);
       if (request.reason !== undefined) ideationText(request.reason);
+      ideationHash(request.expectedSha256);
       return this.mutate(tx, actor, "rejectPreview", request, async () => {
         if (preview.status !== "pending") ideationFail("ALREADY_DECIDED");
         if (request.expectedSha256 !== preview.sha256)
@@ -723,6 +741,7 @@ export class IdeationWorkflow extends IdeationBackend {
         "content",
       ]);
       ideationText(request.content);
+      ideationHash(request.expectedSha256);
       return this.mutate(tx, actor, "revisePreview", request, async () => {
         if (!["pending", "stale"].includes(preview.status))
           ideationFail("ALREADY_DECIDED");
@@ -740,7 +759,7 @@ export class IdeationWorkflow extends IdeationBackend {
           "UPDATE ideation_previews SET status='superseded' WHERE id=$1",
           [preview.id],
         );
-        await this.finishPreviewTask(tx, actor, preview);
+        await this.finishPreviewTask(tx, actor, preview, false);
         await tx.sql(
           "UPDATE pipeline_runs SET request=request || $2::jsonb WHERE id=$1",
           [

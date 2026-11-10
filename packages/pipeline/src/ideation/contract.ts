@@ -1,5 +1,5 @@
 /**
- * Ideation service v1 — CONTRACT ONLY. No runtime exports or service implementation.
+ * Ideation service contract v1.1 — CONTRACT ONLY. No runtime exports or service implementation.
  * Import with `import type ... from "@ruwen/pipeline"`; docs/contracts/ideation-service.md
  * defines runtime validation, ownership, hashing, privacy and transaction requirements.
  */
@@ -266,11 +266,12 @@ export type IdeationPreview =
   | IdeationExpressionPreview
   | IdeationGenerationFieldPreview;
 
+export type IdeationSessionStatus = "open" | "closed";
 export interface IdeationSession {
   readonly id: IdeationSessionId;
   readonly projectId: IdeationProjectId;
   readonly title: string; // coordinator workspace only; never copied to downstream events
-  readonly status: "open" | "closed";
+  readonly status: IdeationSessionStatus;
   readonly revision: number;
   readonly currentTurnId: IdeationRunId | null;
   readonly capabilities: {
@@ -279,6 +280,10 @@ export interface IdeationSession {
   };
   readonly createdAt: IdeationTime;
   readonly updatedAt: IdeationTime;
+}
+/** Closing only stops new coordinator input; existing previews and tasks remain intact. */
+export interface IdeationClosedSession extends IdeationSession {
+  readonly status: "closed";
 }
 /** The ONLY DTO containing raw user wording. Accessible only via the coordinator session. */
 export interface IdeationMessage {
@@ -327,7 +332,15 @@ export interface IdeationTask {
   readonly createdAt: IdeationTime;
   readonly finishedAt: IdeationTime | null;
 }
+/** Shared by future chapter and ideation run-start guards; these are not implementations. */
+export interface RunStartErrorStatus {
+  readonly INSUFFICIENT_CREDITS: 402;
+  readonly ACCOUNT_FROZEN: 423;
+  readonly BILLING_DISABLED: 403;
+}
+export type RunStartErrorCode = keyof RunStartErrorStatus;
 export type IdeationErrorCode =
+  | RunStartErrorCode
   | "UNAUTHENTICATED"
   | "NOT_FOUND"
   | "CSRF_INVALID"
@@ -381,6 +394,9 @@ export interface IdeationPageRequest {
   readonly after?: IdeationCursor;
   readonly limit?: number;
 }
+export interface IdeationListSessions extends IdeationPageRequest {
+  readonly status?: IdeationSessionStatus;
+}
 /** Built by authenticated server code; never populated from a request body. */
 export interface IdeationActor {
   readonly userId: IdeationUserId;
@@ -388,6 +404,9 @@ export interface IdeationActor {
 }
 interface IdeationMutation {
   readonly clientRequestId: IdeationRequestId;
+}
+export interface IdeationCloseSession extends IdeationMutation {
+  readonly sessionId: IdeationSessionId;
 }
 export interface IdeationSendMessage extends IdeationMutation {
   readonly sessionId: IdeationSessionId;
@@ -492,6 +511,7 @@ export type IdeationEvent = IdeationEventData & {
   readonly createdAt: IdeationTime;
 };
 export type IdeationOwnershipLocator =
+  | { readonly projectId: IdeationProjectId }
   | {
       readonly projectId: IdeationProjectId;
       readonly sessionId: IdeationSessionId;
@@ -525,10 +545,18 @@ export interface IdeationService {
     actor: IdeationActor,
     request: IdeationMutation & { readonly title?: string },
   ): Promise<IdeationResult<IdeationSession>>;
+  listIdeationSessions(
+    actor: IdeationActor,
+    request: IdeationListSessions,
+  ): Promise<IdeationResult<IdeationPage<IdeationSession>>>;
   getIdeationSession(
     actor: IdeationActor,
     request: { readonly sessionId: IdeationSessionId },
   ): Promise<IdeationResult<IdeationSession>>;
+  closeIdeationSession(
+    actor: IdeationActor,
+    request: IdeationCloseSession,
+  ): Promise<IdeationResult<IdeationClosedSession>>;
   listIdeationMessages(
     actor: IdeationActor,
     request: IdeationPageRequest & { readonly sessionId: IdeationSessionId },

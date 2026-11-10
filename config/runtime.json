@@ -9,6 +9,7 @@
     "initialDelayMs": 300,
     "characterDelayMs": 2
   },
+  "ideationDemo": { "resetMs": 900, "responseMs": 1800, "chunkMs": 25 },
   "billing": {
     "costMarkup": 2,
     "creditsPerUsd": 10000,

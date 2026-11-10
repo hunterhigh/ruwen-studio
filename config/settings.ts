@@ -17,6 +17,7 @@ export function runtimeSettings(): RuntimeSettings {
       settings.stream.pollIntervalMs,
       settings.stream.heartbeatMs,
       settings.stream.maxConnectionMs,
+      ...Object.values(settings.ideationDemo),
       settings.preview.sessionHours,
       ...Object.values(settings.security),
     ].every((value) => Number.isFinite(value) && value > 0) ||

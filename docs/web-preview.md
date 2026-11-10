@@ -8,7 +8,9 @@
 
 场景还包括anchor_ambiguous、anchor_missing、edit_ratio、length、missing_submit、plot_fail、reality_fail、restage；退回/失败不会自动再写。放弃记录和文学问题记录保留。可通过FAUX_CHARACTER_DELAY_MS调整启动时的流速，默认来自config/runtime.json；逐字模拟按累计截止时间调度，Windows定时器粒度会形成小批次，但不会把每字误差累积到整章。
 
-构思页等待并行线程的ideation-service契约，尚未接入。账户页提供已有记录和模拟用量，不收取真实费用；点数、价格、时限和模型上限仍“待P3实测”。P5尚未完成验收，不进入P6、staging或真实模型阶段。
+构思页已按ideation-service v1提供本地假数据演示：切换或新建会话、发送消息，阅读右侧通讯门及五类预览；模拟批准/拒绝/修改不会写入项目或扣点数，刷新全部清空。表现候选批准与阅读试写后的激活是两次独立操作。页底可展开流式更正/拒绝及错误提示场景。reset只清空当前任务岗位的尝试，不混合其他会话/任务。延迟可在config/runtime.json.ideationDemo调整。真实构思API尚未注册，仍待并行后端接入。
+
+账户页提供已有记录和模拟用量，不收取真实费用；点数、价格、时限和模型上限仍“待P3实测”。P5尚未完成验收，不进入P6、staging或真实模型阶段。
 
 启动器不加载根.env，固定MODEL_MODE=faux、REAL_MODEL=0、P3_GATE_PASSED=0、REAL_CHARGING_ENABLED=0，并移除传给子进程的Anthropic key。本地数据库、认证随机密钥、TLS证书、预览邮件和模型录制均位于Git忽略的.local目录。停止后项目数据保留；同一目录再次pnpm dev可以继续。
 

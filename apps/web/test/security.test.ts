@@ -464,6 +464,46 @@ it("production mailbox cannot be accessed and charging stays server-blocked befo
     ).status,
   ).toBe(404);
 });
+it("the sixteen contract-only ideation routes are not registered before backend implementation", async () => {
+  expect(
+    API_ROUTES.some((route) => JSON.stringify(route).includes("ideation")),
+  ).toBe(false);
+  const id = randomUUID();
+  const routes = [
+    ["POST", "sessions"],
+    ["GET", `sessions/${id}`],
+    ["GET", `sessions/${id}/messages`],
+    ["POST", `sessions/${id}/messages`],
+    ["GET", `sessions/${id}/previews`],
+    ["GET", `previews/${id}`],
+    ["POST", `previews/${id}/approve`],
+    ["POST", `previews/${id}/reject`],
+    ["POST", `previews/${id}/revise`],
+    ["POST", `previews/${id}/activate-expression`],
+    ["POST", `sessions/${id}/compile`],
+    ["GET", `sessions/${id}/tasks`],
+    ["GET", `tasks/${id}`],
+    ["POST", `tasks/${id}/cancel`],
+    ["GET", `decisions/${id}`],
+    ["GET", `sessions/${id}/events`],
+  ] as const;
+  for (const [method, suffix] of routes)
+    expect(
+      (
+        await handleApi(
+          request(
+            `/api/projects/${ownedProjectId}/ideation/${suffix}`,
+            method,
+            true,
+            {},
+            method === "POST" ? {} : undefined,
+          ),
+          services,
+        )
+      ).status,
+      `${method} ${suffix}`,
+    ).toBe(404);
+});
 it("direct authentication cannot create an uninvited user, and mailbox tokens are bound to one browser", async () => {
   const email = `${randomUUID()}@test.invalid`,
     mailbox = newMailbox();

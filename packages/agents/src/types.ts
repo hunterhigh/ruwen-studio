@@ -60,6 +60,14 @@ export interface ModelRuntime {
 export interface SearchProvider {
   search(query: string, signal?: AbortSignal): Promise<Data[]>;
 }
+/** Metadata only: never include rejected text, provider errors or user wording. */
+export type AttemptResetReason =
+  | "format_correction"
+  | "prompt_overlap_correction"
+  | "security_refusal";
+export type RoleStreamEvent =
+  | { type: "delta"; role: RoleId; text: string }
+  | { type: "reset"; role: RoleId; reason: AttemptResetReason };
 export interface RoleContext {
   fs: ProjectFS;
   projectKey: string;
@@ -73,6 +81,7 @@ export interface RoleContext {
   maxTurns?: number;
   maxTokens?: number;
   onDelta?: (delta: string, role: RoleId) => void;
+  onAttemptReset?: (role: RoleId, reason: AttemptResetReason) => void;
   onRequest?: (context: TranscriptContext, role: RoleId) => void;
   onResourceRead?: (resource: Data, role: RoleId) => void;
   search?: SearchProvider;

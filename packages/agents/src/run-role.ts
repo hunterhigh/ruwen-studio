@@ -33,6 +33,7 @@ import {
   roleTools,
 } from "./tools/index.ts";
 import {
+  type AttemptResetReason,
   type Data,
   RoleAbortError,
   type RoleContext,
@@ -509,11 +510,19 @@ export async function runRole(
   try {
     let overlapRetried = false;
     let prompted = false;
-    let correction =
+    const formatCorrection =
       "上次输出未通过格式或内容校验。请依据当前岗位的输入与输出契约重新提交，只输出合法结果。";
+    let correction = formatCorrection;
+    let resetReason: AttemptResetReason = "format_correction";
     for (let attempt = 0; attempt < ROLE_OUTPUT_ATTEMPTS; attempt++) {
       const attemptStart = runtime.state.messages.length;
       if (ctx.signal?.aborted) throw new RoleAbortError("Role cancelled");
+      if (prompted) {
+        ctx.onAttemptReset?.(id, resetReason);
+        // Drop the abandoned withheld suffix as well as resetting the consumer display.
+        // Already published text remains scanner context so reset cannot bypass security.
+        security.retry(resetReason === "prompt_overlap_correction");
+      }
       const nextPrompt = prompted ? correction : user;
       prompted = true;
       await Promise.race([runtime.prompt(nextPrompt), aborted]);
@@ -525,6 +534,7 @@ export async function runRole(
       if (security.failure) {
         output = "";
         if (id === "chuangyi-xietiaoyuan") {
+          ctx.onAttemptReset?.(id, "security_refusal");
           output = INTERNAL_REFUSAL;
           const result = snapshot();
           ctx.onDelta?.(INTERNAL_REFUSAL, id);
@@ -536,6 +546,7 @@ export async function runRole(
           !overlapRetried
         ) {
           overlapRetried = true;
+          resetReason = "prompt_overlap_correction";
           correction =
             "上次输出逐字引用了平台规则。请用自己的话表述，不要逐字引用平台规则；依据当前岗位的输入与输出契约重新提交合法结果。";
           // Never feed rejected excerpts back into provider history or grant them an exemption.
@@ -547,7 +558,6 @@ export async function runRole(
             0,
             failedAssistant < 0 ? attemptStart : failedAssistant,
           );
-          security.retry();
           submitted = false;
           output = undefined;
           attempt--;
@@ -604,6 +614,8 @@ export async function runRole(
       if (submitted) return complete();
       if (limitReached)
         throw new RoleTurnLimitError("Role exceeded its turn budget");
+      correction = formatCorrection;
+      resetReason = "format_correction";
     }
     throw new RoleOutputError(
       `Role did not submit a valid result after one correction${lastValidationError ? `: ${redact(lastValidationError)}` : ""}`,

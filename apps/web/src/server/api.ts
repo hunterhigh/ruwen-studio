@@ -379,14 +379,23 @@ async function events(
               id: string;
               role_id: string;
               delta: string;
+              event_type: "delta" | "reset";
+              reset_reason: string | null;
             }>(
-              // Replay only approved deltas persisted by the worker's onDelta sink.
-              "SELECT id,role_id,delta FROM web_run_events WHERE project_id=$1 AND run_id=$2 AND id>$3 ORDER BY id LIMIT 256",
+              // Replay only approved onDelta text and fixed reset metadata from the worker sink.
+              "SELECT id,role_id,delta,event_type,reset_reason FROM web_run_events WHERE project_id=$1 AND run_id=$2 AND id>$3 ORDER BY id LIMIT 256",
               [owned.project.id, runId, cursor],
             );
             for (const row of rows.rows) {
               cursor = Number(row.id);
-              send("delta", { role: row.role_id, text: row.delta }, cursor);
+              if (row.event_type === "reset")
+                send(
+                  "reset",
+                  { role: row.role_id, reason: row.reset_reason },
+                  cursor,
+                );
+              else
+                send("delta", { role: row.role_id, text: row.delta }, cursor);
             }
             const state = await services.worker.db.pool.query(
               "SELECT status FROM pipeline_runs WHERE id=$1 AND project_id=$2",

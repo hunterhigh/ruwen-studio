@@ -271,6 +271,21 @@ export const ideationPreviews = pgTable("ideation_previews", {
   status: text("status").notNull().default("pending"),
   createdAt: time("created_at"),
 });
+export const ideationDecisions = pgTable("ideation_decisions", {
+  id: uuid("id").primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => ideationSessions.id),
+  previewId: uuid("preview_id")
+    .notNull()
+    .unique()
+    .references(() => ideationPreviews.id),
+  receipt: jsonb("receipt").notNull(),
+  createdAt: time("created_at"),
+});
 export const previews = pgTable("previews", {
   id: id(),
   projectId: uuid("project_id")

@@ -101,7 +101,44 @@ export class IdeationBackend extends IdeationSessions {
       ideationFail("NOT_FOUND");
     if (previewBytesHash(stored.snapshot) !== stored.sha256)
       ideationFail("PREVIEW_STALE");
+    if (preview.status === "pending") {
+      const changed = await this.reconcilePreviewStaleness(
+        tx,
+        actor,
+        preview.sessionId,
+        id,
+      );
+      if (changed.includes(id)) return { ...preview, status: "stale" as const };
+    }
     return preview;
+  }
+  async reconcilePreviewStaleness(
+    tx: IdeationTransaction,
+    actor: IdeationActor,
+    sessionId: string,
+    id?: string,
+  ) {
+    const current = await tx.sha256(registry.REGISTRY);
+    const rows = await tx.sql<{
+      id: string;
+      sha256: IdeationPreview["sha256"];
+      task_id: IdeationPreview["taskId"];
+    }>(
+      `UPDATE ideation_previews p SET status='stale' WHERE p.project_id=$1 AND p.session_id=$2 AND p.status='pending' AND ($4::uuid IS NULL OR p.id=$4) AND (
+      p.snapshot::jsonb->>'registrySha256' <> $3 OR
+      EXISTS(SELECT 1 FROM jsonb_array_elements(p.snapshot::jsonb->'resources') x LEFT JOIN project_files f ON f.project_id=p.project_id AND f.path=x->>'path' WHERE f.sha256 IS DISTINCT FROM x->>'sha256') OR
+      EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(p.snapshot::jsonb->'patches','[]')) x LEFT JOIN project_files f ON f.project_id=p.project_id AND f.path=CASE WHEN x->>'kind'='sections' THEN x->'resource'->>'path' ELSE x->>'path' END WHERE (x->>'kind'='create' AND f.path IS NOT NULL) OR (x->>'kind'='sections' AND f.sha256 IS DISTINCT FROM x->'resource'->>'sha256'))
+    ) RETURNING id,sha256,task_id`,
+      [actor.projectId, sessionId, current, id ?? null],
+    );
+    for (const row of rows.rows)
+      await appendIdeationEvent(tx, actor, sessionId, row.task_id, {
+        type: "preview_changed",
+        previewId: row.id as never,
+        status: "stale",
+        sha256: row.sha256,
+      });
+    return rows.rows.map((r) => r.id);
   }
   getPreview: IdeationService["getPreview"] = (actor, request) =>
     this.call(actor, async (tx) => {
@@ -121,6 +158,7 @@ export class IdeationBackend extends IdeationSessions {
         )
       )
         ideationFail("INVALID_ARGUMENT");
+      await this.reconcilePreviewStaleness(tx, actor, request.sessionId);
       const rows = await tx.sql<{ id: string; ordinal: string }>(
         "SELECT id,ordinal::text FROM ideation_previews WHERE project_id=$1 AND session_id=$2 AND ordinal>$3::bigint AND ($4::text IS NULL OR status=$4) ORDER BY ordinal LIMIT $5",
         [
@@ -149,7 +187,18 @@ export class IdeationBackend extends IdeationSessions {
     task: IdeationTask,
     snapshot: Omit<IdeationPreview, "status" | "sha256">,
   ) {
-    const sources = await rawCoordinatorSources(tx, actor, task.sessionId);
+    const revision = (
+      await tx.sql<{ session_revision: number }>(
+        "SELECT session_revision FROM ideation_tasks WHERE run_id=$1",
+        [task.id],
+      )
+    ).rows[0]?.session_revision;
+    const sources = await rawCoordinatorSources(
+      tx,
+      actor,
+      task.sessionId,
+      revision,
+    );
     assertNoOriginalWording(snapshot, sources);
     const bytes = JSON.stringify(snapshot),
       hash = previewBytesHash(bytes);
@@ -228,7 +277,6 @@ export class IdeationBackend extends IdeationSessions {
         r.scope.project !== clean.scope.project ||
         r.status !== "active" ||
         r.approval.status !== "approved" ||
-        !r.readers.includes("chuangyi-xietiaoyuan") ||
         !r.readers.includes(clean.recipient)
       )
         ideationFail("READERS_DENIED");
@@ -260,7 +308,7 @@ export class IdeationBackend extends IdeationSessions {
       sessionId: task.sessionId,
       taskId: task.id,
       sessionRevision: revision,
-      supersedesPreviewId: null,
+      supersedesPreviewId: task.sourcePreviewId,
       revision: 1,
       summary: "请确认本次干净委托。",
       scope,

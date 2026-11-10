@@ -19,6 +19,7 @@ import {
   type RoleSpec,
   type Tier,
 } from "../types.ts";
+import { ideationNewFiles, ideationSectionPatches } from "./ideation-output.ts";
 
 const bounded = (max = 1600) => str({ maxLength: max });
 const list = (max = 1600) => arr(bounded(max), { maxItems: 64 });
@@ -30,12 +31,6 @@ const scope = obj({
   scene_type: nullable(str()),
   pov: nullable(str()),
 });
-const patch = obj({
-  path: str({ minLength: 1, maxLength: 300 }),
-  base_sha256: str({ pattern: "^[a-f0-9]{64}$" }),
-  new_content: bounded(100_000),
-});
-const patches = arr(patch, { maxItems: 32 });
 const creativePayload = obj({
   fixed: list(600),
   creative_value: bounded(1200),
@@ -101,7 +96,8 @@ const outputs: Record<
       conflicts: list(),
       scope_changes: list(),
       writes_requested: list(),
-      patches,
+      patches: ideationSectionPatches,
+      new_files: ideationNewFiles,
     }),
   },
   "waibu-zhishi-guwen": {
@@ -140,7 +136,8 @@ const outputs: Record<
       summary: bounded(6000),
       locked_events: list(600),
       open_questions: list(),
-      patches,
+      patches: ideationSectionPatches,
+      new_files: ideationNewFiles,
     }),
   },
   "zhangjie-qingjing-bianyiyuan": {

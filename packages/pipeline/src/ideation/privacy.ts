@@ -8,8 +8,69 @@ export function assertNoOriginalWording(
   value: unknown,
   sources: readonly string[],
 ) {
+  // Public technical identifiers are reference tokens, not creative wording. Their ownership,
+  // format and hashes are validated separately; free text (including nested content) stays scanned.
+  const technical = new Set([
+    "id",
+    "resource_id",
+    "resource_ids",
+    "resourceId",
+    "projectId",
+    "sessionId",
+    "taskId",
+    "turnId",
+    "runId",
+    "previewId",
+    "sourcePreviewId",
+    "supersedesPreviewId",
+    "decisionId",
+    "sha256",
+    "base_sha256",
+    "baseSha256",
+    "afterSha256",
+    "registrySha256",
+    "payloadSha256",
+    "path",
+    "resource_path",
+    "createdAt",
+    "revision",
+    "version",
+    "role",
+    "recipient",
+    "sender",
+    "type",
+    "kind",
+    "status",
+    "owner",
+    "readers",
+    "allowAuthor",
+    "supersedes",
+  ]);
+  const text = (v: unknown): unknown =>
+    Array.isArray(v)
+      ? v.map(text)
+      : v && typeof v === "object"
+        ? Object.fromEntries(
+            Object.entries(v)
+              .filter(([key]) => !technical.has(key))
+              .map(([key, value]) => [key, text(value)]),
+          )
+        : v;
+  const words = text(value);
+  const leaves = (v: unknown): string[] =>
+    typeof v === "string"
+      ? [v]
+      : Array.isArray(v)
+        ? v.flatMap(leaves)
+        : v && typeof v === "object"
+          ? Object.values(v).flatMap(leaves)
+          : [];
+  const joined = leaves(words).join("");
   for (const source of sources)
-    if (handoff.sourceOverlapErrors({ value: value as never }, source).length)
+    if (
+      handoff.sourceOverlapErrors({ value: words as never, joined }, source)
+        .length
+    )
       ideationFail("OUTPUT_BLOCKED");
 }
 export class OriginalWordingStream {

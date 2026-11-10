@@ -345,6 +345,7 @@ export async function runRole(
     const execute = tool.execute;
     tool.execute = async (...args) => {
       const result = await execute(...args);
+      ctx.onToolMaterial?.(result.details, id);
       security.detector.addMaterial(result);
       return result;
     };
@@ -412,9 +413,11 @@ export async function runRole(
       });
     },
     getApiKey: (provider) => ctx.runtime.apiKey?.(provider),
-    ...(ctx.loadCoordinatorInput
+    ...(ctx.loadCoordinatorInput || ctx.beforeProviderRequest
       ? {
           prepareRequest: async ({ context }) => {
+            await ctx.beforeProviderRequest?.();
+            if (!ctx.loadCoordinatorInput) return undefined;
             if (id !== "chuangyi-xietiaoyuan")
               throw new RoleOutputError(
                 "Conversation reload is coordinator-only",

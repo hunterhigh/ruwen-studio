@@ -17,12 +17,16 @@ import type {
   IdeationActor,
   IdeationErrorCode,
   IdeationMessageId,
+  IdeationRole,
   IdeationRunId,
   IdeationTaskStatus,
 } from "@ruwen/pipeline";
 import type { PgBoss } from "pg-boss";
 import { rawCoordinatorSources } from "../../../packages/pipeline/src/ideation/backend.ts";
-import { OriginalWordingStream } from "../../../packages/pipeline/src/ideation/privacy.ts";
+import {
+  assertNoOriginalWording,
+  OriginalWordingStream,
+} from "../../../packages/pipeline/src/ideation/privacy.ts";
 import {
   appendIdeationEvent,
   IdeationFailure,
@@ -37,7 +41,7 @@ import { persistPrivatePrompt } from "./private-prompts.ts";
 import { recordRoleSecurityEvents } from "./security-events.ts";
 import type { Task, WorkerOptions } from "./service.ts";
 
-const role = "chuangyi-xietiaoyuan" as const;
+const coordinatorRole = "chuangyi-xietiaoyuan" as const;
 export class IdeationRunner {
   private db: Database;
   private boss: PgBoss;
@@ -119,6 +123,7 @@ export class IdeationRunner {
     }
   }
   async handle(job: Task, jobSignal?: AbortSignal) {
+    let role: IdeationRole = coordinatorRole;
     const actor = {
       projectId: job.projectId,
       userId: job.ownerId,
@@ -189,9 +194,17 @@ export class IdeationRunner {
         ].includes(task.status)
       )
         return;
-      if (task.role !== role || task.stage !== "coordinator")
+      role = task.role;
+      const coordinator = role === coordinatorRole;
+      if (coordinator && task.stage !== "coordinator")
         throw new IdeationFailure("PRECONDITION_FAILED");
-      const initial = await service.coordinatorInput(actor, job.runId);
+      const execution = coordinator
+        ? undefined
+        : await service.executionInput(actor, job.runId);
+      const initial = coordinator
+        ? await service.coordinatorInput(actor, job.runId)
+        : execution?.input;
+      if (!initial) throw new IdeationFailure("PRECONDITION_FAILED");
       const runtime =
         this.options.runtimeForRequest?.({ sessionId: task.sessionId }) ??
         this.options.runtime();
@@ -250,9 +263,15 @@ export class IdeationRunner {
       };
       timer = setInterval(poll, 100);
       poll();
-      const raw = await service.store.transaction(actor, (tx) =>
-        rawCoordinatorSources(tx, actor, task.sessionId),
-      );
+      const raw = await service.store.transaction(actor, async (tx) => {
+        const boundary = (
+          await tx.sql<{ session_revision: number }>(
+            "SELECT session_revision FROM ideation_tasks WHERE run_id=$1",
+            [task.id],
+          )
+        ).rows[0]?.session_revision;
+        return rawCoordinatorSources(tx, actor, task.sessionId, boundary);
+      });
       const wording = new OriginalWordingStream(raw, (text) =>
         event(task.sessionId, { type: "delta", role, text: text as never }),
       );
@@ -262,18 +281,63 @@ export class IdeationRunner {
         result = await runRole(role, initial, {
           fs,
           projectId: actor.projectId,
-          projectKey: String((initial.project_state as Data).project),
+          projectKey: String(
+            coordinator
+              ? (initial.project_state as Data).project
+              : (initial.scope as Data).project,
+          ),
           runtime,
           signal,
           timeoutMs: this.options.roleTimeoutMs ?? 600000,
-          loadCoordinatorInput: async () => {
-            try {
-              return await service.coordinatorInput(actor, job.runId);
-            } catch (error) {
-              if (error instanceof IdeationFailure) requestGuardFailure = error;
-              throw error;
-            }
-          },
+          ...(coordinator
+            ? {
+                loadCoordinatorInput: async () => {
+                  try {
+                    return await service.coordinatorInput(actor, job.runId);
+                  } catch (error) {
+                    if (error instanceof IdeationFailure)
+                      requestGuardFailure = error;
+                    throw error;
+                  }
+                },
+              }
+            : {
+                onResourceRead: (resource: Data) => {
+                  try {
+                    assertNoOriginalWording(resource, raw);
+                  } catch (error) {
+                    if (error instanceof IdeationFailure)
+                      requestGuardFailure = error;
+                    throw error;
+                  }
+                },
+              }),
+          ...(execution?.search
+            ? { search: execution.search, searchApproved: true }
+            : {}),
+          ...(!coordinator
+            ? {
+                beforeProviderRequest: async () => {
+                  try {
+                    if (requestGuardFailure) throw requestGuardFailure;
+                    await service.executionInput(actor, job.runId);
+                  } catch (error) {
+                    if (error instanceof IdeationFailure)
+                      requestGuardFailure = error;
+                    throw error;
+                  }
+                },
+                onToolMaterial: (material: Data) => {
+                  try {
+                    assertNoOriginalWording(material, raw);
+                  } catch (error) {
+                    if (error instanceof IdeationFailure)
+                      requestGuardFailure = error;
+                    throw error;
+                  }
+                },
+              }
+            : {}),
           onPrompt: (prompt) => persistPrivatePrompt(fs, prompt),
           onDelta: (text) => {
             if (!wording.push(text)) hiddenQuote = true;
@@ -292,6 +356,7 @@ export class IdeationRunner {
             actor,
             task.id,
             error.partial,
+            role,
             !requestGuardFailure &&
               (error instanceof RoleAbortError ||
                 error instanceof RoleProviderError),
@@ -299,8 +364,11 @@ export class IdeationRunner {
           );
         throw error;
       }
-      wording.finish();
       completedResult = result;
+      if (requestGuardFailure) throw requestGuardFailure;
+      wording.finish();
+      if (hiddenQuote && !coordinator)
+        throw new IdeationFailure("OUTPUT_BLOCKED");
       if (hiddenQuote) {
         event(task.sessionId, {
           type: "reset",
@@ -330,7 +398,9 @@ export class IdeationRunner {
         ).rows[0]?.cancel_requested;
         const preview =
           typeof result.output === "object" && !cancelled
-            ? await service.saveHandoff(tx, actor, current, result.output)
+            ? coordinator
+              ? await service.saveHandoff(tx, actor, current, result.output)
+              : await service.saveDownstream(tx, actor, current, result)
             : null;
         const content =
           typeof result.output === "string"
@@ -343,24 +413,32 @@ export class IdeationRunner {
             [job.runId],
           )
         ).rows[0]?.session_revision;
-        await tx.sql(
-          "INSERT INTO ideation_messages(id,project_id,session_id,turn_id,role,content,session_revision) VALUES($1,$2,$3,$4,'assistant',$5,$6)",
-          [
-            messageId,
-            actor.projectId,
-            task.sessionId,
-            task.id,
-            JSON.stringify(content),
-            revision,
-          ],
-        );
-        await this.saveRole(tx, actor, job.runId, result, "completed");
-        const status = cancelled ? "CANCELLED" : "SUCCEEDED";
+        if (coordinator)
+          await tx.sql(
+            "INSERT INTO ideation_messages(id,project_id,session_id,turn_id,role,content,session_revision) VALUES($1,$2,$3,$4,'assistant',$5,$6)",
+            [
+              messageId,
+              actor.projectId,
+              task.sessionId,
+              task.id,
+              JSON.stringify(content),
+              revision,
+            ],
+          );
+        await this.saveRole(tx, actor, job.runId, result, "completed", role);
+        const status = cancelled
+          ? "CANCELLED"
+          : coordinator
+            ? "SUCCEEDED"
+            : task.stage === "learning_plan"
+              ? "AWAITING_LEARNING_PLAN_APPROVAL"
+              : "AWAITING_PREVIEW_APPROVAL";
         await tx.sql(
           "UPDATE pipeline_runs SET status=$2,finished_at=now() WHERE id=$1",
           [job.runId, status],
         );
-        await service.options.onTaskTerminal?.(tx, actor, task.id);
+        if (cancelled || coordinator)
+          await service.options.onTaskTerminal?.(tx, actor, task.id);
         await tx.sql(
           "UPDATE ideation_sessions SET current_turn_id=NULL,updated_at=now() WHERE id=$1 AND current_turn_id=$2",
           [task.sessionId, job.runId],
@@ -372,12 +450,13 @@ export class IdeationRunner {
             JSON.stringify({ messageId, previewId: preview?.id ?? null }),
           ],
         );
-        await appendIdeationEvent(tx, actor, task.sessionId, task.id, {
-          type: "message_changed",
-          messageId,
-          turnId: task.id,
-          status: "complete",
-        });
+        if (coordinator)
+          await appendIdeationEvent(tx, actor, task.sessionId, task.id, {
+            type: "message_changed",
+            messageId,
+            turnId: task.id,
+            status: "complete",
+          });
         await appendIdeationEvent(tx, actor, task.sessionId, task.id, {
           type: "task_changed",
           taskId: task.id,
@@ -392,6 +471,7 @@ export class IdeationRunner {
           actor,
           job.runId as IdeationRunId,
           completedResult,
+          role,
         );
       const code: IdeationErrorCode = requestGuardFailure
         ? requestGuardFailure.code
@@ -412,9 +492,14 @@ export class IdeationRunner {
       await service.store.transaction(actor, async (tx) => {
         const task = await service.ownedTask(tx, actor, job.runId);
         if (
-          ["SUCCEEDED", "CANCELLED", "FAILED", "INTERRUPTED"].includes(
-            task.status,
-          )
+          [
+            "SUCCEEDED",
+            "CANCELLED",
+            "FAILED",
+            "INTERRUPTED",
+            "AWAITING_PREVIEW_APPROVAL",
+            "AWAITING_LEARNING_PLAN_APPROVAL",
+          ].includes(task.status)
         )
           return;
         const status: IdeationTaskStatus =
@@ -468,6 +553,7 @@ export class IdeationRunner {
     runId: string,
     result: RoleResult,
     status: string,
+    role: IdeationRole,
     usageUnknown = false,
     blockedBeforeRequest = false,
   ) {
@@ -513,6 +599,7 @@ export class IdeationRunner {
     actor: IdeationActor,
     runId: IdeationRunId,
     result: RoleResult,
+    role: IdeationRole,
     usageUnknown = false,
     blockedBeforeRequest = false,
   ) {
@@ -524,6 +611,7 @@ export class IdeationRunner {
         runId,
         { ...result, output: "", transcript: [] },
         "failed",
+        role,
         usageUnknown,
         blockedBeforeRequest,
       ),

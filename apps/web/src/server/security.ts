@@ -89,7 +89,7 @@ export function securityHeaders(
   return {
     "Content-Security-Policy": `default-src 'self'; script-src 'self' 'nonce-${nonce}'${development ? " 'unsafe-eval'" : ""}; style-src 'self' 'nonce-${nonce}'; img-src 'self'; font-src 'self'; connect-src 'self'${development ? " wss://localhost:* wss://127.0.0.1:*" : ""}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`,
     "X-Content-Type-Options": "nosniff",
-    "Referrer-Policy": "no-referrer",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
     "X-Frame-Options": "DENY",
     "Permissions-Policy":
       "camera=(), microphone=(), geolocation=(), payment=()",

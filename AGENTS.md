@@ -35,7 +35,7 @@ pnpm --filter web dev
 
 ## P5安全要求（2026-11-09人类补充）
 
-- 人类的`docs/security/SECURITY-DESIGN.md`由并行线程提交；收到后完整阅读，逐项落实第5节主线程S1-1至S1-4及3.3节第4条。在文档到达前不能声称按全文验收完成。
+- 人类的`docs/security/SECURITY-DESIGN.md`已合并；修改P5前阅读该文档，按正式编号核对：S1-1渲染/CSP，S1-2归属，S1-3 CSRF/会话/限流，S1-4风控及审计；CSP按3.3第4条。S1-4本线程负责界面和网页管理访问审计，冻结执行由并行线程实现，未接入时必须如实标注。
 - 用户与模型内容只通过统一SafeMarkdown组件显示：不允许原始HTML或图片，只允许HTTPS链接并加noopener noreferrer nofollow；lint禁止原始HTML注入。
 - HTTPS入口设置CSP与安全响应头。所有资源ID接口、SSE与导出统一requireOwnership，逐路由执行A→B返回404测试；新增路由漏测须使pnpm test/CI失败。
 - 所有应用状态变更校验CSRF；Cookie必须HttpOnly、Secure、SameSite=Lax；登录按IP及邮箱限流。P5阶段报告单列安全自查。

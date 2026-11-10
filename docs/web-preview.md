@@ -1,6 +1,6 @@
 # 本机网页预览（P5开发中）
 
-运行`pnpm install`后，在仓库根目录执行`pnpm dev`，保持终端运行，打开`https://localhost:3000`。服务只绑定127.0.0.1。首次使用本地生成证书时，浏览器会显示证书未受信任；只对这个本机地址继续访问，不需要修改系统信任库。
+运行`pnpm install`后，先在当前终端设置独立随机RUWEN_CANARY环境变量，再执行`pnpm dev`。PowerShell可使用`$env:RUWEN_CANARY = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))`；赋值不会输出内容，不把标记写进文件或.env。保持终端运行，打开`https://localhost:3000`。服务只绑定127.0.0.1。首次使用本地生成证书时，浏览器会显示证书未受信任；只对这个本机地址继续访问，不需要修改系统信任库。
 
 登录页填写任意测试邮箱，邀请码`RUWEN-PREVIEW`，点击发送后打开“本浏览器的预览邮件”。该邮件入口只在本机faux/replay开发模式生效，不验证真实邮箱所有权。生产入口禁用预览邮箱，需要真实SMTP或Google配置。`preview@ruwen.local`在默认本机启动配置中具有管理页面权限；可用ADMIN_EMAILS覆盖。
 
@@ -15,3 +15,5 @@
 验证命令：`pnpm lint`、`pnpm typecheck`、`pnpm test`；`pnpm test:e2e`先构建生产网页，再验证开发预览和另起的本机生产HTTPS入口。首次运行浏览器测试先执行`pnpm exec playwright install chromium`。测试使用当前本机预览数据库，只创建测试账户和项目，不访问真实模型或支付服务。开发服务器自身的调试UI会有被严格CSP阻止的样式；产品渲染与生产CSP另有浏览器验证，没有因此开启unsafe-inline。
 
 部署入口必须使用`pnpm --filter web start`（自建HTTPS/nonce头入口），配置DATABASE_URL、BETTER_AUTH_SECRET、BETTER_AUTH_URL、RUWEN_WORKSPACE_ROOT、TLS_KEY_FILE和TLS_CERT_FILE。部署、证书托管、反向代理信任与公网运维在P7再做；当前并未部署公开预览。
+
+2026-11-10安全更新：登录链接15分钟过期且一次性；账户页可登出所有设备；外站链接在点击时先确认。管理页显示现有风险分、设计配置对照与访问审计；冻结/解冻服务未接入，按钮禁用，状态不作正常或冻结判断。

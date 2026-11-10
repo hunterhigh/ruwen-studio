@@ -1,7 +1,11 @@
 "use client";
+import { useState } from "react";
+import { post } from "./client.ts";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
 import { useApi } from "./useApi.ts";
 export function Account() {
+  const [sessionError, setSessionError] = useState(""),
+    [revoking, setRevoking] = useState(false);
   const { data, error } = useApi<{
     user: { email: string };
     balance: string;
@@ -31,9 +35,9 @@ export function Account() {
           </p>
         </div>
       </header>
-      {error && (
+      {(error || sessionError) && (
         <div role="alert" className="error">
-          <SafeMarkdown plain content={error} />
+          <SafeMarkdown plain content={error || sessionError} />
         </div>
       )}
       <section className="account-note">
@@ -44,6 +48,29 @@ export function Account() {
         </p>
         <button type="button" className="button secondary" disabled>
           充值尚未开放
+        </button>
+      </section>
+      <section className="paper-panel">
+        <h2>账户安全</h2>
+        <p>
+          登出所有设备会撤销当前账户的全部会话，包括此浏览器。再次进入工作室时需要重新登录。
+        </p>
+        <button
+          type="button"
+          className="button secondary"
+          disabled={revoking || !data}
+          onClick={() => {
+            if (!window.confirm("确认登出所有设备，包括当前浏览器？")) return;
+            setRevoking(true);
+            void post("/api/auth/revoke-sessions")
+              .then(() => window.location.assign("/sign-in"))
+              .catch((error: Error) => {
+                setSessionError(error.message);
+                setRevoking(false);
+              });
+          }}
+        >
+          {revoking ? "正在撤销会话…" : "登出所有设备"}
         </button>
       </section>
       <h2 className="section-title">岗位用量明细</h2>

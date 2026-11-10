@@ -1,5 +1,7 @@
 "use client";
 import { useState } from "react";
+import type { AdminRiskReview } from "../server/admin-review.ts";
+import { AdminSecurity } from "./AdminSecurity.tsx";
 import { post } from "./client.ts";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
 import { useApi } from "./useApi.ts";
@@ -9,6 +11,7 @@ export function Admin() {
       projects: number;
       failures: unknown[];
       release: unknown;
+      security: AdminRiskReview;
     }>("/api/admin"),
     [code, setCode] = useState(""),
     [error, setError] = useState("");
@@ -33,6 +36,7 @@ export function Admin() {
         <p>每个邀请码仅可使用一次。公开注册与真实收费受服务端闸门保护。</p>
         <button
           type="button"
+          disabled={!data}
           className="button primary"
           onClick={() => {
             void post<{ code: string }>("/api/admin/invitations")
@@ -44,6 +48,7 @@ export function Admin() {
         </button>
         {code && <SafeMarkdown plain content={code} />}
       </section>
+      {data?.security && <AdminSecurity review={data.security} />}
       <section className="paper-panel">
         <h2>失败任务</h2>
         <SafeMarkdown

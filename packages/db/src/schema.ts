@@ -353,3 +353,10 @@ export const securityEvents = pgTable(
   },
   (t) => [uniqueIndex("security_event_once").on(t.runId, t.roleId, t.kind)],
 );
+export const webAdminAudit = pgTable("web_admin_audit", {
+  id: id(),
+  actorId: uuid("actor_id").references(() => users.id),
+  action: text("action").notNull(),
+  outcome: text("outcome").notNull(),
+  createdAt: time("created_at"),
+});

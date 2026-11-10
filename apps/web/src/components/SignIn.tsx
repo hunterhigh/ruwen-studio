@@ -121,7 +121,7 @@ export function SignIn({
         </form>
         {sent && (
           <output className="notice" aria-live="polite">
-            登录链接已发送，请在五分钟内打开。
+            登录链接已发送，请在有效期内打开。
             {preview && (
               <button type="button" className="text-button" onClick={mailbox}>
                 打开本浏览器的预览邮件

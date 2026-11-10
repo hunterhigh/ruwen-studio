@@ -364,6 +364,16 @@ it("CSP is nonce based with no raw inline HTML permission and security headers d
   expect(headers["Content-Security-Policy"]).toContain("img-src 'self'");
   expect(headers["X-Frame-Options"]).toBe("DENY");
   expect(headers["X-Content-Type-Options"]).toBe("nosniff");
+  expect(headers["Referrer-Policy"]).toBe("strict-origin-when-cross-origin");
+  for (const directive of [
+    "default-src 'self'",
+    "connect-src 'self'",
+    "frame-ancestors 'none'",
+    "base-uri 'none'",
+    "form-action 'self'",
+  ])
+    expect(headers["Content-Security-Policy"]).toContain(directive);
+  expect(headers["Strict-Transport-Security"]).toContain("max-age=");
   expect(cookie(CSRF_COOKIE, token, 300)).toContain(
     "HttpOnly; Secure; SameSite=Lax",
   );

@@ -30,11 +30,19 @@
   },
   "preview": { "invitationCode": "RUWEN-PREVIEW", "sessionHours": 24 },
   "security": {
+    "magicLinkMinutes": 15,
     "loginWindowSeconds": 600,
     "loginIpLimit": 10,
     "loginEmailLimit": 5,
     "csrfHours": 24,
     "maxUploadBytes": 20971520
+  },
+  "riskReview": {
+    "userChapterConcurrency": 2,
+    "projectConcurrency": 1,
+    "coordinatorTurnsPerHour": 60,
+    "dailyPlanPercent": 30,
+    "trialChapterRange": [1, 2]
   },
   "stream": {
     "pollIntervalMs": 250,

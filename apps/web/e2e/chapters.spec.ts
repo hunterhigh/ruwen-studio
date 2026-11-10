@@ -3,11 +3,9 @@ import { fileURLToPath } from "node:url";
 import { expect, type Page, test } from "@playwright/test";
 import { exportProjectZip, LocalDirFS, type ProjectFS } from "@ruwen/core";
 
-async function signIn(page: Page) {
+async function signIn(page: Page, email = `${randomUUID()}@test.invalid`) {
   await page.goto("/sign-in");
-  await page
-    .getByLabel("邮箱", { exact: true })
-    .fill(`${randomUUID()}@test.invalid`);
+  await page.getByLabel("邮箱", { exact: true }).fill(email);
   await page.getByLabel("如何称呼你").fill("试读者");
   await page.getByLabel("邀请码").fill("RUWEN-PREVIEW");
   await page.getByRole("button", { name: "发送登录链接" }).click();
@@ -73,7 +71,77 @@ test("imported user Markdown cannot execute HTML, load images or create non-http
     content.getByRole("link", { name: "允许的链接" }),
   ).toHaveAttribute("rel", "noopener noreferrer nofollow");
   expect(externalRequests).toEqual([]);
+  let externalWarning = "";
+  let popups = 0;
+  page.on("popup", () => {
+    popups++;
+  });
+  page.once("dialog", async (dialog) => {
+    externalWarning = dialog.message();
+    await dialog.dismiss();
+  });
+  await content.getByRole("link", { name: "允许的链接" }).click();
+  expect(externalWarning).toContain("https://example.com");
+  expect(popups).toBe(0);
   expect(await page.evaluate(() => "XSS_SENTINEL" in globalThis)).toBe(false);
+});
+test("account can sign out every device using the CSRF-protected session endpoint", async ({
+  page,
+  browser,
+}) => {
+  const email = `${randomUUID()}@test.invalid`;
+  await signIn(page, email);
+  const secondContext = await browser.newContext({
+    ignoreHTTPSErrors: true,
+    baseURL: "https://localhost:3000",
+  });
+  try {
+    const second = await secondContext.newPage();
+    await signIn(second, email);
+    expect((await second.request.get("/api/session")).status()).toBe(200);
+    await page.goto("/account");
+    page.once("dialog", (dialog) => dialog.accept());
+    await page
+      .getByRole("button", { name: "登出所有设备", exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/sign-in$/);
+    expect((await page.request.get("/api/session")).status()).toBe(401);
+    expect((await second.request.get("/api/session")).status()).toBe(401);
+  } finally {
+    await secondContext.close();
+  }
+});
+test("admin risk UI states backend freeze is pending and every dashboard access is audited", async ({
+  page,
+}, testInfo) => {
+  await signIn(page, "preview@ruwen.local");
+  await page.getByRole("link", { name: "管理工作室", exact: true }).click();
+  await expect(
+    page.getByText("冻结执行服务尚未接入", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "冻结运行（待后端接入）", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("heading", {
+      name: "管理访问审计（最近100条）",
+      exact: true,
+    }),
+  ).toBeVisible();
+  const response = await page.request.get("/api/admin");
+  expect(response.status()).toBe(200);
+  const payload = await response.json();
+  expect(payload.security.enforcement).toBe("pending_backend");
+  expect(payload.security.audit).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ action: "dashboard_page", outcome: "allowed" }),
+      expect.objectContaining({ action: "dashboard_data", outcome: "allowed" }),
+    ]),
+  );
+  await page.screenshot({
+    path: testInfo.outputPath("admin-security.png"),
+    fullPage: true,
+  });
 });
 test("real browser: register, project, paced SSE, two approvals, files/export, ownership, CSRF, mobile", async ({
   page,

@@ -1278,3 +1278,35 @@ textarea {
     scroll-behavior: auto;
   }
 }
+
+.admin-security {
+  margin-top: 36px;
+}
+.risk-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 24px;
+}
+.risk-controls dt {
+  color: var(--steel);
+  font-size: 12px;
+}
+.risk-controls dd {
+  margin: 8px 0 0;
+  font-size: 16px;
+}
+.risk-controls small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 5px;
+}
+.admin-security .table-scroll {
+  max-height: 420px;
+  overflow: auto;
+}
+.admin-security th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}

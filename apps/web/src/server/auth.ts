@@ -98,6 +98,7 @@ export function createWebAuth(db: Database, options: AuthEnvironment) {
     },
     plugins: [
       magicLink({
+        expiresIn: runtimeSettings().security.magicLinkMinutes * 60,
         storeToken: "hashed",
         sendMagicLink: async ({ email, url, metadata }) => {
           if (options.preview) {
@@ -116,7 +117,9 @@ export function createWebAuth(db: Database, options: AuthEnvironment) {
               JSON.stringify({
                 email,
                 url,
-                expiresAt: Date.now() + 5 * 60_000,
+                expiresAt:
+                  Date.now() +
+                  runtimeSettings().security.magicLinkMinutes * 60_000,
               }),
               { mode: 0o600 },
             );
@@ -127,7 +130,7 @@ export function createWebAuth(db: Database, options: AuthEnvironment) {
             from: options.smtpFrom ?? "如文工作室 <noreply@localhost>",
             to: email,
             subject: "登录如文工作室",
-            text: `请打开此链接登录，有效期五分钟：\n${url}\n若非本人操作，请忽略。`,
+            text: `请打开此链接登录，有效期${runtimeSettings().security.magicLinkMinutes}分钟：\n${url}\n若非本人操作，请忽略。`,
           });
         },
       }),

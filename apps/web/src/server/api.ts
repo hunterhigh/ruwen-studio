@@ -16,6 +16,12 @@ import {
   releasePolicy,
   runtimeSettings,
 } from "../../../../config/settings.ts";
+import {
+  type AdminAction,
+  adminAllowed,
+  adminRiskReview,
+  auditAdmin,
+} from "./admin-review.ts";
 import { newMailbox, previewMail, redeemInvitation } from "./auth.ts";
 import { type Resource, requireOwnership } from "./ownership.ts";
 import {
@@ -210,11 +216,22 @@ export async function authenticated(request: Request, services: WebServices) {
   const session = await services.auth.api.getSession({
     headers: request.headers,
   });
-  if (!session) throw new HttpError(401, "请先登录。");
+  if (!session) {
+    if (new URL(request.url).pathname.startsWith("/api/admin"))
+      await auditAdmin(
+        services.worker.db.pool,
+        null,
+        new URL(request.url).pathname.endsWith("/invitations")
+          ? "invitation_create"
+          : "dashboard_data",
+        false,
+      );
+    throw new HttpError(401, "请先登录。");
+  }
   return session.user;
 }
 const isAdmin = (services: WebServices, email: string) =>
-  services.adminEmails.includes(email.toLowerCase());
+  adminAllowed(services.adminEmails, email);
 export async function runDetail(
   services: WebServices,
   userId: string,
@@ -484,17 +501,40 @@ export async function handleApi(
       return json(
         { sent: true, previewMailbox: services.environment.preview },
         200,
-        { "Set-Cookie": cookie(MAILBOX_COOKIE, mailbox, 300) },
+        {
+          "Set-Cookie": cookie(
+            MAILBOX_COOKIE,
+            mailbox,
+            runtimeSettings().security.magicLinkMinutes * 60,
+          ),
+        },
       );
     }
     const user = await authenticated(request, services);
+    const adminAction: AdminAction | undefined = route.pattern.startsWith(
+      "/api/admin",
+    )
+      ? route.pattern.endsWith("/invitations")
+        ? "invitation_create"
+        : "dashboard_data"
+      : undefined;
     const owned = route.resource
       ? await requireOwnership(db, user.id, {
           [route.resource]: params[route.resource],
         } as Resource)
       : undefined;
-    if (request.method !== "GET")
-      requireCsrf(request, services.environment.baseURL);
+    if (request.method !== "GET") {
+      try {
+        requireCsrf(request, services.environment.baseURL);
+      } catch (error) {
+        if (adminAction) await auditAdmin(db.pool, user.id, adminAction, false);
+        throw error;
+      }
+    }
+    if (adminAction && !isAdmin(services, user.email)) {
+      await auditAdmin(db.pool, user.id, adminAction, false);
+      throw new HttpError(404, "资源不存在。");
+    }
     if (route.pattern === "/api/session")
       return json({ user, admin: isAdmin(services, user.email) });
     if (route.pattern === "/api/settings") {
@@ -734,13 +774,18 @@ export async function handleApi(
         throw new HttpError(404, "资源不存在。");
       if (request.method === "POST") {
         const code = randomBytes(18).toString("hex");
-        await db.pool.query(
-          "INSERT INTO web_invitations(token_hash,max_uses) VALUES($1,1)",
-          [hash(code)],
-        );
+        await db.transaction(async (client) => {
+          await client.query(
+            "INSERT INTO web_invitations(token_hash,max_uses) VALUES($1,1)",
+            [hash(code)],
+          );
+          await auditAdmin(client, user.id, "invitation_create", true);
+        });
         return json({ code });
       }
+      await auditAdmin(db.pool, user.id, "dashboard_data", true);
       return json({
+        security: await adminRiskReview(db),
         users: (await db.pool.query("SELECT count(*)::int count FROM users"))
           .rows[0]?.count,
         projects: (

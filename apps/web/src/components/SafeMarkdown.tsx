@@ -1,3 +1,5 @@
+"use client";
+import type { MouseEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
@@ -9,6 +11,14 @@ export function safeLink(href: string | undefined) {
   } catch {
     return undefined;
   }
+}
+function confirmExternal(event: MouseEvent<HTMLAnchorElement>) {
+  const target = new URL(event.currentTarget.href);
+  if (
+    target.origin !== window.location.origin &&
+    !window.confirm(`即将打开外部网站：${target.origin}\n请确认是否继续。`)
+  )
+    event.preventDefault();
 }
 /** The sole renderer for user/model content. No HTML plugin, external image or caller-supplied renderer. */
 export function SafeMarkdown({
@@ -70,7 +80,15 @@ export function SafeMarkdown({
         a: ({ href, children }) => {
           const url = safeLink(href);
           return url ? (
-            <a href={url} target="_blank" rel="noopener noreferrer nofollow">
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              onClick={confirmExternal}
+              onAuxClick={(event) => {
+                if (event.button === 1) confirmExternal(event);
+              }}
+            >
               {children}
             </a>
           ) : (

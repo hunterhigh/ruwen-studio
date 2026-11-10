@@ -47,6 +47,17 @@ it("0003 atomically removes every old prompt copy, including file history and sy
       transcript: [
         { role: "system", content: secret },
         { role: "user", content: "稿件" },
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "thinking",
+              thinking: "PRIVATE_THINKING_MIGRATION_TEST",
+              thinkingSignature: "PRIVATE_SIGNATURE_MIGRATION_TEST",
+            },
+            { type: "text", text: "公开结果" },
+          ],
+        },
       ],
     });
     const paths = [
@@ -80,12 +91,32 @@ it("0003 atomically removes every old prompt copy, including file history and sy
         run,
         hash,
         artifact,
-        JSON.stringify([{ role: "system", content: secret }]),
+        JSON.stringify([
+          { role: "system", content: secret },
+          {
+            role: "assistant",
+            content: [
+              { type: "thinking", thinking: "PRIVATE_THINKING_MIGRATION_TEST" },
+            ],
+          },
+        ]),
       ],
     );
     await client.query(
       await readFile(
         new URL("../migrations/0003_private_prompts.sql", import.meta.url),
+        "utf8",
+      ),
+    );
+    await client.query(
+      await readFile(
+        new URL("../migrations/0004_security_events.sql", import.meta.url),
+        "utf8",
+      ),
+    );
+    await client.query(
+      await readFile(
+        new URL("../migrations/0005_private_thinking.sql", import.meta.url),
         "utf8",
       ),
     );
@@ -100,6 +131,10 @@ it("0003 atomically removes every old prompt copy, including file history and sy
       );
       expect(files.rows.some((r) => r.path.includes("/prompts/"))).toBe(false);
       for (const file of files.rows) expect(file.body).not.toContain(secret);
+      for (const file of files.rows) {
+        expect(file.body).not.toContain("PRIVATE_THINKING_MIGRATION_TEST");
+        expect(file.body).not.toContain("PRIVATE_SIGNATURE_MIGRATION_TEST");
+      }
     }
     const preserved = await client.query(
       "SELECT content FROM project_files WHERE path='chapters/001.md'",
@@ -109,8 +144,13 @@ it("0003 atomically removes every old prompt copy, including file history and sy
       "SELECT result,transcript FROM role_runs",
     );
     expect(JSON.stringify(result.rows)).not.toContain(secret);
+    expect(JSON.stringify(result.rows)).not.toContain(
+      "PRIVATE_THINKING_MIGRATION_TEST",
+    );
     expect(result.rows[0].result.output).toBe("clean output");
-    expect(result.rows[0].transcript).toEqual([]);
+    expect(result.rows[0].transcript).toEqual([
+      { role: "assistant", content: [] },
+    ]);
   } finally {
     await client.query("ROLLBACK");
     client.release();

@@ -3,7 +3,10 @@ import { randomBytes } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { deploymentCanary } from "../packages/agents/src/security/notes.ts";
 import { Database } from "../packages/db/src/index.ts";
+
+deploymentCanary();
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const directory = path.join(root, ".local");

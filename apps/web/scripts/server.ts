@@ -4,6 +4,7 @@ import { createServer } from "node:https";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { deploymentCanary } from "@ruwen/agents";
 import type {
   NextBundlerOptions,
   NextServer,
@@ -11,6 +12,8 @@ import type {
 } from "next/dist/server/next.js";
 import { generate } from "selfsigned";
 import { securityHeaders } from "../src/server/security.ts";
+
+deploymentCanary();
 
 const root = fileURLToPath(new URL("../../../", import.meta.url)),
   directory = path.join(root, ".local/tls");

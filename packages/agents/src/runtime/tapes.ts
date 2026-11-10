@@ -9,11 +9,13 @@ import {
   normalizeContext,
   type TranscriptContext,
 } from "@earendil-works/pi-ai";
-import { LeakDetector } from "@ruwen/core";
+import { LeakDetector, withoutThinking } from "@ruwen/core";
+import { securityLimits } from "../../../../config/security.ts";
 import { deploymentCanary } from "../security/notes.ts";
+import { publicTemplateMaterials } from "../security/public-templates.ts";
 import {
   INTERNAL_REFUSAL,
-  SECURITY_ROLE_FAILURE,
+  recordedSecurityFailure,
 } from "../security/role-security.ts";
 import type { ModelRuntime } from "../types.ts";
 import { forwardStream } from "./stream.ts";
@@ -38,7 +40,14 @@ function privateContext(
     ...context,
     messages: context.messages.map((item) => {
       const message = item as unknown as Record<string, unknown>;
-      if (message.role !== "system") return structuredClone(message);
+      if (message.role !== "system")
+        return structuredClone(
+          Object.hasOwn(message, "content")
+            ? withoutThinking(
+                message as Record<string, unknown> & { content: unknown },
+              )
+            : message,
+        );
       return {
         role: "system",
         prompt_sha256:
@@ -124,7 +133,7 @@ export function stableRequestHash(
     .digest("hex");
 }
 interface Tape {
-  version: 2;
+  version: 3;
   requestHash: string;
   request: {
     model: { id: string; provider: string; api: string };
@@ -160,7 +169,7 @@ export function tapeRuntime(
         async () => {
           const tape = JSON.parse(await readFile(file, "utf8")) as Tape;
           if (
-            tape.version !== 2 ||
+            tape.version !== 3 ||
             tape.requestHash !== hash ||
             stableRequestHash(
               tape.request.model,
@@ -173,7 +182,7 @@ export function tapeRuntime(
             throw new Error(
               "Replay fixture is invalid or request hash differs",
             );
-          saved = tape.response;
+          saved = withoutThinking(tape.response);
           return saved;
         },
       ]);
@@ -209,18 +218,33 @@ export function tapeRuntime(
         const guard = new LeakDetector(
           system,
           deploymentCanary(),
-          context.messages
-            .filter((message) => ["user", "toolResult"].includes(message.role))
-            .map((message) => message.content),
+          [
+            ...context.messages
+              .filter((message) =>
+                ["user", "toolResult"].includes(message.role),
+              )
+              .map((message) => message.content),
+            ...(await publicTemplateMaterials()),
+          ],
+          context.messages.some(
+            (message) =>
+              message.role === "system" &&
+              message.toolsAdded?.some((tool) =>
+                tool.name.startsWith("submit_"),
+              ),
+          )
+            ? securityLimits().structuredOverlapChars
+            : securityLimits().chatOverlapChars,
         );
-        const saved = structuredClone(response);
-        if (guard.check(response)) {
+        const saved = structuredClone(withoutThinking(response));
+        const blocked = guard.check(saved);
+        if (blocked) {
           saved.content = [{ type: "text", text: INTERNAL_REFUSAL }];
-          saved.errorMessage = SECURITY_ROLE_FAILURE;
+          saved.errorMessage = recordedSecurityFailure(blocked);
           saved.stopReason = "error";
         }
         const tape: Tape = {
-          version: 2,
+          version: 3,
           requestHash: hash,
           request: {
             model,

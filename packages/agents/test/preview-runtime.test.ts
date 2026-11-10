@@ -161,7 +161,7 @@ it("records complete responses and usage locally then replays offline; a changed
     ),
   );
   expect(file.request.context.messages).toHaveLength(2);
-  expect(file.version).toBe(2);
+  expect(file.version).toBe(3);
   expect(JSON.stringify(file)).not.toContain(process.env.RUWEN_CANARY);
   expect(file.request.context.messages[0]).toHaveProperty("prompt_sha256");
   expect(file.response.usage).toEqual(first.usage[0]);
@@ -184,7 +184,7 @@ it("records complete responses and usage locally then replays offline; a changed
   );
   expect(second.output).toBe(first.output);
   expect(second.usage).toEqual(first.usage);
-  expect(deltas.every((delta) => Array.from(delta).length === 1)).toBe(true);
+  expect(deltas.join("")).toBe(second.output);
   await expect(
     runRole(
       "xiaoshuo-zuozhe",

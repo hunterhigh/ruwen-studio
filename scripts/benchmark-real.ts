@@ -9,7 +9,7 @@ import {
   ROLES,
   type RoleResult,
 } from "../packages/agents/src/index.ts";
-import { LocalDirFS } from "../packages/core/src/index.ts";
+import { LocalDirFS, publicTranscript } from "../packages/core/src/index.ts";
 import { startChapter } from "../packages/pipeline/src/index.ts";
 
 async function main() {
@@ -62,7 +62,10 @@ async function main() {
           runtime,
           signal: control.signal,
           onRequest: (context, role) => {
-            requests.push({ role, context });
+            requests.push({
+              role,
+              context: { messages: publicTranscript(context.messages) },
+            });
           },
           onProgress: (run) =>
             console.log(
@@ -71,7 +74,7 @@ async function main() {
         },
       );
       await writeFile(
-        path.join(fs.root, "provider-requests.json"),
+        path.join(directory, `provider-requests-sample-${sample}.json`),
         JSON.stringify(requests, null, 2),
       );
       samples.push({

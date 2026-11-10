@@ -5,6 +5,7 @@ import {
   createFauxRuntime,
   type Data,
   DEFAULT_ROLE_TIMEOUT_MS,
+  deploymentCanary,
   type ModelRuntime,
   ROLE_OUTPUT_ATTEMPTS,
   ROLES,
@@ -157,6 +158,7 @@ export class WorkerService {
     this.boss.on("error", (error) => options.onError?.(error));
   }
   async start(consume = true) {
+    deploymentCanary();
     try {
       await this.db.migrate();
       await this.boss.start();

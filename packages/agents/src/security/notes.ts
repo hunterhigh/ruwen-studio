@@ -1,3 +1,4 @@
+import { normalizeSecurityText } from "@ruwen/core";
 import type { RoleId } from "../types.ts";
 
 export const GENERAL_SECURITY_NOTE =
@@ -11,7 +12,11 @@ export function deploymentCanary(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): string {
   const value = env.RUWEN_CANARY;
-  if (!value || !/^[A-Za-z0-9_+=/-]{16,256}$/.test(value))
+  if (
+    !value ||
+    !/^[A-Za-z0-9_+=/-]{16,256}$/.test(value) ||
+    !normalizeSecurityText(value)
+  )
     throw new Error(
       "RUWEN_CANARY must be a configured random marker (16-256 ASCII characters)",
     );

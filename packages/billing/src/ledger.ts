@@ -1,5 +1,6 @@
 import type { Database, PostgresFS } from "@ruwen/db";
 import { releasePolicy, runtimeSettings } from "../../../config/settings.ts";
+import { assertDailyBudget } from "./daily-budget.ts";
 
 export type Bank = "live" | "sandbox";
 export interface Sql {
@@ -125,6 +126,7 @@ export async function assertRunEnabled(
     ).rows[0];
     if (reservation) {
       await assertPaidFeature(tx, userId, reservation.bank);
+      await assertDailyBudget(tx, userId, reservation.bank);
       const funds = await balance(tx, userId, reservation.bank);
       if (BigInt(funds.available) + BigInt(reservation.remaining) <= 0n)
         throw new BillingError(
@@ -152,12 +154,28 @@ export async function quoteRun(
   const config = runtimeSettings().billing;
   await assertPaidFeature(tx, userId, bank);
   const amount = config.defaultReservations[kind];
+  await assertDailyBudget(tx, userId, bank, amount);
   if (BigInt((await balance(tx, userId, bank)).available) < BigInt(amount))
     throw new BillingError(
       "INSUFFICIENT_CREDITS",
       402,
       "可用点数不足，请到账户页查看余额与预留。",
     );
+  if (kind === "chapter") {
+    const active =
+      (
+        await tx.query<{ count: number }>(
+          "SELECT count(*)::int count FROM pipeline_runs r JOIN projects p ON p.id=r.project_id WHERE p.owner_id=$1 AND r.kind='chapter_run' AND r.status NOT IN ('DONE','RETURNED','FAILED','FAILED_PRECONDITION','CANCELLED')",
+          [userId],
+        )
+      ).rows[0]?.count ?? 0;
+    if (active >= runtimeSettings().riskReview.userChapterConcurrency)
+      throw new BillingError(
+        "PRECONDITION_FAILED",
+        409,
+        "同时进行的章节数已达上限，请先完成、退回或取消已有运行（含待批准章节）。",
+      );
+  }
   return {
     userId,
     bank,

@@ -8,6 +8,7 @@ import { betterAuth } from "better-auth/minimal";
 import { magicLink } from "better-auth/plugins/magic-link";
 import nodemailer from "nodemailer";
 import { releasePolicy, runtimeSettings } from "../../../../config/settings.ts";
+import { disposableEmail } from "./email-policy.ts";
 import {
   COOKIE_PREFIX,
   clientIp,
@@ -27,6 +28,12 @@ export interface AuthEnvironment {
   googleClientSecret?: string;
 }
 export function createWebAuth(db: Database, options: AuthEnvironment) {
+  const supportedEmail = (email: string) => {
+    if (disposableEmail(email))
+      throw new APIError("FORBIDDEN", {
+        message: "暂不支持此邮箱服务，请使用常用邮箱。",
+      });
+  };
   return betterAuth({
     appName: "如文工作室",
     baseURL: options.baseURL,
@@ -66,6 +73,13 @@ export function createWebAuth(db: Database, options: AuthEnvironment) {
       session: {
         create: {
           before: async (session, context) => {
+            const account = (
+              await db.pool.query<{ email: string }>(
+                "SELECT email FROM users WHERE id=$1",
+                [session.userId],
+              )
+            ).rows[0];
+            if (account) supportedEmail(account.email);
             if (context?.path?.startsWith("/callback/") && context.request) {
               const user = await db.pool.query<{ email: string }>(
                 "SELECT email FROM users WHERE id=$1",
@@ -88,6 +102,7 @@ export function createWebAuth(db: Database, options: AuthEnvironment) {
       user: {
         create: {
           before: async (user) => {
+            supportedEmail(user.email);
             if (releasePolicy().inviteOnly) {
               const granted = await db.pool.query(
                 "SELECT email FROM web_invite_grants WHERE email=$1 AND expires_at>now()",
@@ -107,6 +122,7 @@ export function createWebAuth(db: Database, options: AuthEnvironment) {
         expiresIn: runtimeSettings().security.magicLinkMinutes * 60,
         storeToken: "hashed",
         sendMagicLink: async ({ email, url, metadata }) => {
+          supportedEmail(email);
           if (options.preview) {
             const digest = metadata?.previewMailbox;
             if (typeof digest !== "string" || !/^[a-f0-9]{64}$/.test(digest))

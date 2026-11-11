@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { exportProjectZip, importProjectZip, registry } from "@ruwen/core";
 import { PostgresFS } from "@ruwen/db";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
+import * as settings from "../../../config/settings.ts";
 import { fixture } from "../../worker/test/helpers.ts";
 import { API_ROUTES, handleApi } from "../src/server/api.ts";
 import { createWebAuth } from "../src/server/auth.ts";
@@ -13,6 +14,7 @@ const origin = "https://localhost:3000",
   csrf = "f".repeat(64),
   cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
+  vi.restoreAllMocks();
   for (const close of cleanup.splice(0)) await close();
 });
 async function setup() {
@@ -248,6 +250,91 @@ it("HTTP persists exact messages, accepts idempotently, approves a real handoff,
     (await (await p.call(`/tasks/${receipt.startedTaskId}`)).json()).value
       .status,
   ).toBe("CANCELLED");
+}, 30000);
+
+it("coordinator hourly cap is per session, rolls back refused acceptance, records risk, expires and counts idempotent replay once", async () => {
+  const p = await setup(),
+    policy = settings.runtimeSettings();
+  vi.spyOn(settings, "runtimeSettings").mockImplementation(() => ({
+    ...policy,
+    riskReview: { ...policy.riskReview, coordinatorTurnsPerHour: 1 },
+  }));
+  const db = p.service.db,
+    sessionId = p.own.ids.sessionId;
+  const counts = async () =>
+    (
+      await db.pool.query(
+        "SELECT (SELECT count(*) FROM pipeline_runs WHERE project_id=$1)::int tasks,(SELECT count(*) FROM role_runs r JOIN pipeline_runs p ON p.id=r.run_id WHERE p.project_id=$1)::int roles,(SELECT count(*) FROM credit_ledger WHERE user_id=$2)::int ledger,(SELECT count(*) FROM credit_reservations WHERE user_id=$2)::int holds,(SELECT count(*) FROM ideation_messages WHERE project_id=$1)::int messages",
+        [p.fs.projectId, p.fs.ownerId],
+      )
+    ).rows[0];
+  const before = await counts();
+  const session = (await (await p.call(`/sessions/${sessionId}`)).json()).value;
+  const request = {
+    content: "本轮原话仍属于当前会话。",
+    expectedSessionRevision: session.revision,
+    clientRequestId: randomUUID(),
+  };
+  const denied = await p.call(
+    `/sessions/${sessionId}/messages`,
+    "POST",
+    request,
+  );
+  expect(denied.status).toBe(429);
+  expect((await denied.json()).error.code).toBe("RATE_LIMITED");
+  expect(await counts()).toEqual(before);
+  expect(
+    (
+      await db.pool.query(
+        "SELECT count(*)::int n FROM security_events WHERE user_id=$1 AND kind='rate_limited'",
+        [p.fs.ownerId],
+      )
+    ).rows[0]?.n,
+  ).toBe(1);
+  expect(
+    (
+      await p.call(
+        `/sessions/${p.foreign.ids.sessionId}/messages`,
+        "POST",
+        request,
+      )
+    ).status,
+  ).toBe(404);
+  await db.pool.query(
+    "UPDATE pipeline_runs SET created_at=now()-($2::double precision*interval '1 second') WHERE id=$1",
+    [p.own.ids.taskId, policy.riskReview.coordinatorWindowSeconds + 1],
+  );
+  const accepted = await p.call(
+    `/sessions/${sessionId}/messages`,
+    "POST",
+    request,
+  );
+  expect(accepted.status).toBe(202);
+  const turn = (await accepted.json()).value;
+  expect(
+    (
+      await (
+        await p.call(`/sessions/${sessionId}/messages`, "POST", request)
+      ).json()
+    ).value.turnId,
+  ).toBe(turn.turnId);
+  const fresh = (
+    await (
+      await p.call("/sessions", "POST", {
+        title: "另一会话",
+        clientRequestId: randomUUID(),
+      })
+    ).json()
+  ).value;
+  expect(
+    (
+      await p.call(`/sessions/${fresh.id}/messages`, "POST", {
+        content: "新会话单独计数。",
+        expectedSessionRevision: 0,
+        clientRequestId: randomUUID(),
+      })
+    ).status,
+  ).toBe(202);
 }, 30000);
 
 it.each([

@@ -1,4 +1,4 @@
-import { balance, currentBank } from "@ruwen/billing";
+import { balance, currentBank, dailyBudget } from "@ruwen/billing";
 import type { Database } from "@ruwen/db";
 import { releasePolicy, runtimeSettings } from "../../../../config/settings.ts";
 
@@ -84,6 +84,10 @@ export async function billingAccount(
         balance: (bank === "live" ? live : sandbox).balance,
         bank,
         banks: { live, sandbox },
+        daily: {
+          live: await dailyBudget(tx, userId, "live"),
+          sandbox: await dailyBudget(tx, userId, "sandbox"),
+        },
         frozenAt: accounts.rows[0]?.frozen_at?.toISOString() ?? null,
         usage: usage.rows,
         ledger: ledger.rows,

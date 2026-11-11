@@ -3,6 +3,7 @@ import { createFauxRuntime } from "@ruwen/agents";
 import { balance, MockProvider, PaymentService } from "@ruwen/billing";
 import { afterEach, expect, it, vi } from "vitest";
 import { runtimeSettings } from "../../../config/settings.ts";
+import { defaultFauxResponse } from "../../../packages/agents/src/faux.ts";
 import { fixture } from "../../worker/test/helpers.ts";
 import { handleApi } from "../src/server/api.ts";
 import { createWebAuth } from "../src/server/auth.ts";
@@ -19,14 +20,51 @@ afterEach(async () => {
 });
 async function setup(
   boundary?: (kind: string, role: string, runId: string) => Promise<void>,
-  failBeforeUsage = false,
+  failure: "none" | "before" | "http" | "after" | "redacted" | "local" = "none",
 ) {
-  const runtime = createFauxRuntime();
+  const runtime = createFauxRuntime(
+    failure === "after" || failure === "http" || failure === "redacted"
+      ? [
+          (context) => ({
+            ...defaultFauxResponse(context),
+            content:
+              failure === "redacted"
+                ? [
+                    {
+                      type: "thinking",
+                      thinking: "",
+                      thinkingSignature: "opaque-provider-thinking",
+                      redacted: true,
+                    },
+                  ]
+                : failure === "after"
+                  ? [
+                      {
+                        type: "text",
+                        text: "正文已开始生成，随后服务商连接断开。",
+                      },
+                    ]
+                  : [],
+            stopReason: "error",
+            errorMessage: "HTTP 529 or stream disconnected",
+          }),
+        ]
+      : undefined,
+  );
+  if (failure === "local") {
+    const resolve = runtime.resolve;
+    let resolves = 0;
+    runtime.resolve = (role) => {
+      if (++resolves === 2) throw new Error("local validation before provider");
+      return resolve(role);
+    };
+  }
   let calls = 0;
   const stream = runtime.models.streamSimple.bind(runtime.models);
   runtime.models.streamSimple = (...args) => {
     calls++;
-    if (failBeforeUsage) throw new Error("test transport failed before usage");
+    if (failure === "before")
+      throw new Error("HTTP 529 overloaded before generation");
     return stream(...args);
   };
   const p = await fixture({
@@ -76,8 +114,42 @@ async function setup(
     });
   return { p, services, provider, request, email, calls: () => calls };
 }
-it("provider failure before usage is explicit unknown cost, not a zero-cost completion or automatic release", async () => {
-  const f = await setup(undefined, true);
+it.each([
+  "before",
+  "http",
+  "local",
+] as const)("%s generation failure is known zero and releases its reservation", async (failure) => {
+  const f = await setup(undefined, failure);
+  const id = await f.p.service.enqueueChapter(f.p.fs, { chapter: 1 });
+  await f.p.service.handle({
+    kind: "chapter",
+    projectId: f.p.fs.projectId,
+    ownerId: f.p.fs.ownerId,
+    runId: id,
+  });
+  expect(
+    (
+      await f.p.service.db.pool.query(
+        "SELECT cost_usd::float8 cost_usd,usage_unknown FROM role_runs WHERE run_id=$1",
+        [id],
+      )
+    ).rows[0],
+  ).toMatchObject({ cost_usd: 0, usage_unknown: false });
+  expect(
+    (
+      await f.p.service.db.pool.query(
+        "SELECT status,remaining::text FROM credit_reservations WHERE run_id=$1",
+        [id],
+      )
+    ).rows[0],
+  ).toMatchObject({ status: "released", remaining: "0" });
+  expect(f.calls()).toBe(failure === "local" ? 0 : 1);
+});
+it.each([
+  "after",
+  "redacted",
+] as const)("%s disconnect after generation is unknown cost and keeps a review reservation", async (failure) => {
+  const f = await setup(undefined, failure);
   const id = await f.p.service.enqueueChapter(f.p.fs, { chapter: 1 });
   expect(
     (
@@ -104,6 +176,95 @@ it("provider failure before usage is explicit unknown cost, not a zero-cost comp
   ).rows[0];
   expect(reservation?.status).toBe("review");
   expect(BigInt(reservation?.remaining ?? "0")).toBeGreaterThan(0n);
+});
+
+it.each([
+  "settle",
+  "release",
+] as const)("admin %s requires ownership/role, CSRF and a reason; resolves atomically once and exposes an account explanation", async (action) => {
+  const f = await setup(undefined, "after"),
+    db = f.p.service.db;
+  const id = await f.p.service.enqueueChapter(f.p.fs, { chapter: 1 });
+  await f.p.service.handle({
+    kind: "chapter",
+    projectId: f.p.fs.projectId,
+    ownerId: f.p.fs.ownerId,
+    runId: id,
+  });
+  const reservation = (
+    await db.pool.query<{ id: string; remaining: string }>(
+      "SELECT id,remaining::text FROM credit_reservations WHERE run_id=$1",
+      [id],
+    )
+  ).rows[0];
+  if (!reservation) throw new Error("Missing reservation");
+  const path = `/api/admin/reservations/${reservation.id}/resolve`;
+  const body = {
+    confirmed: true,
+    action,
+    actualCostUsd: "0.125",
+    reason: "核对服务商测试账单，确认实际费用。",
+    expectedRemaining: reservation.remaining,
+  };
+  expect((await handleApi(f.request(path, body), f.services)).status).toBe(404);
+  expect(
+    (await handleApi(f.request("/api/admin/reservations"), f.services)).status,
+  ).toBe(404);
+  f.services.adminEmails = [f.email];
+  expect(
+    (await handleApi(f.request(path, body, { csrf: false }), f.services))
+      .status,
+  ).toBe(403);
+  expect(
+    (await handleApi(f.request(path, { ...body, reason: " " }), f.services))
+      .status,
+  ).toBe(400);
+  const before = await balance(db.pool, f.p.fs.ownerId, "sandbox");
+  const responses = await Promise.all([
+    handleApi(f.request(path, body), f.services),
+    handleApi(f.request(path, body), f.services),
+  ]);
+  expect(responses.map((r) => r.status).sort()).toEqual([200, 409]);
+  const after = await balance(db.pool, f.p.fs.ownerId, "sandbox");
+  expect(after.reserved).toBe("0");
+  if (action === "release") expect(after.balance).toBe(before.balance);
+  else
+    expect(after.balance).toBe(
+      String(
+        BigInt(runtimeSettings().billing.signupCredits) -
+          BigInt(
+            Math.ceil(
+              0.125 *
+                runtimeSettings().billing.costMarkup *
+                runtimeSettings().billing.creditsPerUsd,
+            ),
+          ),
+      ),
+    );
+  const reviews = await db.pool.query<{ id: string; reason: string }>(
+    "SELECT id,reason FROM credit_reservation_reviews WHERE reservation_id=$1",
+    [reservation.id],
+  );
+  expect(reviews.rows).toHaveLength(1);
+  expect(reviews.rows[0]?.reason).toBe(body.reason);
+  await expect(
+    db.pool.query("DELETE FROM credit_reservation_reviews WHERE id=$1", [
+      reviews.rows[0]?.id,
+    ]),
+  ).rejects.toThrow("append-only");
+  expect(
+    (
+      await db.pool.query(
+        "SELECT id FROM web_admin_audit WHERE actor_id=$1 AND action='reservation_resolve' AND outcome='allowed'",
+        [f.p.fs.ownerId],
+      )
+    ).rowCount,
+  ).toBe(1);
+  const account = await (
+    await handleApi(f.request("/api/account"), f.services)
+  ).json();
+  expect(account.reviews[0]).toMatchObject({ action, reason: body.reason });
+  expect(account.reservations).toEqual([]);
 });
 
 it("a paid condition changed after enqueue blocks the actual model and releases the unused live reservation", async () => {

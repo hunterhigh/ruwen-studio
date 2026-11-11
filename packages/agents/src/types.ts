@@ -90,6 +90,8 @@ export interface RoleContext {
   searchApproved?: boolean;
 }
 export interface RoleResult {
+  /** True only when an in-flight generation ended without a final usage result. */
+  usageUnknown?: boolean;
   runtimeMode?: ModelRuntime["mode"];
   output: Data | string;
   usage: Usage[];

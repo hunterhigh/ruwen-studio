@@ -8,6 +8,20 @@ import type { Task, WorkerService } from "../src/service.ts";
 import { fixture, waitStatus } from "./helpers.ts";
 
 const cleanup: (() => Promise<void>)[] = [];
+/** Process exit does not acknowledge that Postgres has processed its socket closure. */
+async function waitProjectReleased(service: WorkerService, projectId: string) {
+  const deadline = performance.now() + 5000;
+  while (performance.now() < deadline) {
+    // An autocommit transaction-level probe releases its lock before returning the connection.
+    const probe = await service.db.pool.query<{ unlocked: boolean }>(
+      "SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) unlocked",
+      [`ruwen:project:${projectId}`],
+    );
+    if (probe.rows[0]?.unlocked) return;
+    await delay(20);
+  }
+  throw new Error("Killed worker's Postgres project lock was not released");
+}
 afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) await fn();
 });
@@ -177,6 +191,7 @@ it("SIGKILL after successful editor persistence preserves exactly one pending pr
   );
   process.proc.kill("SIGKILL");
   await process.closed;
+  await waitProjectReleased(p.service, p.fs.projectId);
   await p.service.handle(task);
   expect((await loadRun(p.fs, id)).status).toBe("AWAITING_CANDIDATE_APPROVAL");
   expect(await ledgers.readEntries(p.fs, candidateProblems.PATH)).toHaveLength(
@@ -213,6 +228,7 @@ it.each([
   await first.wait("fault");
   first.proc.kill("SIGKILL");
   await first.closed;
+  await waitProjectReleased(p.service, p.fs.projectId);
   const second = child(p.service, p.task);
   const result = await second.wait("completed");
   const expected =

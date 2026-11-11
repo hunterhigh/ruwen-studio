@@ -3,6 +3,7 @@ import type { ProjectFS } from "../fs/project-fs.ts";
 
 export const LEGACY_PROMPTS = "authoring-ruwen-v5/reports/prompts/";
 const resultFields = [
+  "usageUnknown",
   "runtimeMode",
   "output",
   "usage",

@@ -36,6 +36,10 @@ export function Admin() {
         </div>
       )}
       <section className="paper-panel">
+        <h2>费用复核</h2>
+        <a href="/admin/reservations">处理待核对预留</a>
+      </section>
+      <section className="paper-panel">
         <h2>邀请新用户</h2>
         <p>每个邀请码仅可使用一次。公开注册与真实收费受服务端闸门保护。</p>
         <button

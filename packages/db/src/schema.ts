@@ -325,6 +325,21 @@ export const creditReservations = pgTable(
   },
   (t) => [uniqueIndex("credit_reservation_run").on(t.runId)],
 );
+export const creditReservationReviews = pgTable("credit_reservation_reviews", {
+  id: id(),
+  reservationId: uuid("reservation_id")
+    .notNull()
+    .unique()
+    .references(() => creditReservations.id),
+  actorId: uuid("actor_id")
+    .notNull()
+    .references(() => users.id),
+  action: text("action").notNull(),
+  actualCostUsd: numeric("actual_cost_usd"),
+  chargedCredits: bigint("charged_credits", { mode: "bigint" }).notNull(),
+  reason: text("reason").notNull(),
+  createdAt: time("created_at"),
+});
 export const billingPolicy = pgTable("billing_policy", {
   id: boolean("id").primaryKey().default(true),
   signupCredits: bigint("signup_credits", { mode: "bigint" }).notNull(),

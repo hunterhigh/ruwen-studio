@@ -15,6 +15,7 @@ import {
   type RoleId,
   type RoleResult,
 } from "../../packages/agents/src/index.ts";
+import { modelProfile } from "../../packages/agents/src/model-profile.ts";
 import {
   resolveCatalogModel,
   roleGenerationPolicy,
@@ -377,6 +378,7 @@ export async function runP3Smoke(options: SmokeOptions) {
   });
   const report = {
     version: 1,
+    profile: modelProfile(),
     mode: options.mode,
     upstream: plan.upstream,
     p3GatePassed: false,

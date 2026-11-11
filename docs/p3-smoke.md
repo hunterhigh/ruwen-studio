@@ -19,10 +19,12 @@ pnpm p3:smoke --mode replay --output .local/p3-smoke/demo
 
 报告 `report-record.json` / `report-replay.json` 包括阶段结果、每岗 input/output/total token、cacheRead/cacheWrite、usage.cost 费用、岗位及 provider 耗时、由 reset 事件统计的纠正重试次数、截断、失败原文、全部调用和录制索引。原文取自既有安全处理后的录制响应，不保存原始 provider 异常、thinking 或系统输入；协调员引用原话的失败仍使用来源引用。被纠正的原始尝试可在 calls 的 recordedResponse 中审阅。完整候选稿同时位于 candidate 字段和 `candidate-record.md`；失败/截断作者尝试位于 candidateDrafts，不晋升为候选稿。memoryPreview 只供审阅。
 
-人类以后批准真实模型验证时，可按既有模型路由配置凭证、REAL_MODEL=1 与部署 RUWEN_CANARY，再运行一条命令（工具会读取当前目录 .env，但不写入配置）：
+人类批准真实模型验证后，只在当前进程环境设置模型凭证、REAL_MODEL=1 与部署 RUWEN_CANARY，再运行一条命令。live 不从 .env 或其他文件加载模型 key，检测到文件凭据即拒绝；参见 [共享限制](model-credential-runtime.md)。MODEL_PROFILE=deepseek 或 --profile deepseek 选择独立 DeepSeek 路由，默认仍为 Anthropic。
 
 ```sh
 pnpm p3:smoke --live --max-usd 5 --output .local/p3-smoke/human-run
 ```
+
+DeepSeek 离线预算使用 `pnpm p3:smoke --plan --profile deepseek --max-usd 1.2`，无需 key，既不调用模型也不提高上限。计划读取所选 profile 的模型目录费率和共用岗位预算；报告同时记录 profile。完整人类流程见 `docs/p3-deepseek-human-run.md`。
 
 `--live` 只改变录制上游；账本在独立工具数据库中始终使用沙箱点数，按既有配置记账，不开启真实收费。实际 provider 费用由美元预算单独计量。live 录制也可使用普通 replay 命令，无需 key。一次 smoke 不等于 P3 门已通过，报告 p3GatePassed 始终为 false。本批仅用 faux/replay 验证，未配置 key、未执行 live。

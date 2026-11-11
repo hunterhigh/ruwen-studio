@@ -544,12 +544,18 @@ export async function handleApi(
         ),
       );
     }
-    if (route.pattern === "/api/health")
-      return json({
-        ok: true,
-        mode: process.env.MODEL_MODE ?? "faux",
-        p3GatePassed: releasePolicy().p3GatePassed,
-      });
+    if (route.pattern === "/api/health") {
+      const { databaseReady } = await import("../../../../config/health.ts");
+      const ok = await databaseReady(db);
+      return json(
+        {
+          ok,
+          mode: process.env.MODEL_MODE ?? "faux",
+          p3GatePassed: releasePolicy().p3GatePassed,
+        },
+        ok ? 200 : 503,
+      );
+    }
     if (route.pattern === "/api/csrf") {
       const token = csrfToken(request);
       return json({ token }, 200, {

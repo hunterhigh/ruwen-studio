@@ -41,6 +41,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Verify approved upstream prompt sources
         run: pnpm check:prompt-sources
+      - name: Block high or critical production dependency vulnerabilities
+        run: pnpm audit --prod --audit-level high
       - name: Lint, typecheck and unit tests
         run: pnpm lint && pnpm typecheck && pnpm test:fast
   full:
@@ -95,7 +97,17 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Verify approved upstream prompt sources
         run: pnpm check:prompt-sources
+      - name: Install PostgreSQL 18 backup clients
+        run: |
+          if [ ! -x /usr/lib/postgresql/18/bin/pg_dump ]; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-common
+            sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+            sudo apt-get install -y postgresql-client-18
+          fi
       - name: Integration, invariant, parity and recovery tests with faux models
+        env:
+          PG_BIN: /usr/lib/postgresql/18/bin
         run: pnpm test
       - name: Install Chromium for full browser acceptance
         run: pnpm exec playwright install --with-deps chromium
@@ -110,3 +122,25 @@ jobs:
             playwright-report/
             test-results/
           if-no-files-found: ignore
+  containers:
+    name: containers
+    needs: fast
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository without recursive submodules
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: false
+      - name: Initialize only the pinned upstream
+        run: git -c submodule.recurse=false submodule update --init -- vendor/ruwen
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - name: Build two production images without secrets
+        run: |
+          docker build -f deploy/Dockerfile.worker -t ruwen-worker:ci .
+          docker build -f deploy/Dockerfile.web -t ruwen-web:ci .
+      - name: Verify independent migration, health, non-root, readonly filesystem and shutdown
+        run: node scripts/container-smoke.ts

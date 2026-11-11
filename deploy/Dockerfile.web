@@ -1,0 +1,30 @@
+# syntax=docker/dockerfile:1
+ARG NODE_IMAGE=node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
+FROM ${NODE_IMAGE} AS dependencies
+WORKDIR /app
+RUN npm install --global pnpm@11.25.0
+COPY . .
+RUN pnpm install --frozen-lockfile
+
+FROM dependencies AS build
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN pnpm build:web
+
+FROM ${NODE_IMAGE} AS production-dependencies
+WORKDIR /app
+RUN npm install --global pnpm@11.25.0
+COPY . .
+RUN pnpm install --prod --frozen-lockfile
+
+FROM ${NODE_IMAGE} AS runtime
+WORKDIR /app
+ENV NODE_ENV=production NODE_DISABLE_COMPILE_CACHE=1 NEXT_TELEMETRY_DISABLED=1 \
+    RUWEN_SKIP_ENV_FILE=1 RUWEN_WORKSPACE_ROOT=/app PORT=8080 MODEL_MODE=faux REAL_MODEL=0 \
+    P3_GATE_PASSED=0 REAL_CHARGING_ENABLED=0 INVITE_ONLY=1 LOCAL_PREVIEW=0
+COPY --from=production-dependencies /app /app
+COPY --from=build /app/apps/web/.next /app/apps/web/.next
+RUN chmod -R a-w /app
+USER 1000:1000
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 CMD ["node", "scripts/healthcheck.ts", "web"]
+CMD ["node", "scripts/production-entry.ts", "web"]

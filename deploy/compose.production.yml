@@ -1,0 +1,45 @@
+# Preparation only. Supply secrets through an operator-owned env file outside this repository.
+x-runtime: &runtime
+  DATABASE_URL: ${DATABASE_URL:?required}
+  RUWEN_CANARY: ${RUWEN_CANARY:?required}
+  BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?required}
+  BETTER_AUTH_URL: ${BETTER_AUTH_URL:?required}
+  WORKER_QUEUE: ruwen-staging
+  MODEL_MODE: faux
+  REAL_MODEL: "0"
+  P3_GATE_PASSED: "0"
+  REAL_CHARGING_ENABLED: "0"
+  INVITE_ONLY: "1"
+  SENTRY_DSN: ${SENTRY_DSN:-}
+x-hardening: &hardening
+  read_only: true
+  user: "1000:1000"
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  init: true
+  stop_grace_period: 30s
+services:
+  migrate:
+    <<: *hardening
+    build: { context: .., dockerfile: deploy/Dockerfile.worker }
+    environment: *runtime
+    command: [node, scripts/production-entry.ts, migrate]
+    profiles: [release]
+  worker:
+    <<: *hardening
+    build: { context: .., dockerfile: deploy/Dockerfile.worker }
+    environment: *runtime
+  web:
+    <<: *hardening
+    build: { context: .., dockerfile: deploy/Dockerfile.web }
+    environment:
+      <<: *runtime
+      HTTP_FROM_PROXY: "1"
+      TRUST_PROXY_PROVIDER: ${TRUST_PROXY_PROVIDER:?required}
+      TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:?required}
+      SMTP_URL: ${SMTP_URL:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+    ports: ["127.0.0.1:8800:8080"]

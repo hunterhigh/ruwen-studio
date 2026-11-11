@@ -55,6 +55,11 @@ import {
   type UserApproval,
 } from "@ruwen/pipeline";
 import { PgBoss } from "pg-boss";
+import {
+  logEvent,
+  reportError,
+  withLogContext,
+} from "../../../config/observability.ts";
 import { runtimeSettings } from "../../../config/settings.ts";
 import type { IdeationSessionOptions } from "../../../packages/pipeline/src/ideation/sessions.ts";
 import { IdeationRunner } from "./ideation-runner.ts";
@@ -83,6 +88,7 @@ export interface Task {
   lockDeferrals?: number;
 }
 export interface WorkerOptions {
+  migrations?: "apply" | "verify";
   ideation?: Omit<IdeationSessionOptions, "modelMode" | "queue">;
   runtime: () => ModelRuntime;
   runtimeForRequest?: (request: Data) => ModelRuntime;
@@ -171,6 +177,14 @@ export class WorkerService {
     this.db = new Database(connectionString);
     this.boss = new PgBoss({
       connectionString,
+      migrate:
+        (options.migrations ??
+          (process.env.NODE_ENV === "production" ? "verify" : "apply")) ===
+        "apply",
+      createSchema:
+        (options.migrations ??
+          (process.env.NODE_ENV === "production" ? "verify" : "apply")) ===
+        "apply",
       superviseIntervalSeconds: 1,
       monitorIntervalSeconds: 5,
       maintenanceIntervalSeconds: 60,
@@ -193,7 +207,13 @@ export class WorkerService {
   async start(consume = true) {
     deploymentCanary();
     try {
-      await this.db.migrate();
+      if (
+        (this.options.migrations ??
+          (process.env.NODE_ENV === "production" ? "verify" : "apply")) ===
+        "apply"
+      )
+        await this.db.migrate();
+      else await this.db.verifyMigrations();
       await initializeBilling(this.db);
       await this.boss.start();
       await this.boss.createQueue(this.queue, {
@@ -513,6 +533,9 @@ export class WorkerService {
       return undefined;
     });
     if (cached) return cached;
+    const roleStarted = performance.now();
+    if (process.env.NODE_ENV === "production")
+      logEvent("role_started", { run_id: run.id, role_id: id });
     await this.options.onBoundary?.("role_intent", id, run.id);
     let result: RoleResult;
     let requested = false;
@@ -526,6 +549,8 @@ export class WorkerService {
         onPrompt: (prompt) => persistPrivatePrompt(fs, prompt),
       });
     } catch (error) {
+      if (process.env.NODE_ENV === "production")
+        reportError("worker_error", error, { run_id: run.id, role_id: id });
       const partial =
         error instanceof RoleExecutionError ? error.partial : undefined;
       if (partial)
@@ -570,6 +595,12 @@ export class WorkerService {
     await this.options.onBoundary?.("role_response", id, run.id);
     await this.saveRole(fs, run.id, id, result, "completed");
     await this.options.onBoundary?.("role_completed", id, run.id);
+    if (process.env.NODE_ENV === "production")
+      logEvent("role_completed", {
+        run_id: run.id,
+        role_id: id,
+        duration_ms: performance.now() - roleStarted,
+      });
     return result;
   }
   private async saveRole(
@@ -632,6 +663,12 @@ export class WorkerService {
     });
   }
   async handle(task: Task, jobSignal?: AbortSignal) {
+    return withLogContext(
+      { run_id: task.runId, project_id: task.projectId },
+      () => this.handleInternal(task, jobSignal),
+    );
+  }
+  private async handleInternal(task: Task, jobSignal?: AbortSignal) {
     if (task.kind === "ideation")
       return this.ideationRunner.handle(task, jobSignal);
     const fs = new PostgresFS(this.db, task.projectId, task.ownerId);

@@ -117,7 +117,9 @@ export function fauxOutput(id: RoleId, input: Data = {}): Data | string {
       };
     case "waibu-zhishi-guwen":
       return {
-        mode: "learning_plan",
+        mode: input.approved_learning_plan
+          ? "research_report"
+          : "learning_plan",
         plan: ["先核对问题边界与可用资料"],
         evidence: [],
         opportunities: [],

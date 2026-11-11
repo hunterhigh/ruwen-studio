@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import type { SearchProvider } from "@ruwen/agents";
 import { securityLimits } from "../../../../config/security.ts";
 import type {
   IdeationActor,
@@ -13,6 +14,7 @@ import type {
   IdeationResult,
   IdeationRunId,
   IdeationSafeText,
+  IdeationSendMessage,
   IdeationService,
   IdeationSession,
   IdeationTask,
@@ -20,8 +22,11 @@ import type {
 } from "./contract.ts";
 import type { IdeationStore, IdeationTransaction } from "./store.ts";
 
-export const ideationUuid =
-  /^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i;
+export const ideationUuid = {
+  test: (value: unknown): value is string =>
+    typeof value === "string" &&
+    /^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i.test(value),
+};
 export class IdeationFailure extends Error {
   readonly code: IdeationErrorCode;
   constructor(code: IdeationErrorCode) {
@@ -62,11 +67,15 @@ export function exactIdeationRequest(request: object, fields: string[]) {
     ideationFail("INVALID_ARGUMENT");
 }
 export function ideationPage(request: IdeationPageRequest) {
-  if (request.after !== undefined && !/^(0|[1-9]\d{0,18})$/.test(request.after))
+  if (
+    request.after !== undefined &&
+    (typeof request.after !== "string" ||
+      !/^(0|[1-9]\d{0,18})$/.test(request.after))
+  )
     ideationFail("INVALID_ARGUMENT");
   if (BigInt(request.after ?? "0") > 9223372036854775807n)
     ideationFail("INVALID_ARGUMENT");
-  const limit = request.limit ?? 50;
+  const limit = request.limit === undefined ? 50 : request.limit;
   if (!Number.isInteger(limit) || limit < 1 || limit > 100)
     ideationFail("INVALID_ARGUMENT");
   return { after: request.after ?? "0", limit };
@@ -105,6 +114,7 @@ export async function appendIdeationEvent(
   );
 }
 export interface IdeationSessionOptions {
+  search?: SearchProvider;
   queue?: string;
   modelMode: IdeationSession["capabilities"]["modelMode"];
   externalSearch?: boolean;
@@ -319,73 +329,81 @@ export class IdeationSessions implements SessionMethods {
       )
         ideationFail("INVALID_ARGUMENT");
       return this.mutate(tx, actor, "sendMessage", request, async () => {
-        if (session.status === "closed") ideationFail("SESSION_CLOSED");
-        if (session.currentTurnId) ideationFail("TURN_IN_PROGRESS");
-        if (session.revision !== request.expectedSessionRevision)
-          ideationFail("PRECONDITION_FAILED");
-        const turnId = randomUUID() as IdeationRunId,
-          messageId = randomUUID() as IdeationMessage["id"],
-          revision = session.revision + 1;
-        await this.guardRun(tx, actor, turnId);
-        await tx.sql(
-          "INSERT INTO pipeline_runs(id,project_id,kind,status,request) VALUES($1,$2,'ideation_coordinator','QUEUED',$3)",
-          [
-            turnId,
-            actor.projectId,
-            JSON.stringify({
-              sessionId: session.id,
-              sessionRevision: revision,
-            }),
-          ],
-        );
-        await tx.sql(
-          "INSERT INTO ideation_tasks(run_id,project_id,session_id,role,stage,session_revision) VALUES($1,$2,$3,'chuangyi-xietiaoyuan','coordinator',$4)",
-          [turnId, actor.projectId, session.id, revision],
-        );
-        await tx.sql(
-          "INSERT INTO ideation_messages(id,project_id,session_id,turn_id,role,content,session_revision) VALUES($1,$2,$3,$4,'user',$5,$6)",
-          [
-            messageId,
-            actor.projectId,
-            session.id,
-            turnId,
-            JSON.stringify(request.content),
-            revision,
-          ],
-        );
-        await tx.sql(
-          "UPDATE ideation_sessions SET revision=$2,current_turn_id=$3,updated_at=now() WHERE id=$1",
-          [session.id, revision, turnId],
-        );
-        await tx.sql(
-          "INSERT INTO ideation_outbox(run_id,queue_name) VALUES($1,$2)",
-          [turnId, this.options.queue ?? "ruwen-work"],
-        );
-        const reservationFailure = await this.options.onRunAccepted?.(
-          tx,
-          actor,
-          turnId,
-        );
-        if (reservationFailure) ideationFail(reservationFailure);
-        await appendIdeationEvent(tx, actor, session.id, turnId, {
-          type: "message_changed",
-          messageId,
-          turnId,
-          status: "complete",
-        });
-        await appendIdeationEvent(tx, actor, session.id, turnId, {
-          type: "task_changed",
-          taskId: turnId,
-          status: "QUEUED",
-        });
-        return {
-          sessionId: session.id,
-          messageId,
-          turnId,
-          sessionRevision: revision,
-        };
+        return this.acceptMessage(tx, actor, session, request);
       });
     });
+  async acceptMessage(
+    tx: IdeationTransaction,
+    actor: IdeationActor,
+    session: IdeationSession,
+    request: IdeationSendMessage,
+  ) {
+    if (session.status === "closed") ideationFail("SESSION_CLOSED");
+    if (session.currentTurnId) ideationFail("TURN_IN_PROGRESS");
+    if (session.revision !== request.expectedSessionRevision)
+      ideationFail("PRECONDITION_FAILED");
+    const turnId = randomUUID() as IdeationRunId,
+      messageId = randomUUID() as IdeationMessage["id"],
+      revision = session.revision + 1;
+    await this.guardRun(tx, actor, turnId);
+    await tx.sql(
+      "INSERT INTO pipeline_runs(id,project_id,kind,status,request) VALUES($1,$2,'ideation_coordinator','QUEUED',$3)",
+      [
+        turnId,
+        actor.projectId,
+        JSON.stringify({
+          sessionId: session.id,
+          sessionRevision: revision,
+        }),
+      ],
+    );
+    await tx.sql(
+      "INSERT INTO ideation_tasks(run_id,project_id,session_id,role,stage,session_revision) VALUES($1,$2,$3,'chuangyi-xietiaoyuan','coordinator',$4)",
+      [turnId, actor.projectId, session.id, revision],
+    );
+    await tx.sql(
+      "INSERT INTO ideation_messages(id,project_id,session_id,turn_id,role,content,session_revision) VALUES($1,$2,$3,$4,'user',$5,$6)",
+      [
+        messageId,
+        actor.projectId,
+        session.id,
+        turnId,
+        JSON.stringify(request.content),
+        revision,
+      ],
+    );
+    await tx.sql(
+      "UPDATE ideation_sessions SET revision=$2,current_turn_id=$3,updated_at=now() WHERE id=$1",
+      [session.id, revision, turnId],
+    );
+    await tx.sql(
+      "INSERT INTO ideation_outbox(run_id,queue_name) VALUES($1,$2)",
+      [turnId, this.options.queue ?? "ruwen-work"],
+    );
+    const reservationFailure = await this.options.onRunAccepted?.(
+      tx,
+      actor,
+      turnId,
+    );
+    if (reservationFailure) ideationFail(reservationFailure);
+    await appendIdeationEvent(tx, actor, session.id, turnId, {
+      type: "message_changed",
+      messageId,
+      turnId,
+      status: "complete",
+    });
+    await appendIdeationEvent(tx, actor, session.id, turnId, {
+      type: "task_changed",
+      taskId: turnId,
+      status: "QUEUED",
+    });
+    return {
+      sessionId: session.id,
+      messageId,
+      turnId,
+      sessionRevision: revision,
+    };
+  }
   listIdeationMessages: SessionMethods["listIdeationMessages"] = (
     actor,
     request,
@@ -449,6 +467,34 @@ export class IdeationSessions implements SessionMethods {
       const task = await this.ownedTask(tx, actor, request.taskId);
       exactIdeationRequest(request, ["taskId", "clientRequestId"]);
       return this.mutate(tx, actor, "cancelTask", request, async () => {
+        if (
+          [
+            "AWAITING_PREVIEW_APPROVAL",
+            "AWAITING_LEARNING_PLAN_APPROVAL",
+          ].includes(task.status)
+        ) {
+          const previews = await tx.sql<{ id: string; sha256: string }>(
+            "UPDATE ideation_previews SET status='rejected' WHERE project_id=$1 AND task_id=$2 AND status IN ('pending','stale') RETURNING id,sha256",
+            [actor.projectId, task.id],
+          );
+          for (const p of previews.rows)
+            await appendIdeationEvent(tx, actor, task.sessionId, task.id, {
+              type: "preview_changed",
+              previewId: p.id as never,
+              sha256: p.sha256 as never,
+              status: "rejected",
+            });
+          await tx.sql(
+            "UPDATE pipeline_runs SET status='CANCELLED',cancel_requested=true,finished_at=now() WHERE id=$1",
+            [task.id],
+          );
+          await this.options.onTaskTerminal?.(tx, actor, task.id);
+          await appendIdeationEvent(tx, actor, task.sessionId, task.id, {
+            type: "task_changed",
+            taskId: task.id,
+            status: "CANCELLED",
+          });
+        }
         if (["QUEUED", "RUNNING"].includes(task.status)) {
           await tx.sql(
             "UPDATE pipeline_runs SET cancel_requested=true,status=CASE WHEN status='QUEUED' THEN 'CANCELLED' ELSE status END,finished_at=CASE WHEN status='QUEUED' THEN now() ELSE finished_at END WHERE id=$1",

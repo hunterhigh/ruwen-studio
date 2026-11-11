@@ -85,6 +85,8 @@ export interface RoleContext {
   onRequest?: (context: TranscriptContext, role: RoleId) => void;
   /** Coordinator only: reloaded from the authorized server message store before EVERY provider request. */
   loadCoordinatorInput?: () => Promise<Data>;
+  beforeProviderRequest?: () => Promise<void>;
+  onToolMaterial?: (material: Data, role: RoleId) => void;
   onResourceRead?: (resource: Data, role: RoleId) => void;
   search?: SearchProvider;
   searchApproved?: boolean;

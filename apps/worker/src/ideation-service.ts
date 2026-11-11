@@ -1,11 +1,11 @@
 import { BillingError } from "@ruwen/billing";
 import type { Database } from "@ruwen/db";
 import { PostgresFS, TenantAccessError } from "@ruwen/db";
-import { IdeationBackend } from "../../../packages/pipeline/src/ideation/backend.ts";
 import {
   IdeationFailure,
   type IdeationSessionOptions,
 } from "../../../packages/pipeline/src/ideation/sessions.ts";
+import { IdeationWorkflow } from "../../../packages/pipeline/src/ideation/workflow.ts";
 import { withIdeationBilling } from "./ideation-billing.ts";
 
 /** Web uses an authenticated actor. No actor identity is ever accepted from a JSON body. */
@@ -13,7 +13,7 @@ export function createIdeationService(
   db: Database,
   options: IdeationSessionOptions,
 ) {
-  return new IdeationBackend(
+  return new IdeationWorkflow(
     {
       async transaction(actor, operation) {
         try {
@@ -31,6 +31,9 @@ export function createIdeationService(
         }
       },
     },
-    withIdeationBilling(options),
+    withIdeationBilling({
+      ...options,
+      externalSearch: Boolean(options.search),
+    }),
   );
 }

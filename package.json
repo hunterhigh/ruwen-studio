@@ -31,7 +31,7 @@
     "test:upstream": "python -I -B scripts/verify-upstream.py"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.5",
+    "@biomejs/biome": "2.6.6",
     "@playwright/test": "1.65.0",
     "@types/node": "24.10.1",
     "@types/nodemailer": "8.0.2",

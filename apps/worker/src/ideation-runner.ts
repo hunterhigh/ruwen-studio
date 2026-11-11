@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   assemblePrompt,
+  COORDINATOR_RECORDING_FORMAT,
   type Data,
   ideationRoleSpec,
   RoleAbortError,
@@ -207,11 +208,29 @@ export class IdeationRunner {
         ? await service.coordinatorInput(actor, job.runId)
         : execution?.input;
       if (!initial) throw new IdeationFailure("PRECONDITION_FAILED");
-      const runtime =
+      let runtime =
         this.options.runtimeForRequest?.({ sessionId: task.sessionId }) ??
         this.options.runtime();
       if (runtime.mode !== this.sessions.modelMode)
         throw new IdeationFailure("PRECONDITION_FAILED");
+      let recordingSources: string[] = [];
+      const bindSources = (input: Data) => {
+        if (
+          typeof input.raw_user_text !== "string" ||
+          !input.raw_user_text.length
+        )
+          throw new IdeationFailure("PRECONDITION_FAILED");
+        recordingSources = [input.raw_user_text];
+      };
+      if (coordinator && ["record", "replay"].includes(runtime.mode)) {
+        if (
+          runtime.coordinatorRecordingFormat !== COORDINATOR_RECORDING_FORMAT ||
+          !runtime.bindCoordinatorSources
+        )
+          throw new IdeationFailure("PRECONDITION_FAILED");
+        bindSources(initial);
+        runtime = runtime.bindCoordinatorSources(() => recordingSources);
+      }
       let intent = false;
       await service.store.transaction(actor, async (tx) => {
         const row = await tx.sql(
@@ -310,7 +329,13 @@ export class IdeationRunner {
             ? {
                 loadCoordinatorInput: async () => {
                   try {
-                    return await service.coordinatorInput(actor, job.runId);
+                    const input = await service.coordinatorInput(
+                      actor,
+                      job.runId,
+                    );
+                    if (["record", "replay"].includes(runtime.mode))
+                      bindSources(input);
+                    return input;
                   } catch (error) {
                     if (error instanceof IdeationFailure)
                       requestGuardFailure = error;

@@ -54,6 +54,9 @@ export interface RoleSpec {
 export interface ModelRuntime {
   mode: "faux" | "real" | "record" | "replay";
   privateStorageRoot?: string;
+  coordinatorRecordingFormat?: "source-references-v1";
+  /** Scope private, database-loaded source bindings to ONE coordinator invocation. Never shared mutable state. */
+  bindCoordinatorSources?(read: () => readonly string[]): ModelRuntime;
   models: Models;
   resolve(role: RoleSpec): { model: Model<Api>; thinkingLevel: ThinkingLevel };
   apiKey?(provider: string): string | undefined;

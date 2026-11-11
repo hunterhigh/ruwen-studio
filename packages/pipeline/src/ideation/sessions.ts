@@ -1,5 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { SearchProvider } from "@ruwen/agents";
+import {
+  COORDINATOR_RECORDING_FORMAT,
+  type SearchProvider,
+} from "@ruwen/agents";
 import { securityLimits } from "../../../../config/security.ts";
 import type {
   IdeationActor,
@@ -122,6 +125,8 @@ export interface IdeationSessionOptions {
   queue?: string;
   modelMode: IdeationSession["capabilities"]["modelMode"];
   externalSearch?: boolean;
+  /** Server capability, never client input. Generic plaintext coordinator recordings remain refused. */
+  coordinatorRecordingFormat?: typeof COORDINATOR_RECORDING_FORMAT;
   /** Main thread supplies billing/freeze guards. Called after all ownership, inside acceptance transaction. */
   beforeRun?: (
     tx: IdeationTransaction,
@@ -263,7 +268,7 @@ export class IdeationSessions implements SessionMethods {
       )
         ideationFail("INVALID_ARGUMENT");
       const rows = await tx.sql<{ id: string; ordinal: string }>(
-        "SELECT id,ordinal::text FROM ideation_sessions WHERE project_id=$1 AND ordinal>$2::bigint AND ($3::text IS NULL OR status=$3) ORDER BY ordinal LIMIT $4",
+        "SELECT id,ordinal::text FROM ideation_sessions WHERE project_id=$1 AND ordinal>$2::bigint AND ($3::text IS NULL OR status=$3) ORDER BY ideation_sessions.ordinal LIMIT $4",
         [actor.projectId, after, request.status ?? null, limit + 1],
       );
       const items = [];
@@ -306,8 +311,10 @@ export class IdeationSessions implements SessionMethods {
     actor: IdeationActor,
     runId: IdeationRunId,
   ) {
-    // Generic recording retains requests; coordinator wording must not become a tape snapshot.
-    if (this.options.modelMode === "record")
+    if (
+      this.options.modelMode === "record" &&
+      this.options.coordinatorRecordingFormat !== COORDINATOR_RECORDING_FORMAT
+    )
       ideationFail("PRECONDITION_FAILED");
     if (!this.options.beforeRun && this.options.modelMode !== "faux")
       ideationFail("BILLING_DISABLED");
@@ -417,7 +424,7 @@ export class IdeationSessions implements SessionMethods {
       exactIdeationRequest(request, ["sessionId", "after", "limit"]);
       const { after, limit } = ideationPage(request);
       const rows = await tx.sql<{ ordinal: string; message: IdeationMessage }>(
-        `SELECT ordinal::text,jsonb_build_object('id',id,'projectId',project_id,'sessionId',session_id,'turnId',turn_id,'role',role,'content',content,'status',status,'createdAt',created_at) AS message FROM ideation_messages WHERE project_id=$1 AND session_id=$2 AND ordinal>$3::bigint AND role IN ('user','assistant') ORDER BY ordinal LIMIT $4`,
+        `SELECT ordinal::text,jsonb_build_object('id',id,'projectId',project_id,'sessionId',session_id,'turnId',turn_id,'role',role,'content',content,'status',status,'createdAt',created_at) AS message FROM ideation_messages WHERE project_id=$1 AND session_id=$2 AND ordinal>$3::bigint AND role IN ('user','assistant') ORDER BY ideation_messages.ordinal LIMIT $4`,
         [actor.projectId, request.sessionId, after, limit + 1],
       );
       return {
@@ -451,7 +458,7 @@ export class IdeationSessions implements SessionMethods {
       exactIdeationRequest(request, ["sessionId", "after", "limit"]);
       const { after, limit } = ideationPage(request);
       const rows = await tx.sql<{ run_id: string; ordinal: string }>(
-        "SELECT run_id,ordinal::text FROM ideation_tasks WHERE project_id=$1 AND session_id=$2 AND ordinal>$3::bigint ORDER BY ordinal LIMIT $4",
+        "SELECT run_id,ordinal::text FROM ideation_tasks WHERE project_id=$1 AND session_id=$2 AND ordinal>$3::bigint ORDER BY ideation_tasks.ordinal LIMIT $4",
         [actor.projectId, request.sessionId, after, limit + 1],
       );
       const items = [];

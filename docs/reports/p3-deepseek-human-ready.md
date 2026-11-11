@@ -6,6 +6,7 @@
 - 离线DeepSeek计划11请求上界$0.8595032321，1.2美元可容纳固定演示，provider calls=0；完整输出见p3-deepseek-plan.md。
 - 每个合并以最新main的fast/full/containers CI全绿为准；未读取真实key或执行任何live命令。
 未完成与风险
+- #31一次full在既有网页重载后筛选回到“全部”、详情选中旧预览而超时；批准API200、列表仍显示已批准，同head另一轮CI及本机22项通过。证据：Actions run 43006406540；未修改apps/web，重跑full且全绿前不合并。
 - 真实API连通性、真实输出和P3质量须人类运行后分析；额外工具/纠正可能触发预算停止，不自动调高1.2。
 - Dependabot #22为pnpm/action-setup同版本SHA更新，按最新main CI全绿处理；#23 upload-artifact 4→7、#24 Vitest 4→5虽原CI全绿，均为主版本，暂不合并。
 - A线程的网页预览自行接入共享环境凭据入口与profile；本批未修改apps/web、计费或上游提示词。

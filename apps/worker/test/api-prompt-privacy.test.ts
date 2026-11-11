@@ -16,6 +16,7 @@ import {
 } from "../../web/src/server/auth.ts";
 import { CSRF_COOKIE } from "../../web/src/server/security.ts";
 import type { WebServices } from "../../web/src/server/services.ts";
+import { ideationFixture } from "../../web/test/ideation-fixture.ts";
 import { fixture } from "./helpers.ts";
 
 const cleanup: (() => Promise<void>)[] = [];
@@ -178,6 +179,9 @@ async function setup(blocked = false) {
 it("every registered HTTP response, file read, export entry and SSE batch excludes private prompt windows and canaries", async () => {
   const { services, fs, id, request, safe, workspaceRoot } = await setup();
   const checkoutId = randomUUID();
+  const ideation = (
+    await ideationFixture(services.worker, fs.projectId, fs.ownerId)
+  ).ids;
   const reservationId =
     (
       await services.worker.db.pool.query<{ id: string }>(
@@ -201,12 +205,14 @@ it("every registered HTTP response, file read, export entry and SSE batch exclud
     safe(await response.json());
   }
   for (const route of API_ROUTES) {
-    const url = route.pattern
+    let url = route.pattern
       .replace(":projectId", fs.projectId)
       .replace(":runId", id)
       .replace(":checkoutId", checkoutId)
       .replace(":accountId", fs.ownerId)
       .replace(":reservationId", reservationId);
+    for (const [key, value] of Object.entries(ideation))
+      url = url.replace(`:${key}`, value);
     expect(url).not.toMatch(/:[A-Za-z]/); // New resource parameters need a concrete privacy fixture.
     const response = await handleApi(
       request(url, route.method, route.method === "POST" ? {} : undefined),

@@ -1,6 +1,7 @@
 import { createApplicationRuntime } from "@ruwen/agents";
 import { createPayments, type PaymentService } from "@ruwen/billing";
-import { WorkerService } from "worker";
+import type { IdeationService } from "@ruwen/pipeline";
+import { configuredIdeation, WorkerService } from "worker";
 import { runtimeSettings } from "../../../../config/settings.ts";
 import {
   type AuthEnvironment,
@@ -14,6 +15,7 @@ export interface WebServices {
   ipProofSecret: string;
   adminEmails: string[];
   payments?: PaymentService;
+  ideation?: IdeationService;
 }
 const globalServices = globalThis as typeof globalThis & {
   ruwenWeb?: Promise<WebServices>;
@@ -47,7 +49,9 @@ export function getServices(): Promise<WebServices> {
         ? { googleClientSecret: process.env.GOOGLE_CLIENT_SECRET }
         : {}),
     };
+    const ideation = configuredIdeation();
     const worker = new WorkerService(url, {
+      ideation,
       ...(process.env.WORKER_QUEUE ? { queue: process.env.WORKER_QUEUE } : {}),
       runtime: () =>
         createApplicationRuntime({
@@ -63,6 +67,7 @@ export function getServices(): Promise<WebServices> {
     if (preview) await seedPreviewInvitation(worker.db);
     return {
       worker,
+      ideation: worker.ideationService,
       payments: createPayments(worker.db, secret, preview),
       auth: createWebAuth(worker.db, environment),
       environment,

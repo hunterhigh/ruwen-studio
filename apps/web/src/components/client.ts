@@ -3,6 +3,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly code?: string,
+    readonly details?: unknown,
   ) {
     super(message);
   }
@@ -53,6 +54,7 @@ export async function request<T = unknown>(
         "code" in value && typeof value.code === "string"
           ? value.code
           : undefined,
+        data,
       );
     throw new ApiError(
       typeof value === "string" ? value : "请求未完成，请重试。",

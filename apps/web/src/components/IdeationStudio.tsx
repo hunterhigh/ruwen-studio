@@ -1,6 +1,8 @@
 "use client";
 import type {
   IdeationApprovalReceipt,
+  IdeationContextScope,
+  IdeationCursor,
   IdeationMessage,
   IdeationPreview,
   IdeationResult,
@@ -8,7 +10,13 @@ import type {
   IdeationSessionId,
   IdeationTask,
 } from "@ruwen/pipeline";
+import { useRouter } from "next/navigation.js";
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  allIdeationPages,
+  createIdeationClient,
+  newRequestId,
+} from "./ideation/client.ts";
 import {
   errorCopy,
   type IdeationUiErrorCode,
@@ -17,12 +25,6 @@ import {
   roleNames,
   taskStatus,
 } from "./ideation/copy.ts";
-import {
-  createIdeationDemo,
-  type DemoTiming,
-  newRequestId,
-} from "./ideation/demo.ts";
-import { demoScope, fixtureResource } from "./ideation/fixtures.ts";
 import { PreviewCard, Structured } from "./ideation/PreviewCard.tsx";
 import { ProjectNav } from "./ProjectHome.tsx";
 import {
@@ -61,20 +63,29 @@ export function IdeationErrorNotice({ code }: { code: IdeationUiErrorCode }) {
 }
 export function IdeationStudio({
   projectId,
-  demoTiming,
+  compileScope,
+  compileSources,
+  modelMode,
   chatLimit,
 }: {
   projectId: string;
-  demoTiming: DemoTiming;
+  compileScope: Omit<IdeationContextScope, "project" | "chapter">;
+  compileSources: readonly { id: string; path: string; sha256: string }[];
+  modelMode: string;
   chatLimit: number;
 }) {
-  const [adapter] = useState(() =>
-    createIdeationDemo(projectId, demoTiming, chatLimit),
-  );
+  const router = useRouter();
+  const [adapter] = useState(() => createIdeationClient(projectId));
   const [selected, setSelected] = useState<IdeationSessionId>(
-    adapter.initialSessionId,
+    "" as IdeationSessionId,
   );
-  const [sessions, setSessions] = useState(adapter.sessions);
+  const selectSession = useCallback((id: IdeationSessionId) => {
+    setSelected(id);
+    const url = new URL(window.location.href);
+    url.searchParams.set("session", id);
+    window.history.replaceState(window.history.state, "", url);
+  }, []);
+  const [sessions, setSessions] = useState<readonly IdeationSession[]>([]);
   const [streams, setStreams] = useState(emptyRoleStreams),
     [view, setView] = useState<View>();
   const [selectedPreview, setSelectedPreview] = useState(""),
@@ -85,35 +96,62 @@ export function IdeationStudio({
   const [message, setMessage] = useState(""),
     [title, setTitle] = useState(""),
     [receipt, setReceipt] = useState<IdeationApprovalReceipt>();
-  const [demoError, setDemoError] = useState<IdeationUiErrorCode>(
-    "INSUFFICIENT_CREDITS",
-  );
   const sequence = useRef(0);
   const refresh = useCallback(async () => {
     const version = ++sequence.current;
     try {
-      const [session, messages, previews, tasks, listed] = await Promise.all([
+      const page = (after?: IdeationCursor) => ({
+        limit: 100,
+        ...(after ? { after } : {}),
+      });
+      const listed = unwrap(
+        await allIdeationPages((after) =>
+          adapter.api.listIdeationSessions(page(after)),
+        ),
+      );
+      if (version !== sequence.current) return;
+      setSessions(listed);
+      if (!selected) {
+        const requested = new URL(window.location.href).searchParams.get(
+          "session",
+        );
+        const current =
+          listed.find((item) => item.id === requested) ?? listed[0];
+        if (current) selectSession(current.id);
+        return;
+      }
+      const [session, messages, previews, tasks] = await Promise.all([
         adapter.api.getIdeationSession({ sessionId: selected }),
-        adapter.api.listIdeationMessages({ sessionId: selected }),
-        adapter.api.listPreviews({ sessionId: selected }),
-        adapter.api.listIdeationTasks({ sessionId: selected }),
-        adapter.api.listIdeationSessions({ limit: 100 }),
+        allIdeationPages((after) =>
+          adapter.api.listIdeationMessages({
+            sessionId: selected,
+            ...page(after),
+          }),
+        ),
+        allIdeationPages((after) =>
+          adapter.api.listPreviews({ sessionId: selected, ...page(after) }),
+        ),
+        allIdeationPages((after) =>
+          adapter.api.listIdeationTasks({
+            sessionId: selected,
+            ...page(after),
+          }),
+        ),
       ]);
       const next = {
         session: unwrap(session),
-        messages: unwrap(messages).items,
-        previews: unwrap(previews).items,
-        tasks: unwrap(tasks).items,
+        messages: unwrap(messages),
+        previews: unwrap(previews),
+        tasks: unwrap(tasks),
       };
       if (version === sequence.current) {
         setView(next);
-        setSessions([...unwrap(listed).items]);
       }
     } catch (caught) {
       if (version === sequence.current)
         setError(caught instanceof UiError ? caught.code : "INTERNAL_ERROR");
     }
-  }, [adapter, selected]);
+  }, [adapter, selected, selectSession]);
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
   useEffect(() => {
@@ -127,22 +165,24 @@ export function IdeationStudio({
     void refresh();
   }, [refresh]);
   useEffect(() => {
-    const unsubscribe = adapter.subscribe((event) => {
+    if (!selected) return;
+    const unsubscribe = adapter.subscribe(selected, (event) => {
       if (event.projectId !== projectId) return;
       if ((event.type === "delta" || event.type === "reset") && event.runId) {
         setStreams((old) =>
           applyRoleFrame(old, { ...event, runId: event.runId ?? "" }),
         );
       } else {
+        if (event.type === "error") setError(event.error.code);
         void refreshRef.current();
       }
     });
     return () => {
       unsubscribe();
-      adapter.dispose();
       sequence.current++;
     };
-  }, [adapter, projectId]);
+  }, [adapter, projectId, selected]);
+  useEffect(() => () => adapter.dispose(), [adapter]);
   const previews =
     view?.previews.filter((item) => filter === "all" || item.kind === filter) ??
     [];
@@ -190,7 +230,12 @@ export function IdeationStudio({
               })
             : await adapter.api.approvePreview({ ...request, confirmed: true });
         setReceipt(unwrap(result));
-        setNotice("模拟批准已记录。实际项目文件、正典和余额均未改变。");
+        setNotice(
+          target.kind === "handoff"
+            ? "通讯门已批准，下游任务已受理。"
+            : "预览已批准，提交结果已保存。后续任务仍遵守各自批准门。",
+        );
+        router.refresh();
       } else if (kind === "reject") {
         unwrap(
           await adapter.api.rejectPreview({
@@ -199,7 +244,7 @@ export function IdeationStudio({
           }),
         );
         setReceipt(undefined);
-        setNotice("已拒绝此演示预览。理由只留在协调员会话。");
+        setNotice("已拒绝此预览。理由只留在协调员会话。");
       } else {
         unwrap(await adapter.api.revisePreview({ ...request, content: text }));
         setReceipt(undefined);
@@ -214,12 +259,13 @@ export function IdeationStudio({
           <span className="eyebrow">故事构思 / IDEATION</span>
           <h1>把想法，交还给故事。</h1>
         </div>
-        <span className="mode-label">本地演示 · 待 P3 实测</span>
+        <span className="mode-label">
+          <SafeMarkdown plain inline content={modelMode} /> · 待 P3 实测
+        </span>
       </header>
       <ProjectNav id={projectId} current="/ideation" />
       <p className="notice">
-        构思界面演示 ·
-        使用本地假数据，不保存对话、不提交项目资料、不扣点数。刷新后重置。
+        对话与任务会保存到当前项目。每份预览先阅读、再决定；批准后才提交资料或执行委托。点数按实际用量结算。
       </p>
       {error && <IdeationErrorNotice code={error} />}
       {notice && <output className="notice">{notice}</output>}
@@ -234,10 +280,10 @@ export function IdeationStudio({
               value={selected}
               disabled={busy}
               onChange={(event) => {
-                const value = adapter.sessions.find(
+                const value = sessions.find(
                   (row) => row.id === event.target.value,
                 );
-                if (value) setSelected(value.id);
+                if (value) selectSession(value.id);
               }}
             >
               {sessions.map((session, index) => (
@@ -254,7 +300,7 @@ export function IdeationStudio({
                   type="button"
                   disabled={busy}
                   aria-current={selected === session.id ? "true" : undefined}
-                  onClick={() => setSelected(session.id)}
+                  onClick={() => selectSession(session.id)}
                 >
                   <SafeMarkdown inline plain content={session.title} />
                   <small>
@@ -277,7 +323,7 @@ export function IdeationStudio({
                   }),
                 );
                 setTitle("");
-                setSelected(result.id);
+                selectSession(result.id);
               });
             }}
           >
@@ -317,7 +363,7 @@ export function IdeationStudio({
                 onClick={() => {
                   if (
                     window.confirm(
-                      "关闭此演示会话的新对话？已有任务继续，预览仍可阅读和决定。",
+                      "关闭此会话的新对话？已有任务继续，预览仍可阅读和决定。",
                     )
                   )
                     void operation(async () => {
@@ -327,7 +373,7 @@ export function IdeationStudio({
                           clientRequestId: newRequestId(),
                         }),
                       );
-                      setNotice("演示会话已关闭，已有任务和预览仍可操作。");
+                      setNotice("会话已关闭，已有任务和预览仍可操作。");
                     });
                 }}
               >
@@ -372,14 +418,16 @@ export function IdeationStudio({
                   <span className="eyebrow">
                     协调员 · {taskStatus[task.status]}
                   </span>
-                  <SafeMarkdown
-                    content={roleStreamText(
-                      streams,
-                      selected,
-                      task.id,
-                      task.role,
-                    )}
-                  />
+                  <div data-testid="ideation-stream">
+                    <SafeMarkdown
+                      content={roleStreamText(
+                        streams,
+                        selected,
+                        task.id,
+                        task.role,
+                      )}
+                    />
+                  </div>
                 </div>
               ))}
           </div>
@@ -406,9 +454,10 @@ export function IdeationStudio({
             <label>
               想和协调员说的话
               <textarea
+                aria-label="想和协调员说的话"
                 rows={4}
                 value={message}
-                disabled={closed}
+                disabled={closed || !view}
                 onChange={(event) => setMessage(event.target.value)}
                 placeholder={
                   closed
@@ -505,14 +554,14 @@ export function IdeationStudio({
           )}
           {receipt && (
             <details className="ideation-receipt">
-              <summary>上次模拟批准记录（非真实提交）</summary>
+              <summary>上次批准记录</summary>
               <Structured
                 value={{
                   decisionId: receipt.id,
                   previewId: receipt.previewId,
                   startedTaskId: receipt.startedTaskId,
-                  simulatedFiles: receipt.committedFiles,
-                  simulatedProjection: receipt.projectionRegistered,
+                  committedFiles: receipt.committedFiles,
+                  projectionRegistered: receipt.projectionRegistered,
                 }}
               />
             </details>
@@ -536,23 +585,24 @@ export function IdeationStudio({
                     sessionId: view.session.id,
                     chapter: String(form.get("chapter")),
                     scope: {
-                      volume: demoScope.volume,
-                      arc: demoScope.arc,
-                      scene_type: demoScope.scene_type,
-                      pov: demoScope.pov,
+                      volume: String(form.get("volume") ?? "").trim() || null,
+                      arc: String(form.get("arc") ?? "").trim() || null,
+                      scene_type:
+                        String(form.get("scene_type") ?? "").trim() || null,
+                      pov: String(form.get("pov") ?? "").trim() || null,
                     },
-                    sources: [
-                      {
-                        resourceId: fixtureResource.id,
-                        expectedSha256: fixtureResource.sha256,
-                      },
-                    ],
+                    sources: compileSources
+                      .filter((source) =>
+                        form.getAll("source").includes(source.id),
+                      )
+                      .map((source) => ({
+                        resourceId: source.id,
+                        expectedSha256: source.sha256,
+                      })) as never,
                     clientRequestId: newRequestId(),
                   }),
                 );
-                setNotice(
-                  "模拟编译已安排；只提交章节、作用域和来源ID/指纹，不提交原话或情境正文。",
-                );
+                setNotice("编译任务已受理，生成的章节情境仍需要你阅读并批准。");
               });
             }}
           >
@@ -563,21 +613,46 @@ export function IdeationStudio({
                 type="number"
                 min="1"
                 max="9999"
-                defaultValue="2"
+                defaultValue="1"
                 required
               />
             </label>
+            <details>
+              <summary>编译作用域与补充来源</summary>
+              {(["volume", "arc", "scene_type", "pov"] as const).map(
+                (field, index) => (
+                  <label key={field}>
+                    {["卷", "篇章", "场景类型", "视角"][index]}
+                    <input
+                      name={field}
+                      defaultValue={compileScope[field] ?? ""}
+                      maxLength={80}
+                    />
+                  </label>
+                ),
+              )}
+              <p className="fine-print">
+                故事、当前状态等必需资料由服务端核对；可再选择相关来源。
+              </p>
+              {compileSources.map((source) => (
+                <label key={source.id}>
+                  <input type="checkbox" name="source" value={source.id} />
+                  <SafeMarkdown inline plain content={source.path} />
+                </label>
+              ))}
+            </details>
             <button
               className="button secondary"
               type="submit"
               disabled={busy || !view}
             >
-              编译章节情境（演示）
+              编译章节情境
             </button>
           </form>
         </header>
         <p className="fine-print">
-          模拟任务无真实费用；未知用量保留为未记录。中断不自动重跑。编译使用演示的已批准来源。
+          费用与用量来自运行记录；价格与预留仍待 P3
+          实测。中断不会自动再次调用模型。
         </p>
         <div className="ideation-task-list">
           {view?.tasks.map((task) => (
@@ -636,7 +711,7 @@ export function IdeationStudio({
                     onClick={() => {
                       if (
                         window.confirm(
-                          "取消此演示任务？已批准资料和已发生用量不会撤销。",
+                          "取消此任务？已批准资料和已发生用量不会撤销。",
                         )
                       )
                         void operation(async () => {
@@ -646,7 +721,7 @@ export function IdeationStudio({
                               clientRequestId: newRequestId(),
                             }),
                           );
-                          setNotice("演示任务已取消，没有撤销已批准资料。");
+                          setNotice("任务已取消，没有撤销已批准资料。");
                         });
                     }}
                   >
@@ -658,69 +733,6 @@ export function IdeationStudio({
           ))}
         </div>
       </section>
-      <details className="ideation-demo-tools">
-        <summary>流式演示场景</summary>
-        <p>仅供本地界面检查，刷新会清除所有演示状态。</p>
-        <button
-          className="button secondary"
-          type="button"
-          disabled={closed}
-          onClick={() => adapter.attempt(selected, false)}
-        >
-          演示格式更正
-        </button>
-        <button
-          className="button secondary"
-          type="button"
-          disabled={closed}
-          onClick={() => adapter.attempt(selected, true)}
-        >
-          演示安全拒绝
-        </button>
-        <section aria-label="构思流式预览">
-          {adapter.runs
-            .filter((run) => run.sessionId === selected)
-            .map((run) => (
-              <article
-                key={run.runId}
-                data-testid="ideation-stream"
-                aria-label="当前岗位尝试"
-              >
-                <SafeMarkdown
-                  content={roleStreamText(
-                    streams,
-                    run.sessionId,
-                    run.runId,
-                    "chuangyi-xietiaoyuan",
-                  )}
-                />
-              </article>
-            ))}
-        </section>
-        <label>
-          错误场景
-          <select
-            aria-label="错误场景"
-            value={demoError}
-            onChange={(event) =>
-              setDemoError(event.target.value as IdeationUiErrorCode)
-            }
-          >
-            {Object.keys(errorCopy).map((code) => (
-              <option value={code} key={code}>
-                {code}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          className="button secondary"
-          type="button"
-          onClick={() => setError(demoError)}
-        >
-          查看错误提示
-        </button>
-      </details>
     </main>
   );
 }

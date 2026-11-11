@@ -58,10 +58,12 @@ import { PgBoss } from "pg-boss";
 import { runtimeSettings } from "../../../config/settings.ts";
 import type { IdeationSessionOptions } from "../../../packages/pipeline/src/ideation/sessions.ts";
 import { IdeationRunner } from "./ideation-runner.ts";
+import { createIdeationService } from "./ideation-service.ts";
 import { persistPrivatePrompt } from "./private-prompts.ts";
 import { recordRoleSecurityEvents } from "./security-events.ts";
 import { streamSink } from "./stream-events.ts";
 
+export { configuredIdeation } from "./ideation-config.ts";
 export { createIdeationService } from "./ideation-service.ts";
 
 type Kind =
@@ -133,6 +135,8 @@ export function queueExpirySeconds(
   return seconds;
 }
 export class WorkerService {
+  readonly ideationService: ReturnType<typeof createIdeationService>;
+  readonly modelMode: ModelRuntime["mode"];
   readonly ideationRunner: IdeationRunner;
   readonly db: Database;
   readonly boss: PgBoss;
@@ -145,6 +149,7 @@ export class WorkerService {
   private options: WorkerOptions;
   private active = new Map<string, AbortController>();
   constructor(connectionString: string, options: WorkerOptions) {
+    this.modelMode = options.runtime().mode;
     const concurrency =
       options.concurrency ?? runtimeSettings().execution.concurrency;
     if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 4)
@@ -178,6 +183,11 @@ export class WorkerService {
       this.queue,
       options,
     );
+    this.ideationService = createIdeationService(this.db, {
+      ...options.ideation,
+      queue: this.queue,
+      modelMode: this.modelMode,
+    });
     this.boss.on("error", (error) => options.onError?.(error));
   }
   async start(consume = true) {

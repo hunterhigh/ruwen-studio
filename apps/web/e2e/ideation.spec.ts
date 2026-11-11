@@ -1,48 +1,43 @@
 import { expect, test } from "@playwright/test";
 import { createDemo, signIn } from "./helpers.ts";
+import { ideationHttpFixture } from "./ideation-http-fixture.ts";
 
-test("typed demo: conversations, session switching, clean handoff, read-only close and tenant page boundary", async ({
+test("persisted conversations: switching, clean handoff, safe user Markdown, close and tenant boundaries", async ({
   page,
   browser,
 }, testInfo) => {
   await signIn(page);
   const projectId = await createDemo(page, "北岸来信 · 构思工作台");
-  const ideationRequests: string[] = [],
-    external: string[] = [],
+  const external: string[] = [],
     errors: string[] = [];
-  page.on("request", (request) => {
-    if (/\/api\/.*\/ideation/.test(request.url()))
-      ideationRequests.push(request.url());
-    if (request.url().includes("tracker.invalid")) external.push(request.url());
+  page.on("request", (r) => {
+    if (r.url().includes("tracker.invalid")) external.push(r.url());
   });
-  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(`/projects/${projectId}/ideation`);
-  await expect(
-    page.getByRole("heading", { name: "把想法，交还给故事。", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("交给下游的干净委托", { exact: true }),
-  ).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath("ideation-initial.png") });
+  const create = async (title: string) => {
+    await page.getByLabel("新会话名称", { exact: true }).fill(title);
+    await page
+      .getByRole("button", { name: "新建构思会话", exact: true })
+      .click();
+    await expect(
+      page.getByLabel("想和协调员说的话", { exact: true }),
+    ).toBeEnabled();
+  };
+  await create("北岸冬信");
   const raw =
     "PRIVATE_IDEATION_WORDING_53ef\n\n让林砚保留自己的选择。\n\n<script>globalThis.IDEATION_XSS=1</script>\n\n![追踪](https://tracker.invalid/raw)";
   await page.getByLabel("想和协调员说的话", { exact: true }).fill(raw);
   await page.getByRole("button", { name: "发送给协调员", exact: true }).click();
   const conversation = page.getByRole("region", {
-    name: "协调员会话",
-    exact: true,
-  });
+      name: "协调员会话",
+      exact: true,
+    }),
+    review = page.getByRole("region", { name: "构思预览工作台", exact: true });
   await expect(conversation).toContainText("PRIVATE_IDEATION_WORDING_53ef");
   await expect(
-    conversation.getByText(
-      "我会把固定事实和仍然开放的选择分开。请先阅读右侧的理解与干净委托，再决定是否交给下游。",
-      { exact: true },
-    ),
+    review.getByText("交给下游的干净委托", { exact: true }),
   ).toBeVisible();
-  const review = page.getByRole("region", {
-    name: "构思预览工作台",
-    exact: true,
-  });
   await expect(review).not.toContainText("PRIVATE_IDEATION_WORDING_53ef");
   await expect(
     page.getByRole("region", { name: "下游任务", exact: true }),
@@ -52,31 +47,37 @@ test("typed demo: conversations, session switching, clean handoff, read-only clo
   await expect(conversation.locator("img,script,iframe")).toHaveCount(0);
   await review
     .getByRole("checkbox", {
-      name: "我已阅读此版本，确认这次模拟批准",
+      name: "我已阅读此版本，确认这次批准",
       exact: true,
     })
     .check();
-  await review
-    .getByRole("button", { name: "批准委托（演示）", exact: true })
-    .click();
-  await expect(page.getByRole("status")).toContainText(
-    "实际项目文件、正典和余额均未改变",
-  );
-  await expect(
-    page.getByText("上次模拟批准记录（非真实提交）", { exact: true }),
-  ).toBeVisible();
-  await page
-    .getByLabel("构思会话", { exact: true })
-    .selectOption({ label: "渡河之前" });
+  await review.getByRole("button", { name: "批准委托", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("通讯门已批准");
+  await expect(page.getByText("上次批准记录", { exact: true })).toBeVisible();
+  const sessions = await (
+    await page.request.get(`/api/projects/${projectId}/ideation/sessions`)
+  ).json();
+  const firstId = sessions.value.items[0].id;
+  const messages = await (
+    await page.request.get(
+      `/api/projects/${projectId}/ideation/sessions/${firstId}/messages`,
+    )
+  ).json();
+  expect(
+    messages.value.items.find((m: { role: string }) => m.role === "user")
+      .content,
+  ).toBe(raw);
+  await create("渡河之前");
   await expect(conversation).not.toContainText("PRIVATE_IDEATION_WORDING_53ef");
   await page
     .getByLabel("构思会话", { exact: true })
     .selectOption({ label: "北岸冬信" });
   await expect(conversation).toContainText("PRIVATE_IDEATION_WORDING_53ef");
-  await page.getByLabel("新会话名称", { exact: true }).fill("另一条河流");
-  await page.getByRole("button", { name: "新建构思会话", exact: true }).click();
+  await page.reload();
+  await expect(conversation).toContainText("PRIVATE_IDEATION_WORDING_53ef");
+  await create("另一条河流");
   await expect(conversation).toContainText("从一个放不下的念头开始");
-  page.once("dialog", (dialog) => dialog.accept());
+  page.once("dialog", (d) => d.accept());
   await conversation
     .getByRole("button", { name: "关闭会话", exact: true })
     .click();
@@ -86,7 +87,6 @@ test("typed demo: conversations, session switching, clean handoff, read-only clo
   await expect(
     page.getByRole("button", { name: "发送给协调员", exact: true }),
   ).toBeDisabled();
-  expect(ideationRequests).toEqual([]);
   expect(errors).toEqual([]);
   await page.screenshot({
     path: testInfo.outputPath("ideation-desktop.png"),
@@ -99,8 +99,21 @@ test("typed demo: conversations, session switching, clean handoff, read-only clo
   try {
     const other = await otherContext.newPage();
     await signIn(other);
-    const response = await other.goto(`/projects/${projectId}/ideation`);
-    expect(response?.status()).toBe(404);
+    for (const suffix of [
+      "/sessions",
+      `/sessions/${firstId}`,
+      `/sessions/${firstId}/events`,
+    ])
+      expect(
+        (
+          await other.request.get(
+            `/api/projects/${projectId}/ideation${suffix}`,
+          )
+        ).status(),
+      ).toBe(404);
+    expect(
+      (await other.goto(`/projects/${projectId}/ideation`))?.status(),
+    ).toBe(404);
     await expect(other.getByText("PRIVATE_IDEATION_WORDING_53ef")).toHaveCount(
       0,
     );
@@ -114,6 +127,7 @@ test("all five preview kinds: diffs, revision confirmation, rejection, learning 
 }, testInfo) => {
   await signIn(page);
   const projectId = await createDemo(page, "五种构思预览");
+  const fixture = await ideationHttpFixture(page, projectId);
   await page.goto(`/projects/${projectId}/ideation`);
   const review = page.getByRole("region", {
     name: "构思预览工作台",
@@ -122,7 +136,7 @@ test("all five preview kinds: diffs, revision confirmation, rejection, learning 
   const card = page.getByRole("article", { name: "预览详情", exact: true });
   const confirm = () =>
     card.getByRole("checkbox", {
-      name: "我已阅读此版本，确认这次模拟批准",
+      name: "我已阅读此版本，确认这次批准",
       exact: true,
     });
   await page.getByLabel("预览类型", { exact: true }).selectOption("file_patch");
@@ -143,31 +157,25 @@ test("all five preview kinds: diffs, revision confirmation, rejection, learning 
   await revised.click();
   await expect(confirm()).not.toBeChecked();
   await expect(
-    card.getByRole("button", { name: "批准文件变更（演示）", exact: true }),
+    card.getByRole("button", { name: "批准文件变更", exact: true }),
   ).toBeDisabled();
   await confirm().check();
-  await card
-    .getByRole("button", { name: "批准文件变更（演示）", exact: true })
-    .click();
-  await expect(card).toContainText("已模拟批准");
+  await card.getByRole("button", { name: "批准文件变更", exact: true }).click();
+  await expect(card).toContainText("已批准");
   await expect(card).not.toContainText("PRIVATE_REVISION_63df");
   await page
     .getByLabel("预览类型", { exact: true })
     .selectOption("learning_plan");
   await expect(card).toContainText("批准之后才进入调查");
   await confirm().check();
-  await card
-    .getByRole("button", { name: "批准学习计划（演示）", exact: true })
-    .click();
-  await expect(card).toContainText("已模拟批准");
+  await card.getByRole("button", { name: "批准学习计划", exact: true }).click();
+  await expect(card).toContainText("已批准");
   await page
     .getByLabel("预览类型", { exact: true })
     .selectOption("expression_candidate");
   await expect(card).toContainText("不会自动成为 active");
   await confirm().check();
-  await card
-    .getByRole("button", { name: "确认为候选（演示）", exact: true })
-    .click();
+  await card.getByRole("button", { name: "确认为候选", exact: true }).click();
   await review
     .getByRole("region", { name: "预览列表", exact: true })
     .getByRole("button")
@@ -176,7 +184,7 @@ test("all five preview kinds: diffs, revision confirmation, rejection, learning 
   await expect(confirm()).not.toBeChecked();
   await confirm().check();
   const activate = card.getByRole("button", {
-    name: "激活表现资源（演示）",
+    name: "激活表现资源",
     exact: true,
   });
   await expect(activate).toBeDisabled();
@@ -185,7 +193,7 @@ test("all five preview kinds: diffs, revision confirmation, rejection, learning 
     .check();
   await expect(activate).toBeEnabled();
   await activate.click();
-  await expect(card).toContainText("已模拟批准");
+  await expect(card).toContainText("已批准");
   await page
     .getByLabel("预览类型", { exact: true })
     .selectOption("generation_field");
@@ -196,9 +204,7 @@ test("all five preview kinds: diffs, revision confirmation, rejection, learning 
   await card.getByRole("button", { name: "拒绝此预览", exact: true }).click();
   await expect(card).toContainText("已拒绝");
   await page.getByLabel("编译章节", { exact: true }).fill("3");
-  await page
-    .getByRole("button", { name: "编译章节情境（演示）", exact: true })
-    .click();
+  await page.getByRole("button", { name: "编译章节情境", exact: true }).click();
   await expect(
     review
       .getByRole("region", { name: "预览列表", exact: true })
@@ -211,14 +217,13 @@ test("all five preview kinds: diffs, revision confirmation, rejection, learning 
     .click();
   await expect(confirm()).not.toBeChecked();
   await confirm().check();
-  await card
-    .getByRole("button", { name: "批准章节情境（演示）", exact: true })
-    .click();
-  await expect(card).toContainText("已模拟批准");
+  await card.getByRole("button", { name: "批准章节情境", exact: true }).click();
+  await expect(card).toContainText("已批准");
   await page.screenshot({
     path: testInfo.outputPath("ideation-generation.png"),
     fullPage: true,
   });
+  fixture.dispose();
 });
 
 test("pending billing/freeze errors give safe guidance and the mobile review has no horizontal overflow", async ({
@@ -226,19 +231,22 @@ test("pending billing/freeze errors give safe guidance and the mobile review has
 }, testInfo) => {
   await signIn(page);
   const projectId = await createDemo(page, "构思错误提示");
+  const fixture = await ideationHttpFixture(page, projectId);
   await page.goto(`/projects/${projectId}/ideation`);
-  await page.getByText("流式演示场景", { exact: true }).click();
   for (const [code, message] of [
     ["INSUFFICIENT_CREDITS", "余额不足"],
     ["ACCOUNT_FROZEN", "等待人工复核"],
     ["BILLING_DISABLED", "真实收费尚未开放"],
-  ]) {
-    await page.getByLabel("错误场景", { exact: true }).selectOption(code ?? "");
+  ] as const) {
+    fixture.failNextSend(code);
     await page
-      .getByRole("button", { name: "查看错误提示", exact: true })
+      .getByLabel("想和协调员说的话", { exact: true })
+      .fill("一次失败的请求");
+    await page
+      .getByRole("button", { name: "发送给协调员", exact: true })
       .click();
     await expect(page.getByRole("main").getByRole("alert")).toContainText(
-      message ?? "",
+      message,
     );
     if (code === "INSUFFICIENT_CREDITS")
       await expect(
@@ -259,6 +267,7 @@ test("pending billing/freeze errors give safe guidance and the mobile review has
     path: testInfo.outputPath("ideation-mobile.png"),
     fullPage: true,
   });
+  fixture.dispose();
 });
 
 test("v1.1 closed session blocks new messages/revisions but keeps existing preview approval available", async ({
@@ -267,6 +276,12 @@ test("v1.1 closed session blocks new messages/revisions but keeps existing previ
   await signIn(page);
   const projectId = await createDemo(page, "关闭后的预览决定");
   await page.goto(`/projects/${projectId}/ideation`);
+  await page.getByLabel("新会话名称", { exact: true }).fill("关闭后的会话");
+  await page.getByRole("button", { name: "新建构思会话", exact: true }).click();
+  await page
+    .getByLabel("想和协调员说的话", { exact: true })
+    .fill("用户原话独特措辞天地玄黄宇宙洪荒日月盈昃辰宿列张");
+  await page.getByRole("button", { name: "发送给协调员", exact: true }).click();
   const conversation = page.getByRole("region", {
     name: "协调员会话",
     exact: true,
@@ -290,12 +305,10 @@ test("v1.1 closed session blocks new messages/revisions but keeps existing previ
   ).toBeDisabled();
   await card
     .getByRole("checkbox", {
-      name: "我已阅读此版本，确认这次模拟批准",
+      name: "我已阅读此版本，确认这次批准",
       exact: true,
     })
     .check();
-  await card
-    .getByRole("button", { name: "批准委托（演示）", exact: true })
-    .click();
-  await expect(card).toContainText("已模拟批准");
+  await card.getByRole("button", { name: "批准委托", exact: true }).click();
+  await expect(card).toContainText("已批准");
 });

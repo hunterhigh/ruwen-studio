@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { createDemo, signIn } from "./helpers.ts";
+import { ideationHttpFixture } from "./ideation-http-fixture.ts";
 
 for (const refusal of [false, true]) {
   test(`chapter delta → reset → ${refusal ? "refusal" : "corrected delta"} clears only the current attempt and ignores replay`, async ({
@@ -100,41 +101,90 @@ for (const refusal of [false, true]) {
   }) => {
     await signIn(page);
     const projectId = await createDemo(page, "重置构思试读");
-    await page.goto(`/projects/${projectId}/ideation`);
-    await page.getByText("流式演示场景", { exact: true }).click();
-    await page
-      .getByRole("button", {
-        name: refusal ? "演示安全拒绝" : "演示格式更正",
-        exact: true,
-      })
-      .click();
-    const first = page.getByTestId("ideation-stream").first();
-    await expect(first).toHaveText("尚未完成的旧尝试。");
-    await expect(first).toHaveText("");
-    const expected = refusal
-      ? "这部分属于平台内部设置，我没法提供。我们继续聊你的故事吧。"
-      : "更正后的思路：让渡河的决定留在人物手中。";
-    await expect(first).toHaveText(expected);
-    await page
-      .getByRole("button", { name: "演示格式更正", exact: true })
-      .click();
-    await expect(page.getByTestId("ideation-stream")).toHaveCount(2);
-    await expect(first).toHaveText(expected);
-    await page
-      .getByLabel("构思会话", { exact: true })
-      .selectOption({ label: "渡河之前" });
-    await expect(page.getByTestId("ideation-stream")).toHaveCount(0);
-    await page
-      .getByRole("button", { name: "演示格式更正", exact: true })
-      .click();
-    await expect(page.getByTestId("ideation-stream")).toHaveCount(1);
-    await page
-      .getByLabel("构思会话", { exact: true })
-      .selectOption({ label: "北岸冬信" });
-    await expect(page.getByTestId("ideation-stream")).toHaveCount(2);
-    await expect(first).toHaveText(expected);
-    await expect(page.getByTestId("ideation-stream").nth(1)).toHaveText(
-      "更正后的思路：让渡河的决定留在人物手中。",
-    );
+    const fixture = await ideationHttpFixture(page, projectId);
+    try {
+      await page.goto(`/projects/${projectId}/ideation`);
+      await expect(
+        page.getByText("交给下游的干净委托", { exact: true }),
+      ).toBeVisible();
+      const s1 = fixture.demo.initialSessionId,
+        s2 = fixture.demo.sessions[1]?.id;
+      if (!s2) throw new Error("Missing second session");
+      const run1 = await fixture.addRun(s1);
+      await expect(page.getByTestId("ideation-stream")).toHaveCount(1);
+      const first = page.getByTestId("ideation-stream").first();
+      await fixture.emit(s1, run1, {
+        type: "delta",
+        role: "chuangyi-xietiaoyuan",
+        text: "旧尝试不应留在画面。" as never,
+      });
+      await expect(first).toHaveText("旧尝试不应留在画面。");
+      const reset = await fixture.emit(s1, run1, {
+        type: "reset",
+        role: "chuangyi-xietiaoyuan",
+        reason: refusal ? "security_refusal" : "format_correction",
+      });
+      await expect(first).toHaveText("");
+      const expected = refusal
+        ? "这部分属于平台内部设置，我没法提供。我们继续聊你的故事吧。"
+        : "更正后的思路：让渡河的决定留在人物手中。";
+      await fixture.emit(s1, run1, {
+        type: "delta",
+        role: "chuangyi-xietiaoyuan",
+        text: expected as never,
+      });
+      await expect(first).toHaveText(expected);
+      const run2 = await fixture.addRun(s1);
+      await expect(page.getByTestId("ideation-stream")).toHaveCount(2);
+      await fixture.emit(s1, run2, {
+        type: "delta",
+        role: "chuangyi-xietiaoyuan",
+        text: "第二任务的独立文本。" as never,
+      });
+      await expect(page.getByTestId("ideation-stream").nth(1)).toHaveText(
+        "第二任务的独立文本。",
+      );
+      await fixture.emit(
+        s1,
+        run1,
+        {
+          type: "reset",
+          role: "chuangyi-xietiaoyuan",
+          reason: "format_correction",
+        },
+        reset,
+      );
+      await expect(first).toHaveText(expected);
+      await page
+        .getByLabel("构思会话", { exact: true })
+        .selectOption({ label: "渡河之前" });
+      await expect(
+        page.getByRole("heading", {
+          name: "从一个放不下的念头开始",
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expect(page.getByTestId("ideation-stream")).toHaveCount(0);
+      const run3 = await fixture.addRun(s2);
+      await expect(page.getByTestId("ideation-stream")).toHaveCount(1);
+      await fixture.emit(s2, run3, {
+        type: "delta",
+        role: "chuangyi-xietiaoyuan",
+        text: "另一会话的独立文本。" as never,
+      });
+      await expect(page.getByTestId("ideation-stream")).toHaveText(
+        "另一会话的独立文本。",
+      );
+      await page
+        .getByLabel("构思会话", { exact: true })
+        .selectOption({ label: "北岸冬信" });
+      await expect(page.getByTestId("ideation-stream")).toHaveCount(2);
+      await expect(first).toHaveText(expected);
+      await expect(page.getByTestId("ideation-stream").nth(1)).toHaveText(
+        "第二任务的独立文本。",
+      );
+    } finally {
+      fixture.dispose();
+    }
   });
 }

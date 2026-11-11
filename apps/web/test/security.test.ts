@@ -26,6 +26,7 @@ import {
   securityHeaders,
 } from "../src/server/security.ts";
 import type { WebServices } from "../src/server/services.ts";
+import { ideationFixture } from "./ideation-fixture.ts";
 
 const origin = "https://localhost:3000",
   token = "a".repeat(64);
@@ -41,6 +42,8 @@ let foreignReservationId = "",
   ownedReservationId = "";
 const foreignCheckoutId = randomUUID(),
   ownedCheckoutId = randomUUID();
+let ownedIdeation: Record<string, string> = {},
+  foreignIdeation: Record<string, string> = {};
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const request = (
   url: string,
@@ -162,6 +165,12 @@ beforeAll(async () => {
       "INSERT INTO billing_checkouts(id,user_id,request_id,provider,plan_id,credits,price_minor,currency,prepared_at) VALUES($1,$2,$3,'mock','preview',100000,500,'USD',now())",
       [id, owner, randomUUID()],
     );
+  ownedIdeation = (
+    await ideationFixture(services.worker, ownedProjectId, ownedAccountId)
+  ).ids;
+  foreignIdeation = (
+    await ideationFixture(services.worker, projectId, foreignAccountId)
+  ).ids;
 }, 20000);
 afterAll(async () => {
   await services?.worker.stop();
@@ -178,10 +187,12 @@ it("every private route rejects anonymous requests; owner mutations also need CS
     const url = route.pattern
       .replace(":projectId", ownedProjectId)
       .replace(":runId", ownedRunId);
-    const ownUrl = url
+    let ownUrl = url
       .replace(":checkoutId", ownedCheckoutId)
       .replace(":accountId", ownedAccountId)
       .replace(":reservationId", ownedReservationId);
+    for (const [key, id] of Object.entries(ownedIdeation))
+      ownUrl = ownUrl.replace(`:${key}`, id);
     expect(
       (
         await handleApi(
@@ -296,12 +307,14 @@ it("valid CSRF cannot approve or return a queued run before a candidate exists",
 
 for (const route of API_ROUTES.filter((item) => item.resource)) {
   it(`I13: A cannot access B: ${route.method} ${route.pattern} (${route.foreignCase})`, async () => {
-    const url = route.pattern
+    let url = route.pattern
       .replace(":projectId", projectId)
       .replace(":runId", runId)
       .replace(":checkoutId", foreignCheckoutId)
       .replace(":accountId", foreignAccountId)
       .replace(":reservationId", foreignReservationId);
+    for (const [key, id] of Object.entries(foreignIdeation))
+      url = url.replace(`:${key}`, id);
     const result = await handleApi(
       request(
         url,
@@ -315,14 +328,21 @@ for (const route of API_ROUTES.filter((item) => item.resource)) {
       services,
     );
     expect(result.status).toBe(404);
-    expect(await result.json()).toEqual({ error: "资源不存在。" });
+    if (route.ideation)
+      expect(await result.json()).toMatchObject({
+        ok: false,
+        error: { code: "NOT_FOUND" },
+      });
+    else expect(await result.json()).toEqual({ error: "资源不存在。" });
   });
 }
 it("CI route coverage: every resource parameter declares and runs a foreign ownership case; no unregistered route files", async () => {
   for (const route of API_ROUTES) {
     const params = route.pattern.match(/:[A-Za-z]+/g) ?? [];
     if (params.length) {
-      expect(params).toEqual([`:${route.resource}`]);
+      expect(params).toEqual(
+        (route.resourceParams ?? [route.resource]).map((key) => `:${key}`),
+      );
       expect(route.foreignCase).toBeTruthy();
     } else expect(route.resource).toBeUndefined();
   }
@@ -508,10 +528,8 @@ it("production mailbox cannot be accessed and charging stays server-blocked befo
     ).status,
   ).toBe(404);
 });
-it("the eighteen v1.1 contract-only ideation routes are not registered before backend implementation", async () => {
-  expect(
-    API_ROUTES.some((route) => JSON.stringify(route).includes("ideation")),
-  ).toBe(false);
+it("the eighteen implemented v1.1 HTTP mappings are explicitly registered", () => {
+  expect(API_ROUTES.filter((route) => route.ideation)).toHaveLength(18);
   const id = randomUUID();
   const routes = [
     ["GET", "sessions"],
@@ -535,20 +553,15 @@ it("the eighteen v1.1 contract-only ideation routes are not registered before ba
   ] as const;
   for (const [method, suffix] of routes)
     expect(
-      (
-        await handleApi(
-          request(
+      API_ROUTES.some(
+        (route) =>
+          route.method === method &&
+          new RegExp(`^${route.pattern.replace(/:[A-Za-z]+/g, "[^/]+")}$`).test(
             `/api/projects/${ownedProjectId}/ideation/${suffix}`,
-            method,
-            true,
-            {},
-            method === "POST" ? {} : undefined,
           ),
-          services,
-        )
-      ).status,
+      ),
       `${method} ${suffix}`,
-    ).toBe(404);
+    ).toBe(true);
 });
 it("direct authentication cannot create an uninvited user, and mailbox tokens are bound to one browser", async () => {
   const email = `${randomUUID()}@test.invalid`,

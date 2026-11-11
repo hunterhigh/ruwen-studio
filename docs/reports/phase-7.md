@@ -9,7 +9,7 @@
 ## 测试结果
 - PG18.6真实备份/还原、覆盖拒绝、账本/批准/文件哈希对比及迁移/探针/日志/代理/操作员冻结集成通过；网页归属与CSRF既有断言保留。
 - 本地隔离库54429演练：42表8615行恢复指纹一致，所有项目文件哈希有效。指纹及工具来源详见[S3记录](../security/S3-production-preparation.md)，归档不进仓库。
-- 本机lint/typecheck、71文件659项全量通过（333.33秒），健康/启动/worker定向14项通过，生产构建及全部22项浏览器通过（4.3分钟）。同步B冒烟工具后的完整组合与Linux镜像结果见[PR #21](https://github.com/hunterhigh/ruwen-studio/pull/21)；最新main的fast/full/containers全绿才合并。
+- 同步B冒烟工具后，本机lint/typecheck、73文件668项全量通过（272.07秒）；生产构建及全部22项浏览器通过（4.3分钟）。Linux镜像启动/只读faux章节结果见[PR #21](https://github.com/hunterhigh/ruwen-studio/pull/21)；最新main的fast/full/containers全绿才合并。
 
 ## 未完成与风险
 - 没有部署staging或公开上线、没有外部账户/key；P7准备完成不能替代P7实际部署验收或P3。3000试用快照和54329数据库不动。

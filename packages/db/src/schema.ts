@@ -177,8 +177,79 @@ export const ideationMessages = pgTable("ideation_messages", {
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
   sessionId: uuid("session_id").notNull(),
+  ordinal: bigint("ordinal", { mode: "bigint" }).generatedAlwaysAsIdentity(),
+  turnId: uuid("turn_id").references(() => pipelineRuns.id),
+  status: text("status").notNull().default("complete"),
+  sessionRevision: integer("session_revision"),
   role: text("role").notNull(),
   content: jsonb("content").notNull(),
+  createdAt: time("created_at"),
+});
+export const ideationSessions = pgTable("ideation_sessions", {
+  id: id(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id),
+  ordinal: bigint("ordinal", { mode: "bigint" }).generatedAlwaysAsIdentity(),
+  title: text("title").notNull().default(""),
+  status: text("status").notNull().default("open"),
+  revision: integer("revision").notNull().default(0),
+  currentTurnId: uuid("current_turn_id").references(() => pipelineRuns.id),
+  createdAt: time("created_at"),
+  updatedAt: time("updated_at"),
+});
+export const ideationTasks = pgTable("ideation_tasks", {
+  runId: uuid("run_id")
+    .primaryKey()
+    .references(() => pipelineRuns.id),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => ideationSessions.id),
+  ordinal: bigint("ordinal", { mode: "bigint" }).generatedAlwaysAsIdentity(),
+  role: text("role").notNull(),
+  stage: text("stage").notNull(),
+  sourcePreviewId: uuid("source_preview_id"),
+  outputPreviewIds: jsonb("output_preview_ids").notNull().default([]),
+  sessionRevision: integer("session_revision").notNull(),
+  error: jsonb("error"),
+});
+export const ideationRequests = pgTable(
+  "ideation_requests",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id),
+    operation: text("operation").notNull(),
+    requestId: uuid("request_id").notNull(),
+    requestSha256: text("request_sha256").notNull(),
+    result: jsonb("result").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.projectId, t.operation, t.requestId] }),
+  ],
+);
+export const ideationOutbox = pgTable("ideation_outbox", {
+  runId: uuid("run_id")
+    .primaryKey()
+    .references(() => ideationTasks.runId),
+  createdAt: time("created_at"),
+});
+export const ideationEvents = pgTable("ideation_events", {
+  id: bigint("id", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => ideationSessions.id),
+  runId: uuid("run_id").references(() => ideationTasks.runId),
+  data: jsonb("data").notNull(),
   createdAt: time("created_at"),
 });
 export const previews = pgTable("previews", {

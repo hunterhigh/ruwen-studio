@@ -7,7 +7,9 @@ import {
   reserveRun,
   type Sql,
 } from "@ruwen/billing";
+import { runtimeSettings } from "../../../config/settings.ts";
 import type { IdeationSessionOptions } from "../../../packages/pipeline/src/ideation/sessions.ts";
+import { IdeationFailure } from "../../../packages/pipeline/src/ideation/sessions.ts";
 import type { IdeationTransaction } from "../../../packages/pipeline/src/ideation/store.ts";
 
 export const ideationSql = (tx: IdeationTransaction): Sql => ({
@@ -41,6 +43,13 @@ export function withIdeationBilling(
       return options.beforeRun?.(tx, actor, runId);
     },
     onRunAccepted: async (tx, actor, runId) => {
+      const policy = runtimeSettings().riskReview;
+      const turns = await tx.sql<{ count: number }>(
+        "SELECT count(*)::int count FROM pipeline_runs p JOIN pipeline_runs admitted ON admitted.id=$1 AND admitted.project_id=$2 AND admitted.kind='ideation_coordinator' WHERE p.project_id=$2 AND p.kind='ideation_coordinator' AND p.request->>'sessionId'=admitted.request->>'sessionId' AND p.created_at>now()-($3::double precision*interval '1 second')",
+        [runId, actor.projectId, policy.coordinatorWindowSeconds],
+      );
+      if ((turns.rows[0]?.count ?? 0) > policy.coordinatorTurnsPerHour)
+        throw new IdeationFailure("RATE_LIMITED");
       const quote = quotes.get(tx)?.get(runId);
       if (!quote || quote.userId !== actor.userId)
         throw new BillingError("PRECONDITION_FAILED", 409, "运行报价已失效。");

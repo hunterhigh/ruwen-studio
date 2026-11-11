@@ -60,7 +60,16 @@
     "userChapterConcurrency": 2,
     "projectConcurrency": 1,
     "coordinatorTurnsPerHour": 60,
+    "coordinatorWindowSeconds": 3600,
     "dailyPlanPercent": 30,
+    "dailyDefaultPlanId": "monthly",
+    "dailyMaximumCredits": 1000000000,
+    "disposableEmailDomains": [
+      "mailinator.com",
+      "guerrillamail.com",
+      "sharklasers.com",
+      "10minutemail.com"
+    ],
     "trialChapterRange": [1, 2]
   },
   "stream": {

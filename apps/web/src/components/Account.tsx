@@ -6,7 +6,7 @@ import { SafeMarkdown } from "./SafeMarkdown.tsx";
 import { useApi } from "./useApi.ts";
 
 type AccountData = Awaited<ReturnType<typeof billingAccount>> & {
-  user: { email: string };
+  user: { id: string; email: string };
 };
 export function Account() {
   const [sessionError, setSessionError] = useState(""),
@@ -91,6 +91,127 @@ export function Account() {
             </article>
           ))}
         </div>
+      </section>
+      <section className="paper-panel" aria-label="每日点数上限">
+        <h2>每日点数上限 · 待 P3 实测</h2>
+        <p>
+          按UTC日期重置，正式与沙箱分别计算同一上限。已用点数和未释放预留都计入额度；降低上限不会改写已发生的费用，会阻止后续新调用。
+        </p>
+        {data && (
+          <>
+            <div className="billing-balances">
+              {(["live", "sandbox"] as const).map((bank) => (
+                <article key={bank}>
+                  <h3>
+                    {bank === "live" ? "正式" : "沙箱"} ·{" "}
+                    <SafeMarkdown inline plain content={data.daily[bank].day} />
+                  </h3>
+                  <p>
+                    上限{" "}
+                    <SafeMarkdown
+                      inline
+                      plain
+                      content={data.daily[bank].limit}
+                    />{" "}
+                    点
+                  </p>
+                  <p>
+                    今日已用{" "}
+                    <SafeMarkdown
+                      inline
+                      plain
+                      content={data.daily[bank].used}
+                    />{" "}
+                    · 未释放预留{" "}
+                    <SafeMarkdown
+                      inline
+                      plain
+                      content={data.daily[bank].held}
+                    />
+                  </p>
+                  <p>
+                    剩余可受理额度{" "}
+                    <SafeMarkdown
+                      inline
+                      plain
+                      content={data.daily[bank].remaining}
+                    />
+                  </p>
+                </article>
+              ))}
+            </div>
+            <form
+              key={`${data.daily[data.bank].customLimit}-${data.daily[data.bank].defaultLimit}`}
+              onSubmit={(event) => {
+                event.preventDefault();
+                const value = Number(
+                  new FormData(event.currentTarget).get("limitCredits"),
+                );
+                void pay(async () => {
+                  if (
+                    !Number.isSafeInteger(value) ||
+                    value < 1 ||
+                    value > data.daily[data.bank].maximum
+                  )
+                    throw new Error("请输入范围内的整数点数。");
+                  await post(
+                    `/api/billing/accounts/${data.user.id}/daily-limit`,
+                    { limitCredits: value },
+                  );
+                  setNotice("每日点数上限已保存。");
+                });
+              }}
+            >
+              <label>
+                每日点数上限
+                <input
+                  name="limitCredits"
+                  type="number"
+                  min="1"
+                  max={data.daily[data.bank].maximum}
+                  step="1"
+                  required
+                  defaultValue={data.daily[data.bank].limit}
+                  disabled={busy}
+                />
+              </label>
+              <p className="fine-print">
+                默认值按套餐点数的配置比例计算；无有效套餐时采用配置中的默认套餐基准。当前默认{" "}
+                <SafeMarkdown
+                  inline
+                  plain
+                  content={data.daily[data.bank].defaultLimit}
+                />{" "}
+                点，待 P3 实测。
+              </p>
+              <div className="decision-actions">
+                <button
+                  className="button primary"
+                  disabled={busy}
+                  type="submit"
+                >
+                  保存每日上限
+                </button>
+                <button
+                  className="button secondary"
+                  disabled={busy || data.daily[data.bank].customLimit === null}
+                  type="button"
+                  onClick={() => {
+                    void pay(async () => {
+                      await post(
+                        `/api/billing/accounts/${data.user.id}/daily-limit`,
+                        { limitCredits: null },
+                      );
+                      setNotice("已恢复默认每日上限。");
+                    });
+                  }}
+                >
+                  恢复默认上限
+                </button>
+              </div>
+            </form>
+          </>
+        )}
       </section>
       <section className="paper-panel">
         <h2>购买测试点数</h2>

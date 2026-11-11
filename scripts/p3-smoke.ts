@@ -1,6 +1,7 @@
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { assertModelCredentialFiles } from "../packages/agents/src/index.ts";
+import { modelProfile } from "../packages/agents/src/model-profile.ts";
 import { isolatedDatabase } from "./lib/isolated-project.ts";
 import { runP3Smoke } from "./lib/p3-smoke.ts";
 import { formatSmokePlan, smokePlan } from "./lib/smoke-plan.ts";
@@ -12,8 +13,11 @@ const { values } = parseArgs({
     output: { type: "string" },
     live: { type: "boolean", default: false },
     plan: { type: "boolean", default: false },
+    profile: { type: "string" },
   },
 });
+if (values.profile) process.env.MODEL_PROFILE = values.profile;
+modelProfile();
 if (!["faux", "record", "replay"].includes(values.mode))
   throw new Error("--mode must be faux, record, or replay");
 const maxUsd = Number(values["max-usd"]);

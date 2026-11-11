@@ -24,6 +24,7 @@ import { formatSmokePlan, smokePlan } from "../../../scripts/lib/smoke-plan.ts";
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
+  vi.unstubAllEnvs();
   for (const stop of cleanup.splice(0)) await stop();
 });
 async function folder() {
@@ -459,7 +460,11 @@ it("bounds UTF-8 system/messages and both forms of tool schemas, independent of 
   expect(requestInputBound(transcript).utf8Bytes).toBeGreaterThan(1500);
 });
 
-it("plans all demo tool turns with current routes and no provider/fetch or recording, identifies the first budget block", async () => {
+it.each([
+  "default",
+  "deepseek",
+])("plans all demo tool turns with profile %s and no provider/fetch or recording, identifies the first budget block", async (profile) => {
+  vi.stubEnv("MODEL_PROFILE", profile);
   const directory = await folder(),
     fetch = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
       throw new Error("Planner cannot fetch");
@@ -475,6 +480,7 @@ it("plans all demo tool turns with current routes and no provider/fetch or recor
   expect(report.providerCalls).toBe(0);
   expect(fetch).not.toHaveBeenCalled();
   const plan = smokePlan(report);
+  expect(plan.profile).toBe(profile);
   expect(plan.requests).toHaveLength(11);
   expect(plan.requests.filter((r) => r.role === "jiyi-weihuyuan")).toHaveLength(
     2,

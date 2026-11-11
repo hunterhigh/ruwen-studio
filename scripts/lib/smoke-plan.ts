@@ -23,6 +23,7 @@ export function smokePlan(report: Awaited<ReturnType<typeof runP3Smoke>>) {
     };
   });
   return {
+    profile: report.profile,
     maxUsd: report.maxUsd,
     totalBoundUsd: cumulativeUsd,
     canFinish: report.status === "completed" && blockedAt === null,
@@ -34,7 +35,7 @@ export function smokePlan(report: Awaited<ReturnType<typeof runP3Smoke>>) {
 }
 export function formatSmokePlan(plan: ReturnType<typeof smokePlan>) {
   return [
-    `P3 PLAN max-usd=${plan.maxUsd}; config/models.json; local demo replies; provider calls=${plan.providerCalls}`,
+    `P3 PLAN max-usd=${plan.maxUsd}; profile=${plan.profile}; config/models${plan.profile === "deepseek" ? ".deepseek" : ""}.json; local demo replies; provider calls=${plan.providerCalls}`,
     ...plan.requests.map(
       (r) =>
         `${String(r.step).padStart(2, "0")} ${r.phase}/${r.role} ${r.model.split("/").at(-1)} in<=${r.inputTokens} out<=${r.outputTokens} USD<=${r.boundUsd.toFixed(10)} cumulative<=${r.cumulativeUsd.toFixed(10)} ${r.status}`,

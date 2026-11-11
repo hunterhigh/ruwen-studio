@@ -68,8 +68,8 @@ const app = next({
   webpack: true,
   dev: development,
   dir: fileURLToPath(new URL("../", import.meta.url)),
-  hostname: "localhost",
-  port,
+  hostname: proxy?.publicUrl.hostname ?? "localhost",
+  port: proxy ? Number(proxy.publicUrl.port || 443) : port,
 });
 await app.prepare();
 const handle = app.getRequestHandler(),

@@ -178,6 +178,14 @@ try {
     assert.match(csrf.headers.get('set-cookie'),/HttpOnly/i);
     assert.match(csrf.headers.get('set-cookie'),/Secure/i);
     assert.match(csrf.headers.get('set-cookie'),/SameSite=Lax/i);
+    const token=(await csrf.json()).token;
+    const cookie=csrf.headers.get('set-cookie').split(';')[0];
+    const login={email:'container-check@test.invalid',name:'容器测试',invitationCode:'INTENTIONALLY_INVALID_INVITATION'};
+    const allowed=await fetch('http://127.0.0.1:8080/api/login',{method:'POST',headers:{...headers,origin:'https://studio.test.invalid','content-type':'application/json','x-csrf-token':token,cookie},body:JSON.stringify(login)});
+    assert.equal(allowed.status,400); // Valid CSRF reaches invitation validation, never mail/model generation.
+    assert.match((await allowed.json()).error,/邀请码/);
+    const crossSite=await fetch('http://127.0.0.1:8080/api/login',{method:'POST',headers:{...headers,origin:'https://other.test.invalid','content-type':'application/json','x-csrf-token':token,cookie},body:JSON.stringify(login)});
+    assert.equal(crossSite.status,403);
     const denied=await fetch('http://127.0.0.1:8080/api/projects');
     assert.equal(denied.status,400); // Missing platform IP cannot reach authentication.
     const account=await fetch('http://127.0.0.1:8080/api/account',{headers});

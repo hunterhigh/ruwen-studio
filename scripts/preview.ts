@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { previewConfiguration } from "../config/preview.ts";
 import { deploymentCanary } from "../packages/agents/src/security/notes.ts";
 import { Database } from "../packages/db/src/index.ts";
 
@@ -20,10 +21,11 @@ try {
 } catch (error) {
   if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
 }
-const port = process.env.PORT ?? "3000";
+const preview = previewConfiguration();
+const port = String(preview.port);
 const environment: NodeJS.ProcessEnv = {
   ...process.env,
-  DATABASE_URL: "postgresql://ruwen:local_test_only@127.0.0.1:54329/ruwen_dev",
+  DATABASE_URL: preview.databaseUrl,
   BETTER_AUTH_SECRET: (await readFile(secretFile, "utf8")).trim(),
   BETTER_AUTH_URL: `https://localhost:${port}`,
   MODEL_MODE: "faux",

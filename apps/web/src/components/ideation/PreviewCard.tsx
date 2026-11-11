@@ -1,4 +1,7 @@
-import type { IdeationFilePatch, IdeationPreview } from "@ruwen/pipeline";
+import type {
+  IdeationFilePatch,
+  IdeationPreviewV1_2 as IdeationPreview,
+} from "@ruwen/pipeline";
 import { useState } from "react";
 import { SafeMarkdown } from "../SafeMarkdown.tsx";
 import { kindNames, previewStatus, roleNames } from "./copy.ts";
@@ -67,17 +70,19 @@ function Patches({ patches }: { patches: readonly IdeationFilePatch[] }) {
   );
 }
 const approvalLabel = (preview: IdeationPreview) =>
-  preview.kind === "handoff"
-    ? "批准委托"
-    : preview.kind === "learning_plan"
-      ? "批准学习计划"
-      : preview.kind === "expression_candidate"
-        ? preview.approvalStage === "candidate"
-          ? "确认为候选"
-          : "激活表现资源"
-        : preview.kind === "generation_field"
-          ? "批准章节情境"
-          : "批准文件变更";
+  preview.kind === "verbatim"
+    ? "批准逐字保留"
+    : preview.kind === "handoff"
+      ? "批准委托"
+      : preview.kind === "learning_plan"
+        ? "批准学习计划"
+        : preview.kind === "expression_candidate"
+          ? preview.approvalStage === "candidate"
+            ? "确认为候选"
+            : "激活表现资源"
+          : preview.kind === "generation_field"
+            ? "批准章节情境"
+            : "批准文件变更";
 const auditNames = {
   route: "实现路线",
   fulfillment: "兑现方式",
@@ -315,6 +320,60 @@ export function PreviewCard({
           <p>只有独立批准后才登记章节投影；批准后才写入项目文件。</p>
         </>
       )}
+      {preview.kind === "verbatim" && (
+        <section className="verbatim-preview">
+          <p className="notice">
+            这是你主动选择的原文。批准前不会写入；选中文字不会被改写。
+          </p>
+          <h3>选中的原文 · {preview.characterCount} 字</h3>
+          <SafeMarkdown plain content={preview.text} />
+          <h3>
+            {preview.target.kind === "current_chapter"
+              ? "逐字保留到本章"
+              : "逐字写入文件"}
+          </h3>
+          {preview.target.kind === "current_chapter" ? (
+            <>
+              <p>
+                第{" "}
+                <SafeMarkdown inline plain content={preview.target.chapter} />{" "}
+                章 · {preview.characterCount} / 600 字
+              </p>
+              <p>
+                替换本章逐字文本槽位，随资料包校验预算；章节批准后清除，不带入下一章。
+              </p>
+            </>
+          ) : (
+            <>
+              <SafeMarkdown plain content={preview.target.resource.path} />
+              <p>
+                追加到文件末尾。批准后作为普通项目资料，按既有权限供岗位读取。
+              </p>
+              {preview.target.separator === "\n" && (
+                <p>写入前增加一个分隔换行，选中文字保持原样。</p>
+              )}
+              <p className="fine-print">
+                当前指纹{" "}
+                <SafeMarkdown
+                  plain
+                  inline
+                  content={preview.target.resource.sha256}
+                />
+                ；写入后{" "}
+                <SafeMarkdown
+                  plain
+                  inline
+                  content={preview.target.afterSha256}
+                />
+              </p>
+            </>
+          )}
+          <details>
+            <summary>来源消息与选区</summary>
+            <Structured value={preview.source} />
+          </details>
+        </section>
+      )}
       <details className="preview-provenance">
         <summary>作用域与资源指纹</summary>
         <Structured
@@ -350,7 +409,9 @@ export function PreviewCard({
           )}
           {preview.status === "stale" && (
             <p className="notice">
-              旧预览不能批准，可把修改意见交回协调员生成新版。
+              {preview.kind === "verbatim"
+                ? "旧预览不能批准，请重新选择原文生成预览。"
+                : "旧预览不能批准，可把修改意见交回协调员生成新版。"}
             </p>
           )}
           <label>
@@ -367,7 +428,12 @@ export function PreviewCard({
             <button
               type="button"
               className="button secondary"
-              disabled={busy || !canRevise || !text.trim()}
+              disabled={
+                busy ||
+                !canRevise ||
+                preview.kind === "verbatim" ||
+                !text.trim()
+              }
               onClick={() => onAction("revise", text, false)}
             >
               交回协调员修改

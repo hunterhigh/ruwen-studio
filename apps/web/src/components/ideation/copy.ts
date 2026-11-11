@@ -1,6 +1,6 @@
 import type {
   IdeationErrorCode,
-  IdeationPreview,
+  IdeationPreviewV1_2 as IdeationPreview,
   IdeationRole,
   IdeationTaskStatus,
 } from "@ruwen/pipeline";
@@ -55,6 +55,7 @@ export const kindNames: Record<IdeationPreview["kind"], string> = {
   learning_plan: "学习计划",
   expression_candidate: "表现候选",
   generation_field: "章节情境",
+  verbatim: "逐字保留",
 };
 export const previewStatus = {
   pending: "等待决定",

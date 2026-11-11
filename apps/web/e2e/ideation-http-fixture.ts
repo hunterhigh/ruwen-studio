@@ -1,14 +1,22 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import type {
+  IdeationApprovalReceipt,
+  IdeationCreateVerbatimPreview,
   IdeationErrorCode,
   IdeationEvent,
   IdeationEventData,
   IdeationRunId,
   IdeationSessionId,
   IdeationTask,
+  IdeationVerbatimPreview,
 } from "@ruwen/pipeline";
 import { createIdeationDemo } from "../src/components/ideation/demo.ts";
+import {
+  fixtureBrand as b,
+  fixtureResource,
+  previewFixture,
+} from "../src/components/ideation/fixtures.ts";
 import {
   IDEATION_ENDPOINTS,
   ideationHttpStatus,
@@ -22,6 +30,8 @@ export async function ideationHttpFixture(page: Page, projectId: string) {
     8000,
   );
   const extraTasks: IdeationTask[] = [];
+  const verbatim: IdeationVerbatimPreview[] = [];
+  const verbatimRequests: IdeationCreateVerbatimPreview[] = [];
   let cursor = 0,
     fail: IdeationErrorCode | undefined;
   await page.addInitScript(() => {
@@ -89,6 +99,92 @@ export async function ideationHttpFixture(page: Page, projectId: string) {
       const request = route.request(),
         url = new URL(request.url()),
         suffix = url.pathname.split("/ideation")[1] ?? "";
+      const literal = /^\/messages\/([^/]+)\/verbatim-previews$/.exec(suffix);
+      if (literal && request.method() === "POST") {
+        const input = {
+          ...request.postDataJSON(),
+          messageId: literal[1],
+        } as IdeationCreateVerbatimPreview;
+        verbatimRequests.push(input);
+        const sessions = await demo.api.listIdeationSessions({});
+        if (!sessions.ok) throw new Error("fixture sessions");
+        for (const session of sessions.value.items) {
+          const messages = await demo.api.listIdeationMessages({
+            sessionId: session.id,
+          });
+          const source =
+            messages.ok &&
+            messages.value.items.find(
+              (m) => m.id === input.messageId && m.role === "user",
+            );
+          if (!source) continue;
+          const text = Array.from(source.content)
+            .slice(input.start, input.end)
+            .join("");
+          const base = previewFixture(
+            "handoff",
+            projectId,
+            session.id,
+            b(randomUUID()),
+          );
+          const sha = b<typeof base.sha256>(
+            createHash("sha256").update(text).digest("hex"),
+          );
+          const preview: IdeationVerbatimPreview = {
+            ...base,
+            kind: "verbatim",
+            origin: "user_explicit",
+            role: "chuangyi-xietiaoyuan",
+            taskId: null,
+            summary: b("请阅读逐字选区和写入目标"),
+            text: b(text),
+            textSha256: sha,
+            characterCount: Array.from(text).length,
+            source: {
+              messageId: source.id,
+              start: input.start,
+              end: input.end,
+              messageSha256: sha,
+            },
+            target:
+              input.target.kind === "current_chapter"
+                ? {
+                    kind: "current_chapter",
+                    chapter: "001",
+                    file: {
+                      path: b("authoring-ruwen-v5/exact-text/001.md"),
+                      sha256: sha,
+                    },
+                    manifest: {
+                      path: b(
+                        "authoring-ruwen-v5/manifests/author-manifest.json",
+                      ),
+                      sha256: sha,
+                    },
+                    previousExactText: null,
+                    maximumCharacters: 600,
+                    maximumPacketCharacters: 8000,
+                  }
+                : {
+                    kind: "resource_file",
+                    resource: {
+                      ...fixtureResource,
+                      id: input.target.resourceId,
+                    },
+                    writeMode: "append",
+                    separator: "\n",
+                    afterSha256: sha,
+                  },
+          };
+          verbatim.unshift(preview);
+          await route.fulfill({
+            status: 201,
+            json: { ok: true, value: preview },
+          });
+          return;
+        }
+        throw new Error("Unknown user fixture message");
+      }
       const endpoint = IDEATION_ENDPOINTS.find(
         (e) =>
           e.method === request.method() &&
@@ -111,6 +207,48 @@ export async function ideationHttpFixture(page: Page, projectId: string) {
         );
         input[endpoint.locator] = pattern.exec(suffix)?.[1];
       }
+      const literalIndex = verbatim.findIndex((p) => p.id === input.previewId);
+      const literalPreview = verbatim[literalIndex];
+      if (literalPreview) {
+        if (endpoint.operation === "getPreview") {
+          await route.fulfill({ json: { ok: true, value: literalPreview } });
+          return;
+        }
+        if (
+          endpoint.operation === "approvePreview" ||
+          endpoint.operation === "rejectPreview"
+        ) {
+          const approved = endpoint.operation === "approvePreview";
+          verbatim[literalIndex] = {
+            ...literalPreview,
+            status: approved ? "approved" : "rejected",
+          };
+          const receipt: IdeationApprovalReceipt = {
+            id: b(randomUUID()),
+            projectId: literalPreview.projectId,
+            previewId: literalPreview.id,
+            approvedSha256: literalPreview.sha256,
+            coreApprovals: [],
+            startedTaskId: null,
+            committedFiles: [],
+            projectionRegistered: false,
+            createdAt: new Date().toISOString(),
+          };
+          await route.fulfill({
+            json: {
+              ok: true,
+              value: approved
+                ? receipt
+                : {
+                    previewId: literalPreview.id,
+                    status: "rejected",
+                    coordinatorMessageId: null,
+                  },
+            },
+          });
+          return;
+        }
+      }
       if (fail && endpoint.operation === "sendIdeationMessage") {
         const code = fail;
         fail = undefined;
@@ -130,6 +268,25 @@ export async function ideationHttpFixture(page: Page, projectId: string) {
         return;
       }
       const result = await demo.api[endpoint.operation](input as never);
+      if (
+        result.ok &&
+        endpoint.operation === "listPreviews" &&
+        "items" in result.value
+      ) {
+        await route.fulfill({
+          json: {
+            ok: true,
+            value: {
+              ...result.value,
+              items: [
+                ...verbatim.filter((p) => p.sessionId === input.sessionId),
+                ...result.value.items,
+              ],
+            },
+          },
+        });
+        return;
+      }
       if (
         result.ok &&
         endpoint.operation === "listIdeationTasks" &&
@@ -161,6 +318,7 @@ export async function ideationHttpFixture(page: Page, projectId: string) {
   );
   return {
     demo,
+    verbatimRequests,
     emit,
     failNextSend(code: IdeationErrorCode) {
       fail = code;

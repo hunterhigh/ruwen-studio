@@ -2,6 +2,7 @@ import { createHmac, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { expect, type Page } from "@playwright/test";
 import { Database } from "@ruwen/db";
+import { previewConfiguration } from "../../../config/preview.ts";
 
 /** Independent UI-login fixtures in the fixed loopback-only preview, never a product bypass. */
 async function resetPreviewLoginFixture(email: string) {
@@ -11,9 +12,7 @@ async function resetPreviewLoginFixture(email: string) {
       "utf8",
     )
   ).trim();
-  const db = new Database(
-    "postgresql://ruwen:local_test_only@127.0.0.1:54329/ruwen_dev",
-  );
+  const db = new Database(previewConfiguration().databaseUrl);
   try {
     const keys = [
       "ip:127.0.0.1",

@@ -1,4 +1,7 @@
 import { defineConfig } from "@playwright/test";
+import { previewConfiguration } from "./config/preview.ts";
+
+const preview = previewConfiguration();
 export default defineConfig({
   testDir: "./apps/web/e2e",
   timeout: 120000,
@@ -6,7 +9,7 @@ export default defineConfig({
   workers: 1,
   use: {
     actionTimeout: 15000,
-    baseURL: "https://localhost:3000",
+    baseURL: preview.baseUrl,
     ignoreHTTPSErrors: true,
     viewport: { width: 1440, height: 1000 },
     trace: "retain-on-failure",
@@ -17,7 +20,7 @@ export default defineConfig({
   },
   webServer: {
     command: "node scripts/preview.ts",
-    url: "https://localhost:3000/api/health",
+    url: `${preview.baseUrl}/api/health`,
     ignoreHTTPSErrors: true,
     reuseExistingServer: !process.env.CI,
     timeout: 120000,

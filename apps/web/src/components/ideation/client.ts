@@ -2,11 +2,11 @@ import type {
   IdeationActor,
   IdeationCursor,
   IdeationError,
-  IdeationEvent,
+  IdeationEventV1_2 as IdeationEvent,
   IdeationPage,
   IdeationRequestId,
   IdeationResult,
-  IdeationService,
+  IdeationServiceV1_2 as IdeationService,
   IdeationSessionId,
 } from "@ruwen/pipeline";
 import { ApiError, request } from "../client.ts";
@@ -114,6 +114,13 @@ export function createIdeationClient(projectId: string) {
       send(`/tasks/${r.taskId}/cancel`, "POST", r, "taskId"),
     getIdeationApproval: (r) =>
       send(`/decisions/${r.decisionId}`, "GET", r, "decisionId"),
+    createVerbatimPreview: (r) =>
+      send(
+        `/messages/${r.messageId}/verbatim-previews`,
+        "POST",
+        r,
+        "messageId",
+      ),
   };
   const active = new Set<EventSource>(),
     cursors = new Map<string, IdeationCursor>();

@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { Database } from "@ruwen/db";
+import { previewConfiguration } from "../../../config/preview.ts";
 import { runtimeSettings } from "../../../config/settings.ts";
 import { createDemo, signIn } from "./helpers.ts";
 
@@ -55,12 +56,10 @@ test("frozen run refuses without a task, and an audited administrator can unfree
   const email = `${randomUUID()}@test.invalid`;
   await signIn(page, email);
   const projectId = await createDemo(page, "风控冻结浏览器测试");
-  const db = new Database(
-    "postgresql://ruwen:local_test_only@127.0.0.1:54329/ruwen_dev",
-  );
+  const db = new Database(previewConfiguration().databaseUrl);
   const adminContext = await browser.newContext({
     ignoreHTTPSErrors: true,
-    baseURL: "https://localhost:3000",
+    baseURL: previewConfiguration().baseUrl,
   });
   try {
     const owner = (
@@ -126,12 +125,10 @@ test("admin reviews uncertain cost with a reason and the account shows the audit
   const email = `${randomUUID()}@test.invalid`;
   await signIn(page, email);
   const projectId = await createDemo(page, "费用人工核对测试");
-  const db = new Database(
-    "postgresql://ruwen:local_test_only@127.0.0.1:54329/ruwen_dev",
-  );
+  const db = new Database(previewConfiguration().databaseUrl);
   const context = await browser.newContext({
     ignoreHTTPSErrors: true,
-    baseURL: "https://localhost:3000",
+    baseURL: previewConfiguration().baseUrl,
   });
   try {
     const owner = (

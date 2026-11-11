@@ -25,11 +25,34 @@ export function SafeMarkdown({
   content,
   inline = false,
   plain = false,
+  selection,
 }: {
   content: string;
   inline?: boolean;
   plain?: boolean;
+  selection?: { label: string; onSelect: (start: number, end: number) => void };
 }) {
+  if (plain && selection) {
+    const report = (event: React.SyntheticEvent<HTMLTextAreaElement>) =>
+      selection.onSelect(
+        event.currentTarget.selectionStart,
+        event.currentTarget.selectionEnd,
+      );
+    return (
+      <textarea
+        className="plain-content verbatim-source"
+        data-safe-markdown="text"
+        readOnly
+        aria-label={selection.label}
+        value={content}
+        rows={Math.min(8, Math.max(2, content.split("\n").length))}
+        onSelect={report}
+        onMouseUp={report}
+        onKeyUp={report}
+        onTouchEnd={report}
+      />
+    );
+  }
   if (plain)
     return inline ? (
       <span data-safe-markdown="text">{content}</span>

@@ -2,6 +2,7 @@ import { registry } from "@ruwen/core";
 import { securityLimits } from "../../../../../../../../config/security.ts";
 import { IdeationStudio } from "../../../../../components/IdeationStudio.tsx";
 import { ownedPage } from "../../../../../server/page-auth.ts";
+import { verbatimTargetOptions } from "../../../../../server/verbatim-targets.ts";
 export default async function IdeationPage({
   params,
 }: {
@@ -45,6 +46,10 @@ export default async function IdeationPage({
         )
         .map((r) => ({ id: r.id, path: r.path, sha256: r.source_sha256 }))}
       chatLimit={securityLimits().chatChars}
+      verbatimTargets={verbatimTargetOptions(
+        metadata.resources,
+        owned.project.project_key,
+      )}
     />
   );
 }

@@ -60,6 +60,7 @@ export async function ideationFixture(
       previewId: preview.id,
       taskId: accepted.turnId,
       decisionId: decision.id,
+      messageId: accepted.messageId,
     },
   };
 }

@@ -528,10 +528,11 @@ it("production mailbox cannot be accessed and charging stays server-blocked befo
     ).status,
   ).toBe(404);
 });
-it("the eighteen implemented v1.1 HTTP mappings are explicitly registered", () => {
-  expect(API_ROUTES.filter((route) => route.ideation)).toHaveLength(18);
+it("the nineteen implemented v1.2 HTTP mappings are explicitly registered", () => {
+  expect(API_ROUTES.filter((route) => route.ideation)).toHaveLength(19);
   const id = randomUUID();
   const routes = [
+    ["POST", `messages/${id}/verbatim-previews`],
     ["GET", "sessions"],
     ["POST", `sessions/${id}/close`],
     ["POST", "sessions"],

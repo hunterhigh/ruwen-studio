@@ -1765,3 +1765,32 @@ textarea {
   top: 0;
   z-index: 1;
 }
+.verbatim-source {
+  width: 100%;
+  resize: vertical;
+  white-space: pre-wrap;
+  font: inherit;
+  line-height: 1.8;
+  background: transparent;
+  border: 1px solid var(--line);
+}
+.verbatim-actions {
+  margin-top: 10px;
+}
+.verbatim-actions summary {
+  color: var(--steel);
+  font-size: 12px;
+  cursor: pointer;
+}
+.verbatim-actions .button {
+  margin: 8px 0;
+}
+.verbatim-actions pre {
+  max-height: 10rem;
+  overflow: auto;
+}
+.verbatim-actions pre,
+.verbatim-preview pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

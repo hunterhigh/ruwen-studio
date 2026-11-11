@@ -7,19 +7,26 @@ import type {
   IdeationClosedSession,
   IdeationCloseSession,
   IdeationCompilationRequest,
+  IdeationCoordinatorReplyText,
+  IdeationCreateVerbatimPreview,
   IdeationErrorCode,
   IdeationEvent,
+  IdeationEventV1_2,
   IdeationFilePreview,
   IdeationListSessions,
   IdeationPage,
   IdeationPageRequest,
   IdeationPreview,
+  IdeationPreviewV1_2,
   IdeationRequestId,
   IdeationResult,
   IdeationService,
+  IdeationServiceV1_2,
   IdeationSession,
   IdeationSessionId,
   IdeationSessionStatus,
+  IdeationVerbatimPreview,
+  IdeationVerbatimTarget,
   RunStartErrorCode,
   RunStartErrorStatus,
 } from "../src/index.ts";
@@ -143,4 +150,56 @@ export type IdeationReusesAllSharedRunCodes = Assert<
 >;
 export type AdditiveContractKeepsEventWireVersion = Assert<
   Equal<IdeationEvent["version"], 1>
+>;
+
+export type VerbatimRequestAcceptsOnlyDatabaseSelection = Assert<
+  Equal<
+    keyof IdeationCreateVerbatimPreview,
+    "messageId" | "start" | "end" | "target" | "clientRequestId"
+  >
+>;
+export type VerbatimTargetHasNoArbitraryPath = Assert<
+  Absent<Extract<IdeationVerbatimTarget, { kind: "resource_file" }>, "path">
+>;
+export type CurrentChapterIsServerSelected = Assert<
+  Equal<
+    Extract<IdeationVerbatimTarget, { kind: "current_chapter" }>,
+    { readonly kind: "current_chapter" }
+  >
+>;
+export type VerbatimCannotPretendToBeAModelTask = Assert<
+  Equal<IdeationVerbatimPreview["taskId"], null>
+>;
+export type VerbatimOriginIsExplicitUser = Assert<
+  Equal<IdeationVerbatimPreview["origin"], "user_explicit">
+>;
+export type V12HasSixPreviewKinds = Assert<
+  Equal<IdeationPreviewV1_2["kind"], IdeationPreview["kind"] | "verbatim">
+>;
+export type VerbatimCreationRequiresAuthenticatedActor = Assert<
+  Equal<
+    Parameters<IdeationServiceV1_2["createVerbatimPreview"]>,
+    [actor: IdeationActor, request: IdeationCreateVerbatimPreview]
+  >
+>;
+export type V12PreviewReadsReturnVerbatim = Assert<
+  Equal<
+    ReturnType<IdeationServiceV1_2["getPreview"]>,
+    Promise<IdeationResult<IdeationPreviewV1_2>>
+  >
+>;
+export type V12CoordinatorDeltaAllowsOwnSessionReply = Assert<
+  Equal<
+    Extract<
+      IdeationEventV1_2,
+      { type: "delta"; role: "chuangyi-xietiaoyuan" }
+    >["text"],
+    IdeationCoordinatorReplyText
+  >
+>;
+export type V12DoesNotChangeResetReasons = Assert<
+  Equal<
+    Extract<IdeationEventV1_2, { type: "reset" }>["reason"],
+    Extract<IdeationEvent, { type: "reset" }>["reason"]
+  >
 >;

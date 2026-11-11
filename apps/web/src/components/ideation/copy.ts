@@ -58,7 +58,7 @@ export const kindNames: Record<IdeationPreview["kind"], string> = {
 };
 export const previewStatus = {
   pending: "等待决定",
-  approved: "已模拟批准",
+  approved: "已批准",
   rejected: "已拒绝",
   stale: "已过期",
   superseded: "已有新版",

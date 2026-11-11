@@ -16,6 +16,7 @@ import {
   registry,
   state,
 } from "@ruwen/core";
+import type { IdeationErrorCode, IdeationService } from "@ruwen/pipeline";
 import { type ChapterRun, loadRun, runPath } from "@ruwen/pipeline";
 import { releasePolicy, runtimeSettings } from "../../../../config/settings.ts";
 import {
@@ -27,6 +28,11 @@ import {
 } from "./admin-review.ts";
 import { newMailbox, previewMail, redeemInvitation } from "./auth.ts";
 import { billingAccount } from "./billing-account.ts";
+import {
+  handleIdeation,
+  IDEATION_ROUTES,
+  ideationFailureResponse,
+} from "./ideation-api.ts";
 import { type Resource, requireOwnership } from "./ownership.ts";
 import {
   CSRF_COOKIE,
@@ -43,6 +49,8 @@ import {
 import type { WebServices } from "./services.ts";
 
 export interface RouteDefinition {
+  ideation?: keyof IdeationService;
+  resourceParams?: readonly string[];
   method: string;
   pattern: string;
   resource?:
@@ -56,6 +64,7 @@ export interface RouteDefinition {
 }
 /** A resource route cannot be added without a 404 fixture; the route coverage test enforces this registry. */
 export const API_ROUTES: readonly RouteDefinition[] = [
+  ...IDEATION_ROUTES,
   { method: "GET", pattern: "/api/health" },
   { method: "GET", pattern: "/api/csrf" },
   { method: "POST", pattern: "/api/login" },
@@ -493,10 +502,12 @@ export async function handleApi(
 ): Promise<Response> {
   let actorId: string | undefined;
   let resourceRequest = false;
+  let ideationRequest = false;
   try {
     const { route, params } = match(request),
       db = services.worker.db,
       url = new URL(request.url);
+    ideationRequest = !!route.ideation;
     const payments = () =>
       services.payments ??
       createPayments(
@@ -608,6 +619,15 @@ export async function handleApi(
       route.resource === "projectId" || route.resource === "runId"
         ? await requireOwnership(db, user.id, {
             [route.resource]: params[route.resource],
+            ...(route.ideation
+              ? {
+                  ideation: Object.fromEntries(
+                    (route.resourceParams ?? [])
+                      .filter((key) => key !== "projectId")
+                      .map((key) => [key, params[key]]),
+                  ),
+                }
+              : {}),
           } as Resource)
         : undefined;
     if (route.resource === "checkoutId")
@@ -632,6 +652,22 @@ export async function handleApi(
       requireCsrf(request, services.environment.baseURL);
     if (adminAction && !isAdmin(services, user.email)) {
       throw new HttpError(404, "资源不存在。");
+    }
+    if (route.ideation) {
+      const data =
+        request.method === "GET"
+          ? Object.fromEntries(url.searchParams)
+          : await body(request);
+      if (request.method === "GET" && typeof data.limit === "string")
+        data.limit = Number(data.limit);
+      return await handleIdeation(
+        request,
+        services,
+        user.id,
+        route,
+        params,
+        data,
+      );
     }
     if (route.pattern === "/api/session")
       return json({ user, admin: isAdmin(services, user.email) });
@@ -969,6 +1005,24 @@ export async function handleApi(
         "INSERT INTO security_events(user_id,kind,score) VALUES($1,$2,1)",
         [actorId, error.status === 404 ? "access_denied" : "rate_limited"],
       );
+    if (ideationRequest) {
+      if (error instanceof BillingError)
+        return ideationFailureResponse(error.code as never);
+      const code =
+        error instanceof HttpError
+          ? (
+              {
+                401: "UNAUTHENTICATED",
+                403: "CSRF_INVALID",
+                404: "NOT_FOUND",
+                400: "INVALID_ARGUMENT",
+                413: "INPUT_LIMIT_EXCEEDED",
+                429: "RATE_LIMITED",
+              } as Partial<Record<number, IdeationErrorCode>>
+            )[error.status]
+          : undefined;
+      return ideationFailureResponse(code ?? "INTERNAL_ERROR");
+    }
     if (error instanceof BillingError)
       return json(
         {

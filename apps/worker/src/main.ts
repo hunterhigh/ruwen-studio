@@ -7,6 +7,7 @@ import {
   MODEL_MODES,
 } from "@ruwen/agents";
 import { runtimeSettings } from "../../../config/settings.ts";
+import { configuredIdeation } from "./ideation-config.ts";
 import { WorkerService } from "./service.ts";
 
 const env = fileURLToPath(new URL("../../../.env", import.meta.url));
@@ -30,6 +31,7 @@ const modelRuntime = (request?: Data) =>
       : { characterDelayMs: Number(process.env.FAUX_CHARACTER_DELAY_MS) }),
   });
 const worker = new WorkerService(process.env.DATABASE_URL, {
+  ideation: configuredIdeation(),
   ...(process.env.WORKER_QUEUE ? { queue: process.env.WORKER_QUEUE } : {}),
   concurrency: Number(process.env.WORKER_CONCURRENCY ?? execution.concurrency),
   ...(process.env.ROLE_TIMEOUT_MS === undefined

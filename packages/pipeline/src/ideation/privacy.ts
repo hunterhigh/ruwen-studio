@@ -80,9 +80,9 @@ export class OriginalWordingStream {
     sources: readonly string[],
     privatePublish: (text: string) => void,
   ) {
-    // Deliberately conservative for public events; quoted wording can still be read via messages.
+    // Preserve source-fragment boundaries after published ranges have been excluded.
     this.stream = new IncrementalOutput(
-      new LeakDetector(sources.join("\n"), deploymentCanary(), [], 12),
+      new OriginalSourceDetector(sources),
       privatePublish,
     );
   }
@@ -100,5 +100,27 @@ export class OriginalWordingStream {
   }
   finish() {
     if (!this.blocked) this.stream.finish();
+  }
+}
+
+class OriginalSourceDetector extends LeakDetector {
+  private readonly fragments: LeakDetector[];
+  constructor(sources: readonly string[]) {
+    super("", deploymentCanary(), [], 12);
+    this.fragments = sources.map(
+      (source) => new LeakDetector(source, deploymentCanary(), [], 12),
+    );
+  }
+  override check(value: unknown) {
+    return (
+      super.check(value) ??
+      this.fragments.map((d) => d.check(value)).find(Boolean)
+    );
+  }
+  override pendingLength(text: string) {
+    return this.fragments.reduce(
+      (length, d) => Math.max(length, d.pendingLength(text)),
+      super.pendingLength(text),
+    );
   }
 }

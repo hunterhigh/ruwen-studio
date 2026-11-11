@@ -184,6 +184,14 @@ try {
     assert.equal(account.status,401);
   `,
   ]);
+  await docker([
+    "exec",
+    "--env",
+    "RUN_CONTAINER_ACCEPTANCE=1",
+    names.worker,
+    "node",
+    "scripts/container-chapter-smoke.ts",
+  ]);
   for (const service of ["worker", "web"] as const) {
     await docker(["stop", "--time", "30", names[service]]);
     assert.equal(
@@ -199,7 +207,7 @@ try {
     );
   }
   process.stdout.write(
-    `${JSON.stringify({ event: "container_acceptance_passed", services: 2, nonRoot: true, readonlyRootfs: true, independentMigration: true, databaseHealth: true, proxyCookiesAndCsp: true, gracefulShutdown: true })}\n`,
+    `${JSON.stringify({ event: "container_acceptance_passed", services: 2, nonRoot: true, readonlyRootfs: true, independentMigration: true, databaseHealth: true, proxyCookiesAndCsp: true, gracefulShutdown: true, readonlyFauxChapter: true })}\n`,
   );
 } catch {
   process.stderr.write('{"event":"container_acceptance_failed"}\n');

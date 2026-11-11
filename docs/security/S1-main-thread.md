@@ -1,32 +1,46 @@
-# 主线程S1交付记录（2026-11-10）
+# 主线程 S1 安全对照（2026-11-11）
 
-以SECURITY-DESIGN §5正式编号为准；本轮已同步PR #2/#3。逐项CSP及S1完整对照见[phase-5报告](../reports/phase-5.md)，更严格img-src差异及分工见[ADR-009](../decisions/ADR-009-web-security-boundary.md)。
+本表以人类的[SECURITY-DESIGN](SECURITY-DESIGN.md) §3.3.4、§5编号及后续分工为准。主线程已接管S1-4冻结和计费；早期占位界面已替换。P5仍须人类试用，本文不代表P3或公开上线验收。
 
-- S1-1：唯一安全Markdown、禁HTML/图片、HTTPS及三个rel、外链点击确认；CSP/nonce/HSTS/nosniff/Referrer-Policy与设计核对。保留仅self图片策略，不开放data图片；生产无unsafe-inline/unsafe-eval。
-- S1-2：现有12条资源路由全部requireOwnership与A→B 404；含SSE/导出。路由覆盖检查在pnpm test/CI中；未来构思的资源参数必须扩展同一测试。
-- S1-3：应用及认证POST统一CSRF，Cookie三属性，IP/邮箱限流；15分钟一次性魔法链接、登录会话轮换、全设备登出（含CSRF与他人会话保留测试）。SMTP/Google真实投递/回调配置未验收。
-- S1-4：管理页展示现有风险事实、设计配置和追加式访问审计。管理页面/API/邀请码及拒绝访问留痕，邀请码和审计同事务；0101只新增网页审计表并禁止改写/删除，无稿件、提示词或令牌正文。冻结/解冻按钮禁用，状态未知。后端冻结、阈值、复核/解冻、其他风控事件与并发/频率/点数/邮箱执行未接入，继续归并行线程。
+## §3.3 第4条：CSP与响应头
 
-第2项提交前lint/typecheck及45文件444项测试通过；生产构建及6项浏览器测试通过。无真实模型、收费或公开部署，未修改vendor、不削弱I1–I13。P5仍未完成；尝试重置事件、构思契约接入与完整构思回归保留后续。
+| 设计要求 | 实际实现 | 验证 |
+|---|---|---|
+| default-src 'self' | 相同 | security.test逐条断言；production浏览器 |
+| img-src 'self' data: | 采用更严格的img-src 'self'；渲染组件不加载任何用户/模型图片 | [ADR-009](../decisions/ADR-009-web-security-boundary.md)；恶意Markdown/ZIP无图片请求 |
+| connect-src 'self' | 生产相同；开发仅增加localhost/127.0.0.1的wss热更新 | 生产CSP测试 |
+| frame-ancestors 'none' | 相同，并有X-Frame-Options DENY | security.test |
+| base-uri 'none' | 相同 | security.test |
+| form-action 'self' | 相同 | security.test |
+| 脚本nonce | 逐请求随机nonce，传入Next SSR；生产无unsafe-inline/unsafe-eval | production浏览器实际页面脚本运行且无CSP违规 |
+| HSTS | max-age=31536000; includeSubDomains | 单元及实际HTTPS响应 |
+| X-Content-Type-Options | nosniff | security.test |
+| Referrer-Policy | strict-origin-when-cross-origin | security.test及浏览器响应 |
 
-## 第3项：文本落盘与SSE仅消费安全onDelta
+另外保留style/font同源、object-src none、权限与COOP/CORP保护；未为调试UI放宽生产CSP。
 
-复核service.ts、stream-events.ts、run-role.ts及api.ts：流式落盘唯一接线为受保护的RoleContext.onDelta，SSE只从该事件表读取，不转发原始provider事件、thinking或transcript。新增approved-stream.test.ts阻塞provider结束，证明已放行前缀可提前落盘/送达，而不安全尾部及thinking/签名始终不落入事件或实时/重连SSE。岗位失败不能再把暂扣尾部补写出来；安全前缀本身不构成批准正文。
+## S1-1：唯一安全渲染
 
-第3项提交前完整lint/typecheck/test全绿：46个文件、445项测试，203.60秒；本项仅测试及约束注释，页面行为不变，全部6项浏览器测试及生产构建已在第2项通过。本机HTTPS预览健康检查200，仍为faux且P3闸门关闭。尝试重置和构思契约的接入留待后续，不把本轮第1–3项完成等同于P5完成。
+SafeMarkdown是唯一Markdown入口，跳过原始HTML并白名单清洗；图片替换为说明文字，只允许绝对HTTPS链接，固定rel="noopener noreferrer nofollow"且外链点击先确认。Biome禁止dangerouslySetInnerHTML，既有渲染入口检查保留。单元与浏览器覆盖脚本、javascript/HTTP链接、图片、恶意导入及取消外链，不执行或外发。新构思消息、预览、差异与流式文本复用同一组件。
 
-## reset网页接入（PR #4之后）
+## S1-2：归属与事件
 
-章节与构思复用按会话/任务/岗位定位的尝试缓冲，reset立即清空当前尝试，持久化最终结果和费用不受影响。排他游标去重防止重连旧reset清掉新文字。两页补格式更正及安全拒绝的浏览器验证；构思暂用类型化本地假数据，不注册契约路由。详见p5-stream-reset-2026-11-10报告。
+49条注册映射中33条接收资源ID，全部经requireOwnership；包含项目、run、checkout、账户、预留，以及新接入的18条构思映射。构思核对projectId与sessionId/previewId/taskId/decisionId的项目关联，错父级也404。管理员跨账户/预留的例外仅由服务端allowlist授权并审计。逐路由A→B 404、匿名401、未知ID、路由声明/实际文件扫描与既有隐私扫描保留；缺新参数夹具或旁路路由使测试失败。
 
-## 构思页面本地演示
+章节SSE和导出沿用统一守卫；构思SSE只用pipeline.ideationSse，按帧/轮询重新认证和检查归属，注销/撤权后关闭。Last-Event-ID优先、游标排他重放；网页按(sessionId,runId,role)重置和去重。真实HTTP测试验证全部18条拒绝不新增任务、模型意图或扣费。
 
-五类预览、会话、任务及错误提示按v1类型开发；消息/修改/拒绝理由只在协调员消息中返回，不复制到卡片或事件。全部内容沿用SafeMarkdown；新增恶意消息与跨用户构思SSR页404浏览器验证。16条契约API逐条验证仍404，未提前加入API_ROUTES。CSRF、真实服务的原话检查/事务/归属及冻结逻辑不能由演示代替，继续列为待接入。三种预告计费/冻结错误仅准备展示文案，不产生收费或冻结行为。详见p5-ideation-demo-2026-11-10报告。
+安全正文链路只有provider→runRole/RoleSecurity放行的onDelta→worker事件落盘→已鉴权SSE；没有从原始provider、thinking或transcript补发的路径。既有approved-stream测试通过真实岗位/worker/Postgres/HTTP响应证明实时与回放只含放行前缀，不含被拦尾部、thinking/签名；失败不补写暂扣文本。两类reset浏览器验证更正和拒绝，以及跨会话/任务隔离。
 
-本轮提交前lint/typecheck/51文件463项测试全绿，生产构建与全部13项浏览器测试通过；原有安全/隔离/恢复断言和时限保持。P5仍未完成。
+## S1-3：CSRF、会话与登录
 
-## P6主线程接管与执行更新
+应用及认证写请求核对Origin、Fetch Metadata、HttpOnly __Host Cookie对应CSRF头；所有18条构思映射的写操作同样测试。支付webhook独立按原始体验签，不放宽用户写请求。Cookie为HttpOnly/Secure/SameSite=Lax；魔法链接15分钟/一次性、登录轮换会话、全设备撤销。IP/邮箱持久限流，入口覆盖连接IP并HMAC证明，不信任客户端XFF。真实认证SDK与浏览器验证通过；SMTP实际投递、Google真实回调仍待配置。
 
-2026-11-10人类将S1-4冻结逻辑和S1-5支付核心交给主线程，上文“归并行/按钮禁用”为早期快照。现已实现security_events累计冻结、受理前/新模型调用前检查、管理员明确复核/CSRF/当前状态校验后解冻、保留旧事件和复核基线、风险与管理访问的只追加审计。新增checkout/account资源按requireOwnership及逐路由A→B 404接入，未签名webhook拒绝，验签后的支付事件与加点同事务幂等。本机仅Mock沙箱，Lemon适配器强制测试订单，真实收费仍关闭。
+## S1-4：冻结、费用复核与审计
 
-现有14条资源路由有归属测试；18条构思API未注册，待分批真实后端。协调员频率、一次性邮箱名单和用户可调每日限额仍未完成；不宣称3.5全量完成。详见ADR-012、billing-service接点与phase-6报告。未知服务商用量显式标记usage_unknown，成本NULL/待核对，保留预留供人工核对，不补跑或自动当零。
+config/runtime.json保留3.5配置并标注待P3实测。security_events累计风险并触发账户冻结；受理前及实际新模型调用前拒绝冻结账户。管理员明确确认、CSRF及状态检查后解冻，旧事件保留、复核基线后新风险仍可再次冻结。已认证越权/限流计入发起者，匿名邮箱限流不按伪造邮箱冻结受害者。
+
+管理页面/API/邀请码/冻结复核/待核对预留及拒绝访问留痕。审计禁止UPDATE/DELETE/TRUNCATE；邀请码、解冻和费用核对均与对应状态变更同事务。待核对预留按实际总费用结算或释放剩余预留，必填理由，用户可见结果与说明；已知生成前零费用直接释放。管理界面不提供稿件/完整转录读取，不记录正文、提示词或密钥。
+
+冻结→拒绝零任务/零调用/零新增扣费→人工解冻→再次冻结，以及费用核对/幂等/账本恒等式均有集成和浏览器覆盖。**边界**：3.5中的协调员频率、一次性邮箱名单和用户自调每日限额未全部实现，不宣称3.5全量验收。真实支付沙箱/模型/红队实测、生产运维与上线前渗透仍保留各阶段闸门。
+
+完整验收结果见[phase-5](../reports/phase-5.md)、[计费修正](../reports/billing-reconciliation-2026-11-11.md)与[构思接入](../reports/ideation-http-integration-2026-11-11.md)。vendor和I1–I13未改，既有提示词防护保持现状。

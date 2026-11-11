@@ -1,6 +1,11 @@
 import { type Database, PostgresFS } from "@ruwen/db";
 import { HttpError } from "./security.ts";
-export type Resource = { projectId: string } | { runId: string };
+export type IdeationLocators = Partial<
+  Record<"sessionId" | "previewId" | "taskId" | "decisionId", string>
+>;
+export type Resource =
+  | { projectId: string; ideation?: IdeationLocators }
+  | { runId: string };
 type BillingResource =
   | { checkoutId: string }
   | { accountId: string }
@@ -71,5 +76,25 @@ export async function requireOwnership(
         );
   const project = rows.rows[0];
   if (!project) throw new HttpError(404, "资源不存在。");
+  if ("projectId" in resource && resource.ideation) {
+    const tables = {
+      sessionId: ["ideation_sessions", "id"],
+      previewId: ["ideation_previews", "id"],
+      taskId: ["ideation_tasks", "run_id"],
+      decisionId: ["ideation_decisions", "id"],
+    } as const;
+    for (const key of Object.keys(
+      resource.ideation,
+    ) as (keyof IdeationLocators)[]) {
+      const value = resource.ideation[key];
+      if (!value || !uuid.test(value)) throw new HttpError(404, "资源不存在。");
+      const [table, column] = tables[key];
+      const owned = await db.pool.query(
+        `SELECT 1 FROM ${table} WHERE project_id=$1 AND ${column}=$2`,
+        [project.id, value],
+      );
+      if (!owned.rowCount) throw new HttpError(404, "资源不存在。");
+    }
+  }
   return { project, fs: new PostgresFS(db, project.id, userId) };
 }

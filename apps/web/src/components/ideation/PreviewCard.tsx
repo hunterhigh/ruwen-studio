@@ -57,7 +57,7 @@ function Patches({ patches }: { patches: readonly IdeationFilePatch[] }) {
               </details>
             )}
             <p className="fine-print">
-              演示目标指纹：
+              目标指纹：
               <SafeMarkdown plain inline content={patch.afterSha256} />
             </p>
           </details>
@@ -68,16 +68,16 @@ function Patches({ patches }: { patches: readonly IdeationFilePatch[] }) {
 }
 const approvalLabel = (preview: IdeationPreview) =>
   preview.kind === "handoff"
-    ? "批准委托（演示）"
+    ? "批准委托"
     : preview.kind === "learning_plan"
-      ? "批准学习计划（演示）"
+      ? "批准学习计划"
       : preview.kind === "expression_candidate"
         ? preview.approvalStage === "candidate"
-          ? "确认为候选（演示）"
-          : "激活表现资源（演示）"
+          ? "确认为候选"
+          : "激活表现资源"
         : preview.kind === "generation_field"
-          ? "批准章节情境（演示）"
-          : "批准文件变更（演示）";
+          ? "批准章节情境"
+          : "批准文件变更";
 const auditNames = {
   route: "实现路线",
   fulfillment: "兑现方式",
@@ -127,7 +127,7 @@ export function PreviewCard({
         </span>
       </header>
       <p className="fine-print">
-        版本 {preview.revision} · 本地演示指纹{" "}
+        版本 {preview.revision} · 版本指纹{" "}
         <SafeMarkdown inline plain content={preview.sha256.slice(0, 12)} /> ·
         批准前不提交
       </p>
@@ -312,7 +312,7 @@ export function PreviewCard({
             <summary>已批准来源</summary>
             <Structured value={preview.approvedSources} />
           </details>
-          <p>只有独立批准后才登记章节投影；此演示不写项目文件。</p>
+          <p>只有独立批准后才登记章节投影；批准后才写入项目文件。</p>
         </>
       )}
       <details className="preview-provenance">
@@ -336,7 +336,7 @@ export function PreviewCard({
                   checked={confirmed}
                   onChange={(event) => setConfirmed(event.target.checked)}
                 />
-                我已阅读此版本，确认这次模拟批准
+                我已阅读此版本，确认这次批准
               </label>
               <button
                 className="button primary"

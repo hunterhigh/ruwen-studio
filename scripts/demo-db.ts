@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { WorkerService } from "../apps/worker/src/service.ts";
-import { createFauxRuntime } from "../packages/agents/src/index.ts";
+import {
+  createFauxRuntime,
+  loadRuntimeEnvironment,
+} from "../packages/agents/src/index.ts";
 import {
   exportProjectZip,
   importProjectZip,
@@ -11,7 +13,7 @@ import {
 import { PostgresFS } from "../packages/db/src/index.ts";
 
 const env = fileURLToPath(new URL("../.env", import.meta.url));
-if (existsSync(env)) process.loadEnvFile(env);
+loadRuntimeEnvironment({ file: env });
 const url =
   process.env.DATABASE_URL ||
   "postgresql://ruwen:local_test_only@127.0.0.1:54329/ruwen_dev";

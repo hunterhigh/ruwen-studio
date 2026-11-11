@@ -1,9 +1,9 @@
-import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   createApplicationRuntime,
   type Data,
   deploymentCanary,
+  loadRuntimeEnvironment,
   MODEL_MODES,
 } from "@ruwen/agents";
 import { workerHealth } from "../../../config/health.ts";
@@ -13,8 +13,11 @@ import { configuredIdeation } from "./ideation-config.ts";
 import { WorkerService } from "./service.ts";
 
 const env = fileURLToPath(new URL("../../../.env", import.meta.url));
-if (process.env.RUWEN_SKIP_ENV_FILE !== "1" && existsSync(env))
-  process.loadEnvFile(env);
+loadRuntimeEnvironment({
+  root: fileURLToPath(new URL("../../../", import.meta.url)),
+  file: env,
+  skipFile: process.env.RUWEN_SKIP_ENV_FILE === "1",
+});
 deploymentCanary();
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
 if (!(MODEL_MODES as readonly string[]).includes(process.env.MODEL_MODE ?? ""))

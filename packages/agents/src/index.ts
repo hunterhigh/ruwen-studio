@@ -22,6 +22,14 @@ export {
   type ModelMode,
 } from "./runtime/index.ts";
 export {
+  assertModelCredentialFiles,
+  loadRuntimeEnvironment,
+  MODEL_KEY_NAMES,
+  ModelCredentialError,
+  processModelKey,
+  redactModelValue,
+} from "./runtime/model-credentials.ts";
+export {
   createScenarioRuntime,
   FAUX_SCENARIOS,
   type FauxScenario,

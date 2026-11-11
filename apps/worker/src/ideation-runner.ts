@@ -559,6 +559,9 @@ export class IdeationRunner {
   ) {
     if (!Number.isFinite(result.costTotal) || result.costTotal < 0)
       throw new Error("Invalid reported role cost");
+    const unknown =
+      result.usageUnknown ??
+      (usageUnknown || (!result.usage.length && !blockedBeforeRequest));
     const safe = {
       ...publicRoleResult(result),
       output: "",
@@ -572,12 +575,10 @@ export class IdeationRunner {
         blockedBeforeRequest && !result.usage.length ? "blocked" : status,
         JSON.stringify(safe),
         JSON.stringify(result.usage),
-        !usageUnknown && (result.usage.length || blockedBeforeRequest)
-          ? result.costTotal
-          : null,
+        unknown ? null : result.costTotal,
         result.usage.reduce((n, u) => n + u.cacheRead, 0),
         result.usage.reduce((n, u) => n + u.cacheWrite, 0),
-        usageUnknown || (!result.usage.length && !blockedBeforeRequest),
+        unknown,
       ],
     );
     await recordRoleSecurityEvents(tx as PostgresFS, runId, role, result);

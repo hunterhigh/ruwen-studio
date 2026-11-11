@@ -5,6 +5,8 @@ export type AdminAction =
   | "dashboard_page"
   | "dashboard_data"
   | "account_unfreeze"
+  | "reservation_list"
+  | "reservation_resolve"
   | "invitation_create";
 export function adminAllowed(emails: string[], email: string) {
   return emails.includes(email.toLowerCase());
@@ -91,3 +93,19 @@ export async function adminRiskReview(db: Database) {
   };
 }
 export type AdminRiskReview = Awaited<ReturnType<typeof adminRiskReview>>;
+
+export async function pendingReservations(db: Database) {
+  return (
+    await db.pool.query<{
+      id: string;
+      run_id: string;
+      email: string;
+      bank: string;
+      remaining: string;
+      held_usd: string;
+      created_at: Date;
+    }>(
+      "SELECT r.id,r.run_id,u.email,r.bank,r.remaining::text,(r.remaining/r.cost_markup/r.credits_per_usd)::text held_usd,r.created_at FROM credit_reservations r JOIN users u ON u.id=r.user_id WHERE r.status='review' ORDER BY r.created_at,r.id",
+    )
+  ).rows;
+}

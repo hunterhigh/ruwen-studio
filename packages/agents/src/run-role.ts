@@ -356,6 +356,8 @@ export async function runRole(
   let limitReached = false;
   let timedOut = false;
   let lastValidationError: string | undefined;
+  let inFlight = false;
+  let generated = false;
   const maxTurns = Math.max(
     1,
     Math.min(spec.maxTurns, ctx.maxTurns ?? spec.maxTurns),
@@ -404,6 +406,8 @@ export async function runRole(
     },
     toolExecution: "sequential",
     streamFn: (selected, context, options) => {
+      inFlight = true;
+      generated = false;
       ctx.onRequest?.(structuredClone(context), id);
       return ctx.runtime.models.streamSimple(selected, context, {
         ...options,
@@ -486,8 +490,41 @@ export async function runRole(
   });
   runtime.subscribe((event) => {
     if (event.type === "message_end" && event.message.role === "assistant") {
-      usage.push(structuredClone(event.message.usage));
+      if (!["error", "aborted"].includes(event.message.stopReason))
+        inFlight = false;
+      else if (
+        event.message.content.some((block) =>
+          block.type === "text"
+            ? !!block.text
+            : block.type === "thinking"
+              ? !!(block.thinking || block.thinkingSignature || block.redacted)
+              : true,
+        )
+      )
+        generated = true;
+      if (!["error", "aborted"].includes(event.message.stopReason) || generated)
+        usage.push(structuredClone(event.message.usage));
       security.observe(event.message);
+    }
+    if (event.type === "message_update") {
+      const delta = event.assistantMessageEvent;
+      if (
+        "partial" in delta &&
+        delta.partial.content.some(
+          (block) =>
+            block.type === "thinking" &&
+            !!(block.thinkingSignature || block.redacted),
+        )
+      )
+        generated = true;
+      if (
+        ["text_delta", "thinking_delta", "toolcall_delta"].includes(
+          delta.type,
+        ) &&
+        "delta" in delta &&
+        delta.delta
+      )
+        generated = true;
     }
     if (
       event.type === "message_update" &&
@@ -519,6 +556,7 @@ export async function runRole(
   const snapshot = (): RoleResult => {
     security.finalizeFailure();
     return {
+      usageUnknown: inFlight && generated,
       runtimeMode: ctx.runtime.mode,
       output: output ?? "",
       usage: structuredClone(usage),

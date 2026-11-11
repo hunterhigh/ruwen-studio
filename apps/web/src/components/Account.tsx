@@ -191,9 +191,25 @@ export function Account() {
               {row.bank === "sandbox" ? "沙箱" : "正式"} · 剩余 {row.remaining}{" "}
               点 ·{" "}
               {row.status === "review"
-                ? "服务商结果未知，等待核对；未把费用当作零"
+                ? `服务商结果未知，等待人工核对。预留折算约 USD ${Number(row.held_usd).toFixed(4)}，这不是已发生费用；核对后结算实际用量或释放剩余预留。`
                 : "预留中，结束或取消后释放已核实的余量"}
             </p>
+          ))}
+        </section>
+      )}
+      {!!data?.reviews.length && (
+        <section className="paper-panel">
+          <h2>预留核对结果</h2>
+          {data.reviews.map((review) => (
+            <div key={review.id}>
+              <p>
+                <SafeMarkdown plain inline content={review.run_id} /> ·{" "}
+                {review.action === "release"
+                  ? "剩余预留已全额释放；保留已核实的岗位费用"
+                  : `运行总实际费用 USD ${review.actual_cost_usd}，合计 ${review.charged_credits} 点`}
+              </p>
+              <SafeMarkdown plain content={review.reason} />
+            </div>
           ))}
         </section>
       )}
@@ -254,7 +270,11 @@ export function Account() {
                 </td>
                 <td>
                   {row.cost_usd === null || row.usage_unknown
-                    ? "费用待核对"
+                    ? data.reviews.some(
+                        (review) => review.run_id === row.run_id,
+                      )
+                      ? "岗位用量未完整返回，运行已人工核对"
+                      : "费用待核对"
                     : `$${Number(row.cost_usd).toFixed(6)}`}
                 </td>
                 <td>

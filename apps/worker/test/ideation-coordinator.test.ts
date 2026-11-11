@@ -20,6 +20,39 @@ const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
   for (const stop of cleanup.splice(0)) await stop();
 });
+it("uses main's explicit known-zero usage metadata when an ideation provider fails before generation", async () => {
+  const runtime = createFauxRuntime();
+  runtime.models.streamSimple = () => {
+    throw new Error("Fixture unavailable before generation");
+  };
+  const p = await setup(() => runtime),
+    accepted = value(await p.send("讨论角色在驿站的选择。"));
+  await p.worker.handle({
+    kind: "ideation",
+    projectId: p.actor.projectId,
+    ownerId: p.actor.userId,
+    runId: accepted.turnId,
+  });
+  const row = (
+    await p.db.pool.query(
+      "SELECT usage_unknown,cost_usd::text FROM role_runs WHERE run_id=$1",
+      [accepted.turnId],
+    )
+  ).rows[0];
+  expect(row).toEqual({ usage_unknown: false, cost_usd: "0.0000000000" });
+  expect(
+    (
+      await p.db.pool.query(
+        "SELECT status,remaining::text FROM credit_reservations WHERE run_id=$1",
+        [accepted.turnId],
+      )
+    ).rows[0],
+  ).toEqual({ status: "released", remaining: "0" });
+  expect(
+    value(await p.service.getIdeationTask(p.actor, { taskId: accepted.turnId }))
+      .error?.code,
+  ).toBe("PROVIDER_UNAVAILABLE");
+}, 30000);
 it("reloads coordinator messages from DB on every tool turn, offers only its three tools, supports plain conversation and finishes an already accepted closed session", async () => {
   const requests: string[] = [];
   let p: Awaited<ReturnType<typeof setup>>;

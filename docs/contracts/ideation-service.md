@@ -188,7 +188,7 @@ v1.1合并后，后端才能实现DB持久化、prepareRequest加载、creation-
 
 创意协调员在自己的已授权会话回复（assistant消息及其delta）可以引用本会话用户原话，不因这种引用清空已发文字、不返回OUTPUT_BLOCKED、不发security_refusal。此delta仅发给该会话有权订阅者；服务端仍验证run/session/project/role关联，不凭客户端角色或事件标签授予例外。系统提示词、金丝雀和thinking的现有处理完全保留；不新增提示词防泄露机制或测试。security_refusal仍可因现有系统安全层拒绝触发。
 
-这不豁免协调员的工具payload或通讯门：creation-check照旧。下游岗位输出、普通预览、交接快照、下游任务的delta及其他事件仍执行现有原话隔离与OUTPUT_BLOCKED。message_changed等事件只带ID；原话例外不能借错误文案、任务状态或其他元数据传播。
+这不豁免协调员的工具payload或通讯门：creation-check照旧。下游岗位输出、普通预览、交接快照、下游任务的delta及其他事件仍执行现有原话隔离与OUTPUT_BLOCKED；10.3节已发布的普通项目资料从原话检查来源排除。message_changed等事件只带ID；原话例外不能借错误文案、任务状态或其他元数据传播。
 
 ### 10.2 显式创建逐字预览
 
@@ -196,7 +196,7 @@ v1.1合并后，后端才能实现DB持久化、prepareRequest加载、creation-
 
 先依第7节核对projectId、messageId→sessionId→projectId以及目标resourceId的归属，再检查消息role必须user。他人、未知、错项目/会话消息返回NOT_FOUND/404；本会话assistant消息或无效选择返回INVALID_ARGUMENT/400。start/end是从0开始、end排他的Unicode码点位置（Array.from），必须是整数且0≤start<end≤消息码点数；不接受UTF-16偏移或隐式截断。非空选区从数据库权威content直接截取，保留空白与换行字节措辞，不把客户端回传正文作为来源。
 
-预览`kind:verbatim,origin:user_explicit,taskId:null`；这是用户操作，不创建模型占位任务、不调用模型、不预留或扣费。关闭会话只限制新消息/回合；已有用户消息仍可用于此操作。预览保存source.messageId/start/end/messageSha256、textSha256、选中文本和服务端解析的目标。原话只在所属会话内的这个专用预览API中返回，是普通预览隔离的唯一显式例外；summary使用固定文案，不含选区副本。选区不复制到审计、批准凭证、SSE、任务、录制或交接快照；preview_changed只带ID/状态/哈希。
+预览`kind:verbatim,origin:user_explicit,taskId:null`；这是用户操作，不创建模型占位任务、不调用模型、不预留或扣费。关闭会话只限制新消息/回合；已有用户消息仍可用于此操作。预览保存source.messageId/start/end/messageSha256、textSha256、选中文本和服务端解析的目标。原话只在所属会话内的这个专用预览API中返回，是普通预览隔离的唯一显式例外；summary使用固定文案，不含选区副本。此创建操作不把选区复制到审计、批准凭证、SSE、任务、录制或交接快照；preview_changed只带ID/状态/哈希。
 
 ### 10.3 两种目标与提交
 
@@ -207,7 +207,9 @@ verbatim只豁免原话重合检查，现有系统输出安全边界照旧。批
 
 当前章批准时将`user_authored_text:{path,confirmed_verbatim:true}`接入现有core.packet的exact-text槽位，提交前用拟提交状态编译验证：含该槽位的完整资料包≤8000码点（若manifest另设更小合法预算也必须遵守），超预算拒绝并回滚，不能截掉选区或其他必需材料。文件保存选区原字节；资料包沿用core既有换行处理，不另改上游算法。绑定章节批准后清除活动槽位，切换章节时也不能加载前章文本；历史文件不等于后续章授权。
 
-逐字文本只能进入专用预览、批准的目标文件，以及当前章小说作者资料包的exact-text槽位。任何其他岗位输入（包括read_resource、修改前后文和搜索材料）、普通预览、下游事件与交接快照均不得包含它。目标文件的明确选区需追踪保护；不能因为文件已注册而把整份含逐字内容的文件交给其他岗位，也不能把它经普通file_patch的beforeText再次暴露。保护必须基于实际文件哈希校验，安全删去受保护片段后的模型视图不冒充物理文件字节；无法保持隔离时拒绝该读取/补丁，不能放宽readers或依赖模型自觉。作者只从绑定本章的exact-text槽位取得该例外，不从其他材料重复取得。
+- 用户通过verbatim预览批准写入resource_file的选区，批准后即为普通项目资料，按现有注册表readers和状态规则供各岗位读取，不做片段追踪、删改视图或额外的读取保护。上游第34行要求服从用户的逐字写入，写入的目的就是让系统使用这段内容；原话隔离针对对话原话与委托，不针对已批准的资料。
+- 为避免现有下游原话重合检查误伤，批准事务同时把该选区（messageId + start/end）记为“已发布片段”；构造下游原话检查来源时，从对应数据库消息中排除已发布片段。来源哈希绑定原消息字节，范围按码点解析；保留分段边界，不把两侧未发布文字拼接为新的句子。未发布原话照旧隔离，未批准的选区不能提前排除。
+- current_chapter的exact-text维持独立设计：只进入本章作者资料包的槽位，不对其他岗位开放，章节批准后清除；此目标不登记为普通资料的已发布片段。
 
 verbatim不通过revisePreview直接改写。需要改选区或目标时，用户先拒绝旧预览，再显式新建；原预览不可变。rejectPreview可照旧拒绝，理由只存会话。resource_file不自动绑定作者槽位，current_chapter不自动修改任意世界/人物/故事资料。
 
@@ -219,8 +221,8 @@ verbatim不通过revisePreview直接改写。需要改选区或目标时，用�
 
 ### 10.5 v1.2 faux验收门
 
-1. 协调员在自己会话的delta逐字引用用户消息，文字不清空、无原话原因的security_refusal；同片段在下游输出、普通预览、交接或下游事件依然OUTPUT_BLOCKED。系统安全层既有测试保持，不扩展。
+1. 协调员在自己会话的delta逐字引用用户消息，文字不清空、无原话原因的security_refusal；同一未发布片段在下游输出、普通预览、交接或下游事件依然OUTPUT_BLOCKED；已发布普通资料按10.3节处理。系统安全层既有测试保持，不扩展。
 2. messageId/目标跨租户、错项目/父会话、未知ID为404；本项目assistant消息、负数/非整数/越界/空区间为400；含emoji时按码点准确截取，批准重读源消息，客户端content字段拒绝。
 3. 当前章600码点可接受、601拒绝；资料包正好预算通过，增加选区导致>8000拒绝并回滚。批准后用真实core.packet编译证明exact-text出现且总长不超预算；章批准/换章后不会带入下一章。
 4. 未批准不写；模型自行创建verbatim拒绝；source/target/manifest哈希变更后批准拒绝；重复批准/幂等冲突不重复写；文件/注册表/审计失败注入全部回滚。保持现有批准消费/正典恢复测试范围，不另增其他强杀测试。
-5. 源原话哨兵仅在本会话回复、专用预览、批准的目标文件和本章作者exact-text槽位可见；所有其他岗位输入、普通预览、任务/错误/事件、交接和录制不可见，包括批准后read_resource和普通补丁读回路径。
+5. resource_file选区批准后，有readers权限的下游岗位可以读取该普通资料且不触发OUTPUT_BLOCKED；无readers权限仍拒绝。同一消息中未被选取的其余原话，以及尚未批准的选区仍被隔离。已发布片段与文件/注册表/审计同事务记录，失败不得留下排除范围。current_chapter原话只在本会话回复、专用预览、批准的exact-text文件和本章作者槽位可见，其他岗位输入、普通预览、任务/错误/事件、交接和录制不可见。

@@ -348,6 +348,58 @@
           "thinkingLevels": ["low", "medium", "high"]
         }
       ]
+    },
+    {
+      "provider": "deepseek",
+      "models": [
+        {
+          "id": "deepseek-flash",
+          "api": "openai-completions",
+          "thinkingLevels": ["off", "low", "high", "max"],
+          "contextWindow": 1000000,
+          "maxTokens": 384000,
+          "cost": {
+            "input": 0.3,
+            "output": 1.2,
+            "cacheRead": 0.006,
+            "cacheWrite": 0
+          },
+          "toolCalls": true,
+          "capabilitySource": "installed openai-completions adapter; offline serializer verified; live availability unverified",
+          "compat": {
+            "supportsStore": false,
+            "supportsDeveloperRole": false,
+            "maxTokensField": "max_tokens",
+            "requiresReasoningContentOnAssistantMessages": true,
+            "thinkingFormat": "deepseek",
+            "supportsStrictMode": true
+          }
+        },
+        {
+          "id": "deepseek-v4-pro",
+          "api": "openai-completions",
+          "thinkingLevels": ["off", "high", "max"],
+          "contextWindow": 1000000,
+          "maxTokens": 384000,
+          "cost": {
+            "input": 1.32,
+            "output": 3.96,
+            "cacheRead": 0.044,
+            "cacheWrite": 0
+          },
+          "toolCalls": true,
+          "capabilitySource": "installed openai-completions adapter; offline serializer verified; live availability unverified",
+          "compat": {
+            "supportsStore": false,
+            "supportsDeveloperRole": false,
+            "maxTokensField": "max_tokens",
+            "requiresReasoningContentOnAssistantMessages": true,
+            "thinkingFormat": "deepseek",
+            "supportsStrictMode": true,
+            "supportsMidConvoSystemMessages": true
+          }
+        }
+      ]
     }
   ]
 }

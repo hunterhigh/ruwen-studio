@@ -231,7 +231,7 @@ export async function finishReservation(
   await lockAccount(tx, userId);
   const unknown = (
     await tx.query<{ unknown: boolean }>(
-      "SELECT EXISTS(SELECT 1 FROM role_runs WHERE run_id=$1 AND (status='running' OR usage_unknown OR (status='failed' AND coalesce(jsonb_array_length(usage),0)=0))) unknown",
+      "SELECT EXISTS(SELECT 1 FROM role_runs WHERE run_id=$1 AND (status='running' OR usage_unknown)) unknown",
       [runId],
     )
   ).rows[0]?.unknown;

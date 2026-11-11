@@ -178,6 +178,13 @@ async function setup(blocked = false) {
 it("every registered HTTP response, file read, export entry and SSE batch excludes private prompt windows and canaries", async () => {
   const { services, fs, id, request, safe, workspaceRoot } = await setup();
   const checkoutId = randomUUID();
+  const reservationId =
+    (
+      await services.worker.db.pool.query<{ id: string }>(
+        "SELECT id FROM credit_reservations WHERE run_id=$1",
+        [id],
+      )
+    ).rows[0]?.id ?? "";
   await services.worker.db.pool.query(
     "INSERT INTO billing_checkouts(id,user_id,request_id,provider,plan_id,credits,price_minor,currency,prepared_at) VALUES($1,$2,$3,'mock','preview',100000,500,'USD',now())",
     [checkoutId, fs.ownerId, randomUUID()],
@@ -198,7 +205,8 @@ it("every registered HTTP response, file read, export entry and SSE batch exclud
       .replace(":projectId", fs.projectId)
       .replace(":runId", id)
       .replace(":checkoutId", checkoutId)
-      .replace(":accountId", fs.ownerId);
+      .replace(":accountId", fs.ownerId)
+      .replace(":reservationId", reservationId);
     expect(url).not.toMatch(/:[A-Za-z]/); // New resource parameters need a concrete privacy fixture.
     const response = await handleApi(
       request(url, route.method, route.method === "POST" ? {} : undefined),

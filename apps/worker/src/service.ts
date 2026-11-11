@@ -12,7 +12,6 @@ import {
   RoleAbortError,
   RoleExecutionError,
   type RoleId,
-  RoleProviderError,
   type RoleResult,
   runRole,
 } from "@ruwen/agents";
@@ -489,21 +488,56 @@ export class WorkerService {
     if (cached) return cached;
     await this.options.onBoundary?.("role_intent", id, run.id);
     let result: RoleResult;
+    let requested = false;
     try {
       result = await runRole(id, input, {
         ...ctx,
+        onRequest: (request, role) => {
+          requested = true;
+          ctx.onRequest?.(request, role);
+        },
         onPrompt: (prompt) => persistPrivatePrompt(fs, prompt),
       });
     } catch (error) {
-      if (error instanceof RoleExecutionError && error.partial)
+      const partial =
+        error instanceof RoleExecutionError ? error.partial : undefined;
+      if (partial)
         await this.saveRole(
           fs,
           run.id,
           id,
-          error.partial,
+          partial,
           "failed",
-          error instanceof RoleAbortError || error instanceof RoleProviderError,
+          partial.usageUnknown ?? false,
         );
+      else if (!requested) {
+        const intent = (
+          await fs.transaction((tx) =>
+            tx.sql<{ model: string; prompt_sha256: string }>(
+              "SELECT model,prompt_sha256 FROM role_runs WHERE run_id=$1 AND role_id=$2",
+              [run.id, id],
+            ),
+          )
+        ).rows[0];
+        if (intent)
+          await this.saveRole(
+            fs,
+            run.id,
+            id,
+            {
+              output: "",
+              usage: [],
+              costTotal: 0,
+              usageUnknown: false,
+              model: intent.model,
+              promptSha256: intent.prompt_sha256,
+              transcript: [],
+              readResources: [],
+              durationMs: 0,
+            },
+            "failed",
+          );
+      }
       throw error;
     }
     await this.options.onBoundary?.("role_response", id, run.id);
@@ -555,10 +589,10 @@ export class WorkerService {
           JSON.stringify(publicRoleResult(result)),
           JSON.stringify(publicTranscript(result.transcript)),
           JSON.stringify(result.usage),
-          !usageUnknown && result.usage.length ? result.costTotal : null,
+          !usageUnknown ? result.costTotal : null,
           result.usage.reduce((sum, usage) => sum + usage.cacheRead, 0),
           result.usage.reduce((sum, usage) => sum + usage.cacheWrite, 0),
-          usageUnknown || result.usage.length === 0,
+          usageUnknown,
         ],
       );
       if (changed.rows[0] && result.usage.length) {

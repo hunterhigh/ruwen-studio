@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { Database } from "@ruwen/db";
 import { runtimeSettings } from "../../../config/settings.ts";
@@ -115,6 +115,97 @@ test("frozen run refuses without a task, and an audited administrator can unfree
     });
   } finally {
     await adminContext.close();
+    await db.close();
+  }
+});
+
+test("admin reviews uncertain cost with a reason and the account shows the audited result", async ({
+  page,
+  browser,
+}) => {
+  const email = `${randomUUID()}@test.invalid`;
+  await signIn(page, email);
+  const projectId = await createDemo(page, "费用人工核对测试");
+  const db = new Database(
+    "postgresql://ruwen:local_test_only@127.0.0.1:54329/ruwen_dev",
+  );
+  const context = await browser.newContext({
+    ignoreHTTPSErrors: true,
+    baseURL: "https://localhost:3000",
+  });
+  try {
+    const owner = (
+      await db.pool.query<{ owner_id: string }>(
+        "SELECT owner_id FROM projects WHERE id=$1",
+        [projectId],
+      )
+    ).rows[0]?.owner_id;
+    if (!owner) throw new Error("Missing fixture owner");
+    const run = randomUUID(),
+      settings = runtimeSettings().billing;
+    await db.pool.query(
+      "INSERT INTO pipeline_runs(id,project_id,kind,chapter,status,request) VALUES($1,$2,'chapter_run','1','FAILED','{}')",
+      [run, projectId],
+    );
+    const prompt = "billing review browser fixture";
+    const promptHash = createHash("sha256").update(prompt).digest("hex");
+    await db.pool.query(
+      "INSERT INTO prompts(sha256,content) VALUES($1,$2) ON CONFLICT DO NOTHING",
+      [promptHash, prompt],
+    );
+    await db.pool.query(
+      "INSERT INTO role_runs(run_id,role_id,status,model,prompt_sha256,input_sha256,usage_unknown) VALUES($1,'xiaoshuo-zuozhe','failed','faux/uncertain',$2,$2,true)",
+      [run, promptHash],
+    );
+    await db.pool.query(
+      "INSERT INTO credit_reservations(user_id,run_id,bank,amount,remaining,status,cost_markup,credits_per_usd) VALUES($1,$2,'sandbox',$3,$3,'review',$4,$5)",
+      [
+        owner,
+        run,
+        settings.defaultReservations.chapter,
+        settings.costMarkup,
+        settings.creditsPerUsd,
+      ],
+    );
+    await page.goto("/account");
+    await expect(page.getByText(/预留折算约 USD/)).toBeVisible();
+    await page.goto("/admin/reservations");
+    await expect(
+      page.getByRole("heading", { name: "这一页不在这里。", exact: true }),
+    ).toBeVisible();
+    const admin = await context.newPage();
+    await signIn(admin, "preview@ruwen.local");
+    await admin.goto("/admin");
+    await admin.getByRole("link", { name: "处理待核对预留" }).click();
+    const card = admin.locator("section").filter({
+      has: admin.getByRole("heading", { name: email, exact: true }),
+    });
+    await card.getByLabel("运行总实际费用 USD", { exact: true }).fill("0.125");
+    await card
+      .getByLabel("核对理由（必填，对用户可见）")
+      .fill("已按服务商测试账单核对总实际费用。");
+    admin.once("dialog", (dialog) => dialog.accept());
+    await card.getByRole("button", { name: "确认核对并记入审计" }).click();
+    await expect(
+      admin.getByText("核对已完成，账本和处理理由已保存。"),
+    ).toBeVisible();
+    await page.goto("/account");
+    await expect(
+      page.getByRole("heading", { name: "预留核对结果" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("已按服务商测试账单核对总实际费用。", { exact: true }),
+    ).toBeVisible();
+    expect(
+      (
+        await db.pool.query(
+          "SELECT v.id FROM credit_reservation_reviews v JOIN credit_reservations r ON r.id=v.reservation_id WHERE r.run_id=$1",
+          [run],
+        )
+      ).rowCount,
+    ).toBe(1);
+  } finally {
+    await context.close();
     await db.close();
   }
 });

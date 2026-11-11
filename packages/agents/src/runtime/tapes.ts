@@ -18,6 +18,11 @@ import {
   recordedSecurityFailure,
 } from "../security/role-security.ts";
 import type { ModelRuntime } from "../types.ts";
+import {
+  COORDINATOR_RECORDING_FORMAT,
+  coordinatorTape,
+  replayCoordinatorTape,
+} from "./coordinator-tape.ts";
 import { forwardStream } from "./stream.ts";
 
 const ordered = (value: unknown): unknown => {
@@ -147,18 +152,34 @@ export function tapeRuntime(
   mode: "record" | "replay",
   workspaceRoot: string,
   characterDelayMs = 0,
+  coordinatorSources?: () => readonly string[],
 ): ModelRuntime {
   const directory = path.resolve(workspaceRoot, ".local/model-recordings");
   const upstream = base.models.streamSimple.bind(base.models);
   const stream: Models["streamSimple"] = (selected, rawContext, options) => {
     const context = normalizeContext(rawContext);
+    const coordinator = context.messages.some(
+      (message) =>
+        message.role === "system" &&
+        message.toolsAdded?.some((tool) => tool.name === "propose_handoff"),
+    );
+    const sources = coordinator ? coordinatorSources?.().slice() : undefined;
+    if (
+      coordinator &&
+      (!sources?.length ||
+        sources.some((source) => typeof source !== "string" || !source.length))
+    )
+      throw new Error("Coordinator recording requires bound database sources");
     const model = {
       id: selected.id,
       provider: selected.provider,
       api: selected.api,
     };
     const hash = stableRequestHash(model, context, options),
-      file = path.join(directory, `${hash}.json`);
+      file = path.join(
+        directory,
+        `${coordinator ? "coordinator-" : ""}${hash}.json`,
+      );
     if (mode === "replay") {
       const replay = createFauxCore({
         models: [{ id: selected.id, maxTokens: selected.maxTokens }],
@@ -167,7 +188,22 @@ export function tapeRuntime(
       let saved: AssistantMessage | undefined;
       replay.setResponses([
         async () => {
-          const tape = JSON.parse(await readFile(file, "utf8")) as Tape;
+          const stored: unknown = JSON.parse(await readFile(file, "utf8"));
+          if (coordinator) {
+            const decoded = replayCoordinatorTape(
+              stored,
+              hash,
+              sources ?? [],
+            ) as { response: AssistantMessage };
+            if (
+              !Array.isArray(decoded.response?.content) ||
+              !decoded.response.usage
+            )
+              throw new Error("Coordinator replay response is invalid");
+            saved = withoutThinking(decoded.response);
+            return saved;
+          }
+          const tape = stored as Tape;
           if (
             tape.version !== 3 ||
             tape.requestHash !== hash ||
@@ -243,17 +279,34 @@ export function tapeRuntime(
           saved.errorMessage = recordedSecurityFailure(blocked);
           saved.stopReason = "error";
         }
-        const tape: Tape = {
-          version: 3,
-          requestHash: hash,
-          request: {
-            model,
-            context: privateContext(context),
-            options: safeOptions(options),
-          },
+        const tape: Tape | undefined = coordinator
+          ? undefined
+          : {
+              version: 3,
+              requestHash: hash,
+              request: {
+                model,
+                context: privateContext(context),
+                options: safeOptions(options),
+              },
+              response: saved,
+            };
+        // The generic v3 context MUST NOT be serialized for a coordinator.
+        const payload = {
+          model,
+          options: safeOptions(options),
           response: saved,
         };
-        let content = JSON.stringify(tape, null, 2);
+        const redactedPayload = secret
+          ? JSON.parse(JSON.stringify(payload).split(secret).join("[REDACTED]"))
+          : payload;
+        let content = JSON.stringify(
+          coordinator
+            ? coordinatorTape(hash, sources ?? [], redactedPayload)
+            : tape,
+          null,
+          2,
+        );
         if (secret) content = content.split(secret).join("[REDACTED]");
         await mkdir(directory, { recursive: true });
         const temporary = `${file}.${randomUUID()}.tmp`;
@@ -291,6 +344,9 @@ export function tapeRuntime(
     ...base,
     mode,
     privateStorageRoot: directory,
+    coordinatorRecordingFormat: COORDINATOR_RECORDING_FORMAT,
+    bindCoordinatorSources: (read) =>
+      tapeRuntime(base, mode, workspaceRoot, characterDelayMs, read),
     models,
     ...(mode === "replay" ? { apiKey: () => undefined } : {}),
   };

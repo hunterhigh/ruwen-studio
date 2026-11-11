@@ -98,7 +98,7 @@ export function withIdeationV1_2(
         );
         for (const row of pending.rows) await verbatim.owned(tx, actor, row.id);
         const rows = await tx.sql<{ id: string; ordinal: string }>(
-          "SELECT id,ordinal::text FROM ideation_previews WHERE project_id=$1 AND session_id=$2 AND ordinal>$3::bigint AND ($4::text IS NULL OR status=$4) ORDER BY ordinal LIMIT $5",
+          "SELECT id,ordinal::text FROM ideation_previews WHERE project_id=$1 AND session_id=$2 AND ordinal>$3::bigint AND ($4::text IS NULL OR status=$4) ORDER BY ideation_previews.ordinal LIMIT $5",
           [
             actor.projectId,
             request.sessionId,

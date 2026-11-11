@@ -5,7 +5,7 @@ import {
   IdeationFailure,
   type IdeationSessionOptions,
 } from "../../../packages/pipeline/src/ideation/sessions.ts";
-import { IdeationWorkflow } from "../../../packages/pipeline/src/ideation/workflow.ts";
+import { IdeationServiceBackend } from "../../../packages/pipeline/src/ideation/specialized.ts";
 import { withIdeationBilling } from "./ideation-billing.ts";
 
 /** Web uses an authenticated actor. No actor identity is ever accepted from a JSON body. */
@@ -13,7 +13,7 @@ export function createIdeationService(
   db: Database,
   options: IdeationSessionOptions,
 ) {
-  return new IdeationWorkflow(
+  return new IdeationServiceBackend(
     {
       async transaction(actor, operation) {
         try {

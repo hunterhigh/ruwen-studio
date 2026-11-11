@@ -19,6 +19,7 @@ import {
   roleGenerationPolicy,
 } from "./models.ts";
 import { assemblePrompt } from "./prompts/manifest.ts";
+import { ideationRoleSpec } from "./roles/expression-phase.ts";
 import { ROLES } from "./roles/index.ts";
 import { publicTemplateMaterials } from "./security/public-templates.ts";
 import {
@@ -310,7 +311,7 @@ export async function runRole(
   }
   if (ctx.signal?.aborted)
     throw new RoleAbortError("Role cancelled before start");
-  const spec = ROLES[id];
+  const spec = ideationRoleSpec(id, ctx.ideationPhase);
   assertInputLimits(rawInput);
   const submitName =
     spec.output.kind === "tool" ? spec.output.toolName : undefined;

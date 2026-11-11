@@ -237,6 +237,14 @@ export const defaultFauxResponse = (context: TranscriptContext) => {
     }
   }
   const output = fauxOutput(id, input);
+  if (id === "biaoxian-shejishi" && input.noncanonical_trial === true)
+    return fauxAssistantMessage(
+      fauxToolCall("submit_expression_trial", {
+        sample: `${FAUX_PROSE}风从廊下拐进院里。`,
+        canonical: false,
+      }),
+      { stopReason: "toolUse" },
+    );
   const spec = ROLES[id];
   return spec.output.kind === "text"
     ? fauxAssistantMessage(String(output))

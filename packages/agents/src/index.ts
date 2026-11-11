@@ -12,6 +12,7 @@ export {
   defaultUpstreamRoot,
   rolePromptFiles,
 } from "./prompts/manifest.ts";
+export { ideationRoleSpec } from "./roles/expression-phase.ts";
 export { ROLES } from "./roles/index.ts";
 export { runRole } from "./run-role.ts";
 export {

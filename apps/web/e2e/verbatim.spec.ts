@@ -1,5 +1,6 @@
 import { expect, type Locator, test } from "@playwright/test";
-import { createDemo, signIn } from "./helpers.ts";
+import { previewConfiguration } from "../../../config/preview.ts";
+import { createDemo, selectMessageRange, signIn } from "./helpers.ts";
 import { ideationHttpFixture } from "./ideation-http-fixture.ts";
 
 async function select(source: Locator, start: number, end: number) {
@@ -28,6 +29,24 @@ test("v1.2 typed HTTP fixture: own-message codepoint selection, both destination
     .getByLabel("你的消息原文，可选中文字", { exact: true })
     .last();
   await expect(source).toHaveValue(`序${chosen}尾`);
+  const quoteRun = await fixture.addRun(fixture.demo.initialSessionId);
+  const quoteStream = page.getByTestId("ideation-stream").last();
+  await expect(quoteStream).toHaveCount(1);
+  await fixture.emit(fixture.demo.initialSessionId, quoteRun, {
+    type: "delta",
+    role: "chuangyi-xietiaoyuan",
+    text: `你说：“${chosen}”` as never,
+  });
+  await expect(quoteStream).toContainText(chosen);
+  await fixture.emit(fixture.demo.initialSessionId, quoteRun, {
+    type: "delta",
+    role: "chuangyi-xietiaoyuan",
+    text: "，我们可以保留这个感觉。" as never,
+  });
+  await expect(quoteStream).toContainText(
+    `你说：“${chosen}”，我们可以保留这个感觉。`,
+  );
+  await expect(quoteStream).not.toContainText("回复已保存");
   await select(source, 1, 1 + chosen.length);
   const article = source.locator("..");
   await expect(article).toContainText(`${Array.from(chosen).length} / 600 字`);
@@ -101,9 +120,115 @@ test("v1.2 typed HTTP fixture: own-message codepoint selection, both destination
       .locator("..")
       .getByRole("button", { name: "逐字写入文件", exact: true }),
   ).toBeEnabled();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
   await page.screenshot({
     path: info.outputPath("verbatim-selection.png"),
     fullPage: true,
   });
   fixture.dispose();
+});
+
+test("persisted v1.2: Unicode user selection appends only after approval and survives reload without model admission", async ({
+  page,
+}) => {
+  await signIn(page);
+  const projectId = await createDemo(page, "逐字保留 · 真实持久化");
+  const previewConfig = previewConfiguration();
+  const prefix =
+    previewConfig.port === 3000
+      ? "ruwen"
+      : `ruwen-preview-${previewConfig.port}`;
+  const cookies = await page.context().cookies(previewConfig.baseUrl);
+  expect(
+    cookies.some(
+      (c) =>
+        c.name.includes(`${prefix}.`) &&
+        c.secure &&
+        c.httpOnly &&
+        c.sameSite === "Lax",
+    ),
+  ).toBe(true);
+  if (previewConfig.port !== 3000)
+    expect(cookies.some((c) => c.name.includes("ruwen."))).toBe(false);
+  await page.goto(`/projects/${projectId}/ideation`);
+  await page.getByLabel("新会话名称", { exact: true }).fill("我的原句");
+  await page.getByRole("button", { name: "新建构思会话", exact: true }).click();
+  const chosen = "😀保留原句，\n 下一行。";
+  await page
+    .getByLabel("想和协调员说的话", { exact: true })
+    .fill(`序${chosen}尾`);
+  await page.getByRole("button", { name: "发送给协调员", exact: true }).click();
+  const source = page.getByLabel("你的消息原文，可选中文字", { exact: true });
+  await expect(source).toHaveValue(`序${chosen}尾`);
+  await expect(
+    page.getByRole("button", { name: "批准委托", exact: true }),
+  ).toBeVisible();
+  await selectMessageRange(source, 1, 1 + chosen.length);
+  const article = source.locator("..");
+  await article
+    .getByLabel("逐字写入的目标文件")
+    .selectOption({ label: "世界/当前态势.md" });
+  const before = await (
+    await page.request.get(
+      `/api/projects/${projectId}/files?path=${encodeURIComponent("世界/当前态势.md")}`,
+    )
+  ).json();
+  const response = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/verbatim-previews") && r.request().method() === "POST",
+  );
+  await article
+    .getByRole("button", { name: "逐字写入文件", exact: true })
+    .click();
+  const created = await response;
+  expect(created.status()).toBe(201);
+  const preview = (await created.json()).value;
+  expect(preview).toMatchObject({
+    kind: "verbatim",
+    taskId: null,
+    text: chosen,
+    characterCount: Array.from(chosen).length,
+  });
+  const card = page.getByRole("article", { name: "预览详情", exact: true });
+  await expect(card).toContainText(chosen);
+  await expect(
+    card.getByRole("button", { name: "批准逐字保留", exact: true }),
+  ).toBeDisabled();
+  expect(
+    (
+      await (
+        await page.request.get(
+          `/api/projects/${projectId}/files?path=${encodeURIComponent("世界/当前态势.md")}`,
+        )
+      ).json()
+    ).text,
+  ).toBe(before.text);
+  await card
+    .getByRole("checkbox", {
+      name: "我已阅读此版本，确认这次批准",
+      exact: true,
+    })
+    .check();
+  await card.getByRole("button", { name: "批准逐字保留", exact: true }).click();
+  await expect(card.getByText("已批准", { exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByLabel("预览类型", { exact: true }).selectOption("verbatim");
+  await expect(card.getByText("已批准", { exact: true })).toBeVisible();
+  const after = await (
+    await page.request.get(
+      `/api/projects/${projectId}/files?path=${encodeURIComponent("世界/当前态势.md")}`,
+    )
+  ).json();
+  expect(after.text).toBe(before.text + preview.target.separator + chosen);
+  const tasks = await (
+    await page.request.get(
+      `/api/projects/${projectId}/ideation/sessions/${preview.sessionId}/tasks`,
+    )
+  ).json();
+  expect(tasks.value.items).toHaveLength(1);
 });

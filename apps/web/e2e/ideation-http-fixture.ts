@@ -267,6 +267,10 @@ export async function ideationHttpFixture(page: Page, projectId: string) {
         });
         return;
       }
+      if (endpoint.operation === "createVerbatimPreview")
+        throw new Error(
+          "Verbatim fixture path must be handled before legacy dispatch",
+        );
       const result = await demo.api[endpoint.operation](input as never);
       if (
         result.ok &&

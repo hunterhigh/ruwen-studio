@@ -26,6 +26,8 @@ const port = String(preview.port);
 const environment: NodeJS.ProcessEnv = {
   ...process.env,
   DATABASE_URL: preview.databaseUrl,
+  RUWEN_COOKIE_PREFIX:
+    preview.port === 3000 ? "ruwen" : `ruwen-preview-${preview.port}`,
   BETTER_AUTH_SECRET: (await readFile(secretFile, "utf8")).trim(),
   BETTER_AUTH_URL: `https://localhost:${port}`,
   MODEL_MODE: "faux",

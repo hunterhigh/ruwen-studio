@@ -352,7 +352,7 @@ export function IdeationStudio({
             </button>
           </form>
           <p className="fine-print">
-            会话中的原话留给协调员。下游只接收通过通讯门的委托。
+            会话原话留在本会话；你批准的逐字资料会按目标权限使用。下游委托仍须通过通讯门。
           </p>
         </aside>
         <section className="ideation-conversation" aria-label="协调员会话">

@@ -16,7 +16,10 @@ import {
   registry,
   state,
 } from "@ruwen/core";
-import type { IdeationErrorCode, IdeationService } from "@ruwen/pipeline";
+import type {
+  IdeationErrorCode,
+  IdeationServiceV1_2 as IdeationService,
+} from "@ruwen/pipeline";
 import { type ChapterRun, loadRun, runPath } from "@ruwen/pipeline";
 import { releasePolicy, runtimeSettings } from "../../../../config/settings.ts";
 import {

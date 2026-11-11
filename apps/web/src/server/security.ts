@@ -15,8 +15,11 @@ export class HttpError extends Error {
 }
 export const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
-export const CSRF_COOKIE = "__Host-ruwen.csrf";
-export const MAILBOX_COOKIE = "__Host-ruwen.mailbox";
+export const COOKIE_PREFIX = process.env.RUWEN_COOKIE_PREFIX ?? "ruwen";
+if (!/^[a-z][a-z0-9-]{0,63}$/.test(COOKIE_PREFIX))
+  throw new Error("Invalid cookie namespace");
+export const CSRF_COOKIE = `__Host-${COOKIE_PREFIX}.csrf`;
+export const MAILBOX_COOKIE = `__Host-${COOKIE_PREFIX}.mailbox`;
 export const cookie = (name: string, value: string, maxAge: number) =>
   `${name}=${value}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
 export function readCookie(request: Request, name: string) {

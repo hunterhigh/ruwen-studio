@@ -1,7 +1,23 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { Database } from "@ruwen/db";
+export async function selectMessageRange(
+  source: Locator,
+  start: number,
+  end: number,
+) {
+  await source.evaluate(
+    (node, range) => {
+      const input = node as HTMLTextAreaElement;
+      input.focus();
+      input.setSelectionRange(range.start, range.end);
+      input.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    },
+    { start, end },
+  );
+}
+
 import { previewConfiguration } from "../../../config/preview.ts";
 
 /** Independent UI-login fixtures in the fixed loopback-only preview, never a product bypass. */

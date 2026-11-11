@@ -3,10 +3,10 @@ import type {
   IdeationActor,
   IdeationErrorCode,
   IdeationResult,
-  IdeationService,
+  IdeationServiceV1_2 as IdeationService,
   IdeationSessionId,
 } from "@ruwen/pipeline";
-import { ideationSse } from "@ruwen/pipeline";
+import { ideationSse, withIdeationV1_2 } from "@ruwen/pipeline";
 import type { RouteDefinition } from "./api.ts";
 import { requireOwnership } from "./ownership.ts";
 import type { WebServices } from "./services.ts";
@@ -15,10 +15,18 @@ type Endpoint = {
   method: string;
   path: string;
   operation: keyof IdeationService;
-  locator?: "sessionId" | "previewId" | "taskId" | "decisionId";
+  locator?: "sessionId" | "previewId" | "taskId" | "decisionId" | "messageId";
+  created?: boolean;
   accepted?: boolean;
 };
 export const IDEATION_ENDPOINTS: readonly Endpoint[] = [
+  {
+    method: "POST",
+    path: "/messages/:messageId/verbatim-previews",
+    operation: "createVerbatimPreview",
+    locator: "messageId",
+    created: true,
+  },
   { method: "POST", path: "/sessions", operation: "createIdeationSession" },
   { method: "GET", path: "/sessions", operation: "listIdeationSessions" },
   {
@@ -149,7 +157,7 @@ export const ideationHttpStatus = (code: IdeationErrorCode): number =>
     }) as Partial<Record<IdeationErrorCode, number>>
   )[code] ?? 409;
 export function webIdeation(services: WebServices): IdeationService {
-  services.ideation ??= services.worker.ideationService;
+  services.ideation ??= withIdeationV1_2(services.worker.ideationService);
   return services.ideation;
 }
 export function ideationFailureResponse(code: IdeationErrorCode) {
@@ -182,7 +190,8 @@ export async function handleIdeation(
     actor = { userId, projectId: params.projectId } as IdeationActor;
   if (route.ideation === "listIdeationEvents") {
     const result = await ideationSse(
-      service,
+      // The versioned facade changes only text brands; event wire shapes and the guarded event store are shared.
+      services.worker.ideationService,
       async () => {
         const session = await services.auth.api.getSession({
           headers: request.headers,
@@ -225,6 +234,23 @@ export async function handleIdeation(
       ? { [endpoint.locator]: params[endpoint.locator] }
       : {}),
   };
+  if (route.ideation === "createVerbatimPreview") {
+    const target = input.target;
+    if (
+      target &&
+      typeof target === "object" &&
+      "kind" in target &&
+      target.kind === "resource_file" &&
+      "resourceId" in target &&
+      typeof target.resourceId === "string"
+    ) {
+      await requireOwnership(services.worker.db, userId, {
+        projectId: params.projectId ?? "",
+        ideation: { messageId: params.messageId ?? "" },
+        resourceIds: [target.resourceId],
+      });
+    }
+  }
   // JSON is validated by the real contract service, including exact fields; no client identity is forwarded.
   const result: IdeationResult<unknown> = await service[endpoint.operation](
     actor,
@@ -232,9 +258,11 @@ export async function handleIdeation(
   );
   return Response.json(result, {
     status: result.ok
-      ? endpoint.accepted
-        ? 202
-        : 200
+      ? endpoint.created
+        ? 201
+        : endpoint.accepted
+          ? 202
+          : 200
       : ideationHttpStatus(result.error.code),
     headers: { "Cache-Control": "no-store" },
   });

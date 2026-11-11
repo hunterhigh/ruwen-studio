@@ -13,6 +13,7 @@
     "core": "node packages/core/bin/ruwen-core.ts",
     "demo:create": "node scripts/create-demo.ts",
     "benchmark:real": "node scripts/benchmark-real.ts",
+    "redteam": "node scripts/redteam.ts",
     "db:dev": "node scripts/dev-postgres.ts",
     "dev": "node scripts/preview.ts",
     "build:web": "pnpm --filter web build",

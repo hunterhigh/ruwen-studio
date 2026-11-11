@@ -46,7 +46,19 @@
     "realChargingEnabled": false,
     "inviteOnly": true
   },
-  "preview": { "invitationCode": "RUWEN-PREVIEW", "sessionHours": 24 },
+  "preview": {
+    "invitationCode": "RUWEN-PREVIEW",
+    "sessionHours": 24,
+    "real": {
+      "port": 3001,
+      "databasePort": 55329,
+      "databaseName": "ruwen_real_preview",
+      "instance": "real-preview",
+      "distDir": ".next-real-preview",
+      "startupTimeoutMs": 90000,
+      "shutdownTimeoutMs": 30000
+    }
+  },
   "security": {
     "magicLinkMinutes": 15,
     "loginWindowSeconds": 600,

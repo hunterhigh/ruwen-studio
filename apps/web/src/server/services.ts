@@ -4,6 +4,7 @@ import type { IdeationServiceV1_2 } from "@ruwen/pipeline";
 import { withIdeationV1_2 } from "@ruwen/pipeline";
 import { configuredIdeation, WorkerService } from "worker";
 import { reportError } from "../../../../config/observability.ts";
+import { isLocalRealPreview } from "../../../../config/real-preview.ts";
 import { runtimeSettings } from "../../../../config/settings.ts";
 import {
   type AuthEnvironment,
@@ -36,7 +37,8 @@ export function getServices(): Promise<WebServices> {
     const preview =
       process.env.LOCAL_PREVIEW === "1" &&
       process.env.NODE_ENV !== "production" &&
-      ["faux", "replay"].includes(process.env.MODEL_MODE ?? "");
+      (["faux", "replay"].includes(process.env.MODEL_MODE ?? "") ||
+        isLocalRealPreview());
     const environment: AuthEnvironment = {
       baseURL: process.env.BETTER_AUTH_URL ?? "https://localhost:3000",
       secret,

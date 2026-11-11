@@ -4,13 +4,13 @@ FROM ${NODE_IMAGE} AS production-dependencies
 WORKDIR /app
 RUN npm install --global pnpm@11.25.0
 COPY . .
-RUN pnpm install --prod --frozen-lockfile
+RUN pnpm install --prod --frozen-lockfile && node scripts/package-demo.ts
 
 FROM ${NODE_IMAGE} AS runtime
 WORKDIR /app
 ENV NODE_ENV=production NODE_DISABLE_COMPILE_CACHE=1 NEXT_TELEMETRY_DISABLED=1 \
     RUWEN_SKIP_ENV_FILE=1 RUWEN_WORKSPACE_ROOT=/app HEALTH_PORT=8081 MODEL_MODE=faux REAL_MODEL=0 \
-    P3_GATE_PASSED=0 REAL_CHARGING_ENABLED=0 INVITE_ONLY=1 LOCAL_PREVIEW=0
+    P3_GATE_PASSED=0 REAL_CHARGING_ENABLED=0 INVITE_ONLY=1 LOCAL_PREVIEW=0 RUWEN_BUNDLED_DEMO=1
 COPY --from=production-dependencies /app /app
 RUN chmod -R a-w /app
 USER 1000:1000

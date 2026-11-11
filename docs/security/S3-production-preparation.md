@@ -5,7 +5,7 @@
 | 控制 | 实现/验证入口 | 尚待实际环境验证 |
 |---|---|---|
 | 两生产镜像 | 多阶段、Node digest固定、生产依赖、UID/GID1000、代码无写权限；忽略.env/.local/recordings | CI containers实际构建/启动为合并条件 |
-| 只读文件系统 | Compose read_only、仅/tmp tmpfs、cap_drop ALL、no-new-privileges；CI用root尝试写根目录须EROFS | Fly/Railway实际根挂载配置尚未验证，不伪造平台键 |
+| 只读文件系统 | Compose read_only、仅/tmp tmpfs、cap_drop ALL、no-new-privileges；CI用root尝试写根目录须EROFS。演示ZIP在构建时打包，运行时只读归档导入Postgres，不对镜像源目录创建事务锁 | Fly/Railway实际根挂载配置尚未验证，不伪造平台键 |
 | 独立迁移 | release迁移应用/pg-boss，运行进程只核验应用迁移哈希；缺失拒绝启动 | 托管PG角色及升级维护入口 |
 | 探针/停机 | DB限时且合并并发探测，web/api/health、私有worker/health；未启动/关闭/数据库不可用为503，SIGTERM正常结束 | 实际平台持续监控和告警 |
 | 入口代理 | 必须明确平台/CIDR/公开HTTPS URL，只读经核验peer的平台IP；覆盖伪造XFF、错peer、缺头、Cookie/CSP | Fly/Railway真实peer范围、避免私网/公网TCP旁路 |

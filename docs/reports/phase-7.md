@@ -2,6 +2,7 @@
 
 ## 做了什么
 - web/worker两份多阶段生产镜像，固定Node digest、生产依赖、非root、应用无写权限；Compose严格只读根、tmpfs、降权，CI新增containers实际启动检查。
+- 容器验收发现LocalDirFS导出会在演示源旁建锁；改为构建时打包ZIP、运行时只读导入Postgres，补只读归档新建项目集成测试，未放宽根文件系统或事务隔离。
 - 独立release迁移应用/pg-boss；生产启动只核验迁移。web与私有worker探针核查DB，配套SIGTERM、Fly东京样板与Railway说明，入口代理须可信CIDR和公开HTTPS URL。
 - 备份/新库还原/本地演练脚本；运维手册覆盖发布、回滚、轮换、审计冻结、未知费用复核和上游submodule/提示词哈希锁更新。
 - Sentry无DSN关闭；生产日志与Sentry仅运行元数据白名单，不含密钥、正文、原始异常/SQL/头/堆栈。依赖审计高危阻断fast，Dependabot覆盖npm/actions/docker；Vitest升4.1.12消除旧critical。

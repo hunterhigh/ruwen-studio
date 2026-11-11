@@ -6,6 +6,8 @@
 
 `deploy/Dockerfile.web`、`deploy/Dockerfile.worker`固定Node镜像digest，分阶段安装/构建，最终UID/GID为1000、应用文件无写权限。运行时还必须启用只读根文件系统，仅/tmp临时可写；这由宿主运行器决定，Dockerfile本身不能设置挂载选项。
 
+演示项目由镜像构建步骤生成fixtures/demo-project.zip，RUWEN_BUNDLED_DEMO=1时web/容器验收只读该归档并导入Postgres，不在只读源码树申请LocalDirFS事务锁；不得通过开放源码目录写权限解决打包问题。
+
 ```sh
 docker build -f deploy/Dockerfile.web -t ruwen-web:reviewed .
 docker build -f deploy/Dockerfile.worker -t ruwen-worker:reviewed .

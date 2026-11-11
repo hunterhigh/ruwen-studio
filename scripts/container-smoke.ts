@@ -33,6 +33,8 @@ async function docker(args: string[], allowFailure = false) {
               const item = JSON.parse(line) as {
                 check?: unknown;
                 status?: unknown;
+                event?: unknown;
+                stage?: unknown;
               };
               if (
                 typeof item.check === "string" &&
@@ -48,6 +50,22 @@ async function docker(args: string[], allowFailure = false) {
               )
                 process.stderr.write(
                   `${JSON.stringify({ event: "container_check", check: item.check, status: item.status })}\n`,
+                );
+              if (
+                item.event === "readonly_faux_chapter_failed" &&
+                typeof item.stage === "string" &&
+                [
+                  "validate",
+                  "producer_start",
+                  "seed_project",
+                  "import_archive",
+                  "enqueue",
+                  "approval_gate",
+                  "usage_assertions",
+                ].includes(item.stage)
+              )
+                process.stderr.write(
+                  `${JSON.stringify({ event: item.event, stage: item.stage })}\n`,
                 );
             } catch {
               /* Drop non-metadata. */

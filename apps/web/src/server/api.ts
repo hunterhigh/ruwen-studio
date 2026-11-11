@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { FAUX_SCENARIOS, ROLE_IDS, type RoleResult } from "@ruwen/agents";
 import {
@@ -745,14 +746,21 @@ export async function handleApi(
         else if (demo)
           await importProjectZip(
             fs,
-            await exportProjectZip(
-              new LocalDirFS(
-                path.join(
-                  services.environment.workspaceRoot,
-                  "fixtures/demo-project",
+            process.env.RUWEN_BUNDLED_DEMO === "1"
+              ? await readFile(
+                  path.join(
+                    services.environment.workspaceRoot,
+                    "fixtures/demo-project.zip",
+                  ),
+                )
+              : await exportProjectZip(
+                  new LocalDirFS(
+                    path.join(
+                      services.environment.workspaceRoot,
+                      "fixtures/demo-project",
+                    ),
+                  ),
                 ),
-              ),
-            ),
           );
         else await initProject(fs, `project-${id}`);
         if (importing) {

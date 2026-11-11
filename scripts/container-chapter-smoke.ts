@@ -1,28 +1,28 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import { WorkerService } from "../apps/worker/src/service.ts";
 import { createFauxRuntime } from "../packages/agents/src/index.ts";
-import {
-  exportProjectZip,
-  importProjectZip,
-  LocalDirFS,
-} from "../packages/core/src/index.ts";
+import { importProjectZip } from "../packages/core/src/index.ts";
 import { PostgresFS } from "../packages/db/src/index.ts";
 
 let producer: WorkerService | undefined;
+let stage = "validate";
 try {
   const url = new URL(process.env.DATABASE_URL ?? "");
   assert.equal(process.env.RUN_CONTAINER_ACCEPTANCE, "1");
   assert.match(url.hostname, /^ruwen-ci-\d+-db$/);
   assert.equal(url.pathname, "/ruwen_staging");
   assert.equal(process.env.MODEL_MODE, "faux");
+  stage = "producer_start";
   producer = new WorkerService(url.toString(), {
     runtime: createFauxRuntime,
     migrations: "verify",
     queue: process.env.WORKER_QUEUE ?? "ruwen-container-ci",
   });
   await producer.start(false);
+  stage = "seed_project";
   const owner = randomUUID(),
     project = randomUUID();
   await producer.db.pool.query("INSERT INTO users(id,email) VALUES($1,$2)", [
@@ -34,11 +34,11 @@ try {
     [project, owner],
   );
   const fs = new PostgresFS(producer.db, project, owner);
-  await importProjectZip(
-    fs,
-    await exportProjectZip(new LocalDirFS("/app/fixtures/demo-project")),
-  );
+  stage = "import_archive";
+  await importProjectZip(fs, await readFile("/app/fixtures/demo-project.zip"));
+  stage = "enqueue";
   const run = await producer.enqueueChapter(fs, { chapter: 1 });
+  stage = "approval_gate";
   let status = "";
   for (let n = 0; n < 120; n++) {
     status =
@@ -56,6 +56,7 @@ try {
     await delay(500);
   }
   assert.equal(status, "AWAITING_CANDIDATE_APPROVAL");
+  stage = "usage_assertions";
   assert.equal(
     (
       await producer.db.pool.query(
@@ -79,7 +80,9 @@ try {
     '{"event":"readonly_faux_chapter_passed","approvalGate":true,"roles":5}\n',
   );
 } catch {
-  process.stderr.write('{"event":"readonly_faux_chapter_failed"}\n');
+  process.stdout.write(
+    `${JSON.stringify({ event: "readonly_faux_chapter_failed", stage })}\n`,
+  );
   process.exitCode = 1;
 } finally {
   await producer?.stop();

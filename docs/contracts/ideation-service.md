@@ -1,6 +1,6 @@
-# 构思服务契约 v1.1（contract only）
+# 构思服务契约 v1.2（contract only，待确认）
 
-日期：2026-11-10。类型与函数签名：`packages/pipeline/src/ideation/contract.ts`，仅类型导出。主线程用`import type { IdeationService, IdeationPreview, IdeationEvent } from "@ruwen/pipeline"`编写假数据适配器；**没有可以调用的真实服务函数、构思路由、队列处理器或数据库实现**。v1.1补充会话列表/关闭及章节与构思共用的运行前置错误码；v1.1合并后才按第9节实现，事件wire version仍为1。
+日期：2026-11-11。v1.1已实现；以下第1–9节保留基线约定，第10节为本次待确认增量。类型与函数签名：`packages/pipeline/src/ideation/contract.ts`，仅类型导出。v1.1消费者用`import type { IdeationService, IdeationPreview, IdeationEvent } from "@ruwen/pipeline"`接入；v1.2新入口见第10节；**v1.1后端已合并；本PR不新增运行时实现**。v1.1补充会话列表/关闭及章节与构思共用的运行前置错误码；v1.1的后端验收已完成，事件wire version仍为1。
 
 依据PLAN §6.4/§7.2、上游`ruwen-gushi-gousi/SKILL.md`、`shared/information-contract.md`、`shared/creative-communication-contract.md`与当前core的确定性校验。上游原文不变，I1–I13不变。与计划表格的两处差异见OQ-005、OQ-018及ADR-011。
 
@@ -179,3 +179,50 @@ v1.1必须把GET /sessions及POST /sessions/:sessionId/close加入同一越权�
 ## 9. 后续实现验收门
 
 v1.1合并后，后端才能实现DB持久化、prepareRequest加载、creation-check、用户批准再分派和各预览原子提交。必须以faux证明：完整流程、creation-check拒绝、未批准写入阻断、重复批准/幂等冲突、原话哨兵隔离、无搜索配置、表现审计/试写/激活门、2200字预算、reset顺序与SSE重连、所有资源ID越权及worker检查点恢复。还须验证会话列表状态过滤/分页不越权、关闭幂等与发送并发顺序、关闭后发送/修改为SESSION_CLOSED且既有预览/任务不变，以及三种运行前置拒绝在鉴权之后且任务/模型调用/扣费均为零；章节接入时复用同组错误码验收。不把当前类型检查或假数据页面当成这些实现已验收。
+
+## 10. v1.2：会话回复与用户逐字通道（待人类确认，contract only）
+
+本节明确覆盖第2/5节“一切事件均不得含原话”的旧表述，其余隔离不变。v1.1后端已由PR #6–#9合并；本次只增加契约、类型和类型检查，不声称v1.2已实现。兼容入口`IdeationService`/`IdeationPreview`仍是v1.1；新消费者使用`IdeationServiceV1_2`、`IdeationPreviewV1_2`和`IdeationEventV1_2`。实现PR会提供v1.2适配器；旧入口不能收到新种类，不用类型断言把verbatim伪装成file_patch。事件wire version仍为1。
+
+### 10.1 协调员本会话的原话例外
+
+创意协调员在自己的已授权会话回复（assistant消息及其delta）可以引用本会话用户原话，不因这种引用清空已发文字、不返回OUTPUT_BLOCKED、不发security_refusal。此delta仅发给该会话有权订阅者；服务端仍验证run/session/project/role关联，不凭客户端角色或事件标签授予例外。系统提示词、金丝雀和thinking的现有处理完全保留；不新增提示词防泄露机制或测试。security_refusal仍可因现有系统安全层拒绝触发。
+
+这不豁免协调员的工具payload或通讯门：creation-check照旧。下游岗位输出、普通预览、交接快照、下游任务的delta及其他事件仍执行现有原话隔离与OUTPUT_BLOCKED；10.3节已发布的普通项目资料从原话检查来源排除。message_changed等事件只带ID；原话例外不能借错误文案、任务状态或其他元数据传播。
+
+### 10.2 显式创建逐字预览
+
+`createVerbatimPreview(actor,request)`只供认证用户的显式操作。HTTP为`POST /messages/:messageId/verbatim-previews`（沿用第6节项目前缀），返回201及`IdeationVerbatimPreview`。messageId来自路径，body只含start/end/target及通用幂等元数据clientRequestId；服务层DTO合并messageId，不收content、replacement、path、role、sessionId、chapter或批准字段。POST须CSRF；模型工具白名单没有此方法，模型只能建议用户选择范围，不能自行创建、改写或批准。
+
+先依第7节核对projectId、messageId→sessionId→projectId以及目标resourceId的归属，再检查消息role必须user。他人、未知、错项目/会话消息返回NOT_FOUND/404；本会话assistant消息或无效选择返回INVALID_ARGUMENT/400。start/end是从0开始、end排他的Unicode码点位置（Array.from），必须是整数且0≤start<end≤消息码点数；不接受UTF-16偏移或隐式截断。非空选区从数据库权威content直接截取，保留空白与换行字节措辞，不把客户端回传正文作为来源。
+
+预览`kind:verbatim,origin:user_explicit,taskId:null`；这是用户操作，不创建模型占位任务、不调用模型、不预留或扣费。关闭会话只限制新消息/回合；已有用户消息仍可用于此操作。预览保存source.messageId/start/end/messageSha256、textSha256、选中文本和服务端解析的目标。原话只在所属会话内的这个专用预览API中返回，是普通预览隔离的唯一显式例外；summary使用固定文案，不含选区副本。此创建操作不把选区复制到审计、批准凭证、SSE、任务、录制或交接快照；preview_changed只带ID/状态/哈希。
+
+### 10.3 两种目标与提交
+
+- `target:{kind:resource_file,resourceId}`：只指当前项目中用户已获授权的文件资源，按现有资料所有者、类型/目录、readers、作用域、状态和实际哈希规则判断；文件名建议不改变所有者。服务端解析路径，预览列出base/after哈希。明确要求逐字写入指定文件时按上游服从用户；不借此绕过active表现版本/批准门，也不接受任意路径。此版本以文件末尾追加选区为确定性语义；如需段落替换，先另议契约，不由模型猜测。原文片段不改写，必要的分隔换行明确列在写入预览中。
+- `target:{kind:current_chapter}`：从当前已授权章节状态和作者manifest确定章节/作用域；不存在可用当前章则PRECONDITION_FAILED。写入`authoring-ruwen-v5/exact-text/`下当前章独立文件，并绑定该章ID。单个当前章槽位（包括本次选区）上限600个Unicode码点，中文、标点、空白及其他字符都计数，超限INPUT_LIMIT_EXCEEDED/413；不以只数汉字绕过上游上限。一次批准替换该章槽位；不是跨请求累计绕过上限。
+
+verbatim只豁免原话重合检查，现有系统输出安全边界照旧。批准仍用approvePreview的confirmed/expectedSha256/clientRequestId；服务端重读消息字节与范围、预览、目标文件、注册表、章状态/manifest并重算全部哈希，来源或章/资源变化返回PREVIEW_STALE/RESOURCE_STALE，不相信客户端哈希。按现有平台decision规则单次决定，文件、manifest/所需注册表、批准消费和审计同一事务提交；失败全部回滚，重复批准不重复写入，不发明新的core批准action。
+
+当前章批准时将`user_authored_text:{path,confirmed_verbatim:true}`接入现有core.packet的exact-text槽位，提交前用拟提交状态编译验证：含该槽位的完整资料包≤8000码点（若manifest另设更小合法预算也必须遵守），超预算拒绝并回滚，不能截掉选区或其他必需材料。文件保存选区原字节；资料包沿用core既有换行处理，不另改上游算法。绑定章节批准后清除活动槽位，切换章节时也不能加载前章文本；历史文件不等于后续章授权。
+
+- 用户通过verbatim预览批准写入resource_file的选区，批准后即为普通项目资料，按现有注册表readers和状态规则供各岗位读取，不做片段追踪、删改视图或额外的读取保护。上游第34行要求服从用户的逐字写入，写入的目的就是让系统使用这段内容；原话隔离针对对话原话与委托，不针对已批准的资料。
+- 为避免现有下游原话重合检查误伤，批准事务同时把该选区（messageId + start/end）记为“已发布片段”；构造下游原话检查来源时，从对应数据库消息中排除已发布片段。来源哈希绑定原消息字节，范围按码点解析；保留分段边界，不把两侧未发布文字拼接为新的句子。未发布原话照旧隔离，未批准的选区不能提前排除。
+- current_chapter的exact-text维持独立设计：只进入本章作者资料包的槽位，不对其他岗位开放，章节批准后清除；此目标不登记为普通资料的已发布片段。
+
+verbatim不通过revisePreview直接改写。需要改选区或目标时，用户先拒绝旧预览，再显式新建；原预览不可变。rejectPreview可照旧拒绝，理由只存会话。resource_file不自动绑定作者槽位，current_chapter不自动修改任意世界/人物/故事资料。
+
+### 10.4 HTTP、归属与错误补充
+
+新增POST纳入统一requireOwnership、API_ROUTES、CSRF和动态A→B=404测试。messageId只能解析当前已授权项目的用户消息及其父会话；target.resourceId逐个核对项目命名空间及写入权限；current_chapter的章ID、exact-text路径和manifest由服务器确定，不作为可伪造的外部ID。verbatim previewId仍绑定project/session，taskId允许null且只对user_explicit种类成立；查询/决定/分页/幂等重放不能因没有run而跳过归属。新文件路径仅由当前已授权预览分配，禁止用它下载其他项目资源。
+
+沿用404 NOT_FOUND、400 INVALID_ARGUMENT、413 INPUT_LIMIT_EXCEEDED、409 PRECONDITION_FAILED/READERS_DENIED/RESOURCE_STALE/PREVIEW_STALE/ALREADY_DECIDED/IDEMPOTENCY_CONFLICT及现有批准错误。模型试图通过工具自行创建verbatim按未授权工具拒绝，INVALID_ARGUMENT/400（不创建预览/任务）；不能借propose_handoff多塞kind或原文绕过creation-check。新接口不调用模型且不启动付费功能；以后若引入模型运行，仍先归属后执行第8节共用前置检查。
+
+### 10.5 v1.2 faux验收门
+
+1. 协调员在自己会话的delta逐字引用用户消息，文字不清空、无原话原因的security_refusal；同一未发布片段在下游输出、普通预览、交接或下游事件依然OUTPUT_BLOCKED；已发布普通资料按10.3节处理。系统安全层既有测试保持，不扩展。
+2. messageId/目标跨租户、错项目/父会话、未知ID为404；本项目assistant消息、负数/非整数/越界/空区间为400；含emoji时按码点准确截取，批准重读源消息，客户端content字段拒绝。
+3. 当前章600码点可接受、601拒绝；资料包正好预算通过，增加选区导致>8000拒绝并回滚。批准后用真实core.packet编译证明exact-text出现且总长不超预算；章批准/换章后不会带入下一章。
+4. 未批准不写；模型自行创建verbatim拒绝；source/target/manifest哈希变更后批准拒绝；重复批准/幂等冲突不重复写；文件/注册表/审计失败注入全部回滚。保持现有批准消费/正典恢复测试范围，不另增其他强杀测试。
+5. resource_file选区批准后，有readers权限的下游岗位可以读取该普通资料且不触发OUTPUT_BLOCKED；无readers权限仍拒绝。同一消息中未被选取的其余原话，以及尚未批准的选区仍被隔离。已发布片段与文件/注册表/审计同事务记录，失败不得留下排除范围。current_chapter原话只在本会话回复、专用预览、批准的exact-text文件和本章作者槽位可见，其他岗位输入、普通预览、任务/错误/事件、交接和录制不可见。

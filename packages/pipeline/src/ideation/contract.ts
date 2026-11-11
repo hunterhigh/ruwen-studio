@@ -623,3 +623,92 @@ export interface IdeationService {
     request: IdeationPageRequest & { readonly sessionId: IdeationSessionId },
   ): Promise<IdeationResult<IdeationPage<IdeationEvent>>>;
 }
+
+/** v1.2 user-only source selection. No client-supplied literal text or filesystem path. */
+export type IdeationVerbatimTarget =
+  | { readonly kind: "resource_file"; readonly resourceId: IdeationResourceId }
+  | { readonly kind: "current_chapter" };
+export interface IdeationCreateVerbatimPreview extends IdeationMutation {
+  readonly messageId: IdeationMessageId;
+  readonly start: number; // zero-based Unicode codepoints; inclusive
+  readonly end: number; // Unicode codepoints; exclusive
+  readonly target: IdeationVerbatimTarget;
+}
+/** Only server-selected database bytes may receive this brand. */
+export type IdeationVerbatimText = Opaque<"explicit-user-verbatim-selection">;
+export interface IdeationVerbatimPreview
+  extends Omit<IdeationPreviewBase, "taskId"> {
+  readonly kind: "verbatim";
+  readonly origin: "user_explicit";
+  readonly taskId: null; // no synthetic model task, reservation or generation
+  readonly role: "chuangyi-xietiaoyuan";
+  readonly source: {
+    readonly messageId: IdeationMessageId;
+    readonly start: number;
+    readonly end: number;
+    readonly messageSha256: IdeationSha256;
+  };
+  readonly text: IdeationVerbatimText;
+  readonly textSha256: IdeationSha256;
+  readonly characterCount: number;
+  readonly target:
+    | {
+        readonly kind: "resource_file";
+        readonly resource: IdeationResourceRef;
+        readonly writeMode: "append";
+        readonly separator: "" | "\n";
+        readonly afterSha256: IdeationSha256;
+      }
+    | {
+        readonly kind: "current_chapter";
+        readonly chapter: string;
+        readonly file: IdeationFileRef;
+        readonly manifest: IdeationFileRef;
+        readonly previousExactText: IdeationFileRef | null;
+        readonly maximumCharacters: 600;
+        readonly maximumPacketCharacters: number; // <= 8000, validated via core.packet
+      };
+}
+export type IdeationPreviewV1_2 = IdeationPreview | IdeationVerbatimPreview;
+/** Prompt-checked coordinator reply may quote its own session; downstream stays raw-source checked. */
+export type IdeationCoordinatorReplyText =
+  Opaque<"prompt-checked-own-session-reply">;
+export type IdeationEventV1_2 =
+  | Exclude<IdeationEvent, { readonly type: "delta" }>
+  | (Omit<Extract<IdeationEvent, { readonly type: "delta" }>, "role" | "text"> &
+      (
+        | {
+            readonly role: "chuangyi-xietiaoyuan";
+            readonly text: IdeationCoordinatorReplyText;
+          }
+        | {
+            readonly role: IdeationDownstreamRole;
+            readonly text: IdeationSafeText;
+          }
+      ));
+/** Contract only; v1.1 consumers keep their existing adapter until explicitly upgraded. */
+export interface IdeationServiceV1_2
+  extends Omit<
+    IdeationService,
+    "getPreview" | "listPreviews" | "listIdeationEvents"
+  > {
+  createVerbatimPreview(
+    actor: IdeationActor,
+    request: IdeationCreateVerbatimPreview,
+  ): Promise<IdeationResult<IdeationVerbatimPreview>>;
+  getPreview(
+    actor: IdeationActor,
+    request: { readonly previewId: IdeationPreviewId },
+  ): Promise<IdeationResult<IdeationPreviewV1_2>>;
+  listPreviews(
+    actor: IdeationActor,
+    request: IdeationPageRequest & {
+      readonly sessionId: IdeationSessionId;
+      readonly status?: IdeationPreviewStatus;
+    },
+  ): Promise<IdeationResult<IdeationPage<IdeationPreviewV1_2>>>;
+  listIdeationEvents(
+    actor: IdeationActor,
+    request: IdeationPageRequest & { readonly sessionId: IdeationSessionId },
+  ): Promise<IdeationResult<IdeationPage<IdeationEventV1_2>>>;
+}

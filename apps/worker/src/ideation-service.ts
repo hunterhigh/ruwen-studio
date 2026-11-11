@@ -1,6 +1,7 @@
 import { BillingError } from "@ruwen/billing";
 import type { Database } from "@ruwen/db";
 import { PostgresFS, TenantAccessError } from "@ruwen/db";
+import { withIdeationV1_2 } from "../../../packages/pipeline/src/ideation/service-v1-2.ts";
 import {
   IdeationFailure,
   type IdeationSessionOptions,
@@ -36,4 +37,12 @@ export function createIdeationService(
       externalSearch: Boolean(options.search),
     }),
   );
+}
+
+/** Opt in to the merged v1.2 contract; v1.1 consumers keep their existing preview union. */
+export function createIdeationServiceV1_2(
+  db: Database,
+  options: IdeationSessionOptions,
+) {
+  return withIdeationV1_2(createIdeationService(db, options));
 }

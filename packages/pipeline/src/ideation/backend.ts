@@ -13,6 +13,7 @@ import type {
   IdeationTask,
 } from "./contract.ts";
 import { assertNoOriginalWording } from "./privacy.ts";
+import { downstreamOriginalSources } from "./published.ts";
 import {
   appendIdeationEvent,
   exactIdeationRequest,
@@ -163,7 +164,7 @@ export class IdeationBackend extends IdeationSessions {
         ideationFail("INVALID_ARGUMENT");
       await this.reconcilePreviewStaleness(tx, actor, request.sessionId);
       const rows = await tx.sql<{ id: string; ordinal: string }>(
-        "SELECT id,ordinal::text FROM ideation_previews WHERE project_id=$1 AND session_id=$2 AND ordinal>$3::bigint AND ($4::text IS NULL OR status=$4) ORDER BY ordinal LIMIT $5",
+        "SELECT id,ordinal::text FROM ideation_previews WHERE project_id=$1 AND session_id=$2 AND kind<>'verbatim' AND ordinal>$3::bigint AND ($4::text IS NULL OR status=$4) ORDER BY ordinal LIMIT $5",
         [
           actor.projectId,
           request.sessionId,
@@ -196,12 +197,9 @@ export class IdeationBackend extends IdeationSessions {
         [task.id],
       )
     ).rows[0]?.session_revision;
-    const sources = await rawCoordinatorSources(
-      tx,
-      actor,
-      task.sessionId,
-      revision,
-    );
+    const sources = await (task.role === "chuangyi-xietiaoyuan"
+      ? rawCoordinatorSources
+      : downstreamOriginalSources)(tx, actor, task.sessionId, revision);
     assertNoOriginalWording(snapshot, sources);
     const bytes = JSON.stringify(snapshot),
       hash = previewBytesHash(bytes);

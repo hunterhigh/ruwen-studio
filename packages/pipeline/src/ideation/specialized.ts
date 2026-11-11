@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Data, RoleResult } from "@ruwen/agents";
 import { approval, checks, registry, state } from "@ruwen/core";
-import { previewBytesHash, rawCoordinatorSources } from "./backend.ts";
+import { previewBytesHash } from "./backend.ts";
 import {
   compilationSources,
   ideationAuthorManifest,
@@ -27,6 +27,7 @@ import {
 } from "./expression.ts";
 import { resourceMetadata } from "./file-patches.ts";
 import { assertNoOriginalWording } from "./privacy.ts";
+import { downstreamOriginalSources } from "./published.ts";
 import {
   appendIdeationEvent,
   exactIdeationRequest,
@@ -331,7 +332,7 @@ export class IdeationServiceBackend
     ).rows[0]?.session_revision;
     assertNoOriginalWording(
       value,
-      await rawCoordinatorSources(tx, actor, task.sessionId, revision),
+      await downstreamOriginalSources(tx, actor, task.sessionId, revision),
     );
   }
   override async saveDownstream(
@@ -515,7 +516,12 @@ export class IdeationServiceBackend
         const compiled = await compilationSources(tx, actor, request);
         assertNoOriginalWording(
           compiled.input,
-          await rawCoordinatorSources(tx, actor, session.id, session.revision),
+          await downstreamOriginalSources(
+            tx,
+            actor,
+            session.id,
+            session.revision,
+          ),
         );
         const id = await this.enqueue(
           tx,

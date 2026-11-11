@@ -1,6 +1,6 @@
-# 构思服务契约 v1.2（contract only，待确认）
+# 构思服务契约 v1.2（已确认）
 
-日期：2026-11-11。v1.1已实现；以下第1–9节保留基线约定，第10节为本次待确认增量。类型与函数签名：`packages/pipeline/src/ideation/contract.ts`，仅类型导出。v1.1消费者用`import type { IdeationService, IdeationPreview, IdeationEvent } from "@ruwen/pipeline"`接入；v1.2新入口见第10节；**v1.1后端已合并；本PR不新增运行时实现**。v1.1补充会话列表/关闭及章节与构思共用的运行前置错误码；v1.1的后端验收已完成，事件wire version仍为1。
+日期：2026-11-11。v1.1已实现；以下第1–9节保留基线约定，第10节为人类已确认并修订的增量。类型与函数签名：`packages/pipeline/src/ideation/contract.ts`，仅类型导出。v1.1消费者用`import type { IdeationService, IdeationPreview, IdeationEvent } from "@ruwen/pipeline"`接入；v1.2新入口见第10节；**v1.1/v1.2后端均已提供；工厂与网页接入见 `docs/ideation-v1-2-integration.md`**。v1.1补充会话列表/关闭及章节与构思共用的运行前置错误码；v1.1的后端验收已完成，事件wire version仍为1。
 
 依据PLAN §6.4/§7.2、上游`ruwen-gushi-gousi/SKILL.md`、`shared/information-contract.md`、`shared/creative-communication-contract.md`与当前core的确定性校验。上游原文不变，I1–I13不变。与计划表格的两处差异见OQ-005、OQ-018及ADR-011。
 
@@ -180,9 +180,9 @@ v1.1必须把GET /sessions及POST /sessions/:sessionId/close加入同一越权�
 
 v1.1合并后，后端才能实现DB持久化、prepareRequest加载、creation-check、用户批准再分派和各预览原子提交。必须以faux证明：完整流程、creation-check拒绝、未批准写入阻断、重复批准/幂等冲突、原话哨兵隔离、无搜索配置、表现审计/试写/激活门、2200字预算、reset顺序与SSE重连、所有资源ID越权及worker检查点恢复。还须验证会话列表状态过滤/分页不越权、关闭幂等与发送并发顺序、关闭后发送/修改为SESSION_CLOSED且既有预览/任务不变，以及三种运行前置拒绝在鉴权之后且任务/模型调用/扣费均为零；章节接入时复用同组错误码验收。不把当前类型检查或假数据页面当成这些实现已验收。
 
-## 10. v1.2：会话回复与用户逐字通道（待人类确认，contract only）
+## 10. v1.2：会话回复与用户逐字通道（已确认）
 
-本节明确覆盖第2/5节“一切事件均不得含原话”的旧表述，其余隔离不变。v1.1后端已由PR #6–#9合并；本次只增加契约、类型和类型检查，不声称v1.2已实现。兼容入口`IdeationService`/`IdeationPreview`仍是v1.1；新消费者使用`IdeationServiceV1_2`、`IdeationPreviewV1_2`和`IdeationEventV1_2`。实现PR会提供v1.2适配器；旧入口不能收到新种类，不用类型断言把verbatim伪装成file_patch。事件wire version仍为1。
+本节明确覆盖第2/5节“一切事件均不得含原话”的旧表述，其余隔离不变。v1.1后端已由PR #6–#9合并；本节契约已于2026-11-11由人类确认并按已发布资料规则修订；后端实现见接入文档。兼容入口`IdeationService`/`IdeationPreview`仍是v1.1；新消费者使用`IdeationServiceV1_2`、`IdeationPreviewV1_2`和`IdeationEventV1_2`。v1.2适配器由createIdeationServiceV1_2/withIdeationV1_2提供；旧入口不能收到新种类，不用类型断言把verbatim伪装成file_patch。事件wire version仍为1。
 
 ### 10.1 协调员本会话的原话例外
 

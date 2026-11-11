@@ -27,6 +27,7 @@ import {
   writablePath,
 } from "./file-patches.ts";
 import { assertNoOriginalWording } from "./privacy.ts";
+import { downstreamOriginalSources } from "./published.ts";
 import {
   appendIdeationEvent,
   exactIdeationRequest,
@@ -376,7 +377,7 @@ export class IdeationWorkflow extends IdeationBackend {
       ).rows[0]?.session_revision;
       assertNoOriginalWording(
         input,
-        await rawCoordinatorSources(tx, actor, task.sessionId, revision),
+        await downstreamOriginalSources(tx, actor, task.sessionId, revision),
       );
       return {
         input,
@@ -407,7 +408,7 @@ export class IdeationWorkflow extends IdeationBackend {
           [task.id],
         )
       ).rows[0]?.session_revision ?? ideationFail("NOT_FOUND");
-    const raw = await rawCoordinatorSources(
+    const raw = await downstreamOriginalSources(
       tx,
       actor,
       task.sessionId,

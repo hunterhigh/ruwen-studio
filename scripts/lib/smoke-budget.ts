@@ -10,6 +10,9 @@ import { forwardStream } from "../../packages/agents/src/runtime/stream.ts";
 import { stableRequestHash } from "../../packages/agents/src/runtime/tapes.ts";
 
 type Model = ReturnType<ModelRuntime["resolve"]>["model"];
+export type SmokeRequest = Parameters<
+  ModelRuntime["models"]["streamSimple"]
+>[1];
 type Message = Awaited<
   ReturnType<ReturnType<ModelRuntime["models"]["streamSimple"]>["result"]>
 >;
@@ -20,6 +23,8 @@ export interface SmokeCall {
   phase: string;
   status: "running" | "completed" | "failed" | "budget_stopped";
   boundUsd: number;
+  inputTokenBound: number;
+  outputTokenBound: number;
   durationMs: number;
   usage?: SmokeUsage;
   stopReason?: string;
@@ -28,8 +33,55 @@ export interface SmokeCall {
   tape?: string;
 }
 export class SmokeBudgetError extends Error {}
-/** Conservative catalog bound: all context charged at every input/cache rate plus capped output. */
-export function requestCostBound(model: Model, maxTokens = model.maxTokens) {
+/** Text byte fallback bound; keep the JSON envelope as allowance for message/tool framing. */
+export function requestInputBound(context: SmokeRequest) {
+  for (const message of context.messages)
+    if (
+      Array.isArray(message.content) &&
+      message.content.some((block) => block.type === "image")
+    )
+      throw new SmokeBudgetError(
+        "Smoke byte budgets support text requests only",
+      );
+  // Tool schemas are plain JSON Schema in the installed SDK. Count every definition,
+  // including transcript-level toolsAdded, not only the optional shorthand context.tools.
+  const sentFields = new Set([
+    "role",
+    "content",
+    "sections",
+    "toolsAdded",
+    "toolsRemoved",
+    "toolCallId",
+    "toolName",
+    "isError",
+  ]);
+  const messages = context.messages.map((message) =>
+    Object.fromEntries(
+      Object.entries(message).filter(([key]) => sentFields.has(key)),
+    ),
+  );
+  // Transport timings, usage/cost and model IDs are not sent as prompt content.
+  const utf8Bytes = Buffer.byteLength(
+    JSON.stringify({ ...context, messages }),
+    "utf8",
+  );
+  const tools =
+    (context.tools?.length ?? 0) +
+    context.messages.reduce(
+      (n, m) => n + (m.role === "system" ? (m.toolsAdded?.length ?? 0) : 0),
+      0,
+    );
+  // Provider control tokens are not text bytes. Retain a separate conservative framing
+  // allowance rather than silently treating bare content bytes as their upper bound.
+  const framingTokens = 1024 + 256 * context.messages.length + 1024 * tools;
+  return { utf8Bytes, framingTokens, tokens: utf8Bytes + framingTokens };
+}
+/** Actual request bytes, all input/cache rate ceilings, and the role's capped output. */
+export function requestCostBound(
+  model: Model,
+  context: SmokeRequest,
+  maxTokens = model.maxTokens,
+) {
   const rates = [model.cost, ...(model.cost.tiers ?? [])];
   const max = (key: "input" | "output" | "cacheRead" | "cacheWrite") =>
     Math.max(
@@ -50,7 +102,7 @@ export function requestCostBound(model: Model, maxTokens = model.maxTokens) {
     throw new SmokeBudgetError("Missing valid model token ceiling");
   return (
     Math.ceil(
-      ((model.contextWindow *
+      ((requestInputBound(context).tokens *
         (max("input") + max("cacheRead") + max("cacheWrite")) +
         maxTokens * max("output")) /
         1e6) *
@@ -86,6 +138,8 @@ export class SmokeBudget {
         phase: this.phase,
         status: "running",
         boundUsd: 0,
+        inputTokenBound: 0,
+        outputTokenBound: 0,
         durationMs: 0,
       };
       this.calls.push(row);
@@ -96,7 +150,13 @@ export class SmokeBudget {
       );
       let bound: number;
       try {
-        bound = requestCostBound(model, maxTokens);
+        if (options?.onPayload)
+          throw new SmokeBudgetError(
+            "Smoke byte budgets cannot allow a later payload transformation",
+          );
+        row.inputTokenBound = requestInputBound(context).tokens;
+        row.outputTokenBound = maxTokens;
+        bound = requestCostBound(model, context, maxTokens);
       } catch (error) {
         this.stopped = true;
         row.status = "budget_stopped";

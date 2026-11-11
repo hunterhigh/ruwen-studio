@@ -1,3 +1,4 @@
+export { normalizeContext } from "@earendil-works/pi-ai";
 export { createFauxRuntime, FAUX_PROSE, fauxOutput } from "./faux.ts";
 export {
   createRealRuntime,
@@ -21,6 +22,14 @@ export {
   MODEL_MODES,
   type ModelMode,
 } from "./runtime/index.ts";
+export {
+  assertModelCredentialFiles,
+  loadRuntimeEnvironment,
+  MODEL_KEY_NAMES,
+  ModelCredentialError,
+  processModelKey,
+  redactModelValue,
+} from "./runtime/model-credentials.ts";
 export {
   createScenarioRuntime,
   FAUX_SCENARIOS,

@@ -5,8 +5,12 @@ import {
   getSupportedThinkingLevels,
 } from "@earendil-works/pi-ai";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
+import { deepseekProvider } from "@earendil-works/pi-ai/providers/deepseek";
 import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
 import type { EditPolicy } from "@ruwen/core";
+import { readModelRoutes } from "./model-profile.ts";
+import { environmentCredentials } from "./runtime/credential-runtime.ts";
+import { processModelKey } from "./runtime/model-credentials.ts";
 import type { ModelRuntime, RoleId, RoleSpec } from "./types.ts";
 
 interface Route {
@@ -31,9 +35,7 @@ export const DEFAULT_ROLE_TIMEOUT_MS = Math.max(
   ).map((role) => role.timeoutMs),
 );
 export function roleGenerationPolicy(id: RoleId) {
-  const policy = (JSON.parse(readFileSync(routePath, "utf8")) as Routes).roles[
-    id
-  ];
+  const policy = readModelRoutes<Routes>().roles[id];
   if (
     !policy ||
     !Number.isInteger(policy.maxTokens) ||
@@ -46,8 +48,7 @@ export function roleGenerationPolicy(id: RoleId) {
   return policy;
 }
 export function editingPolicy(): EditPolicy {
-  const policy = (JSON.parse(readFileSync(routePath, "utf8")) as Routes)
-    .editing;
+  const policy = readModelRoutes<Routes>().editing;
   if (
     !policy ||
     !(policy.maxChangedRatio > 0 && policy.maxChangedRatio <= 0.15)
@@ -56,16 +57,31 @@ export function editingPolicy(): EditPolicy {
   return policy;
 }
 export function resolveRoute(spec: RoleSpec): Route {
-  const routes = JSON.parse(readFileSync(routePath, "utf8")) as Routes;
+  const routes = readModelRoutes<Routes>();
   const route = routes.roleOverrides[spec.id] ?? routes.tiers[spec.modelTier];
   if (!route) throw new Error("Model route is not configured");
   return route;
+}
+/** Tool support is audited against the installed adapter, not inferred from reasoning support. */
+export function validateRoleModel(
+  spec: RoleSpec,
+  model: { provider: string; id: string; maxTokens: number },
+) {
+  if (roleGenerationPolicy(spec.id).maxTokens > model.maxTokens)
+    throw new Error("Role maxTokens exceeds configured model output limit");
+  if (
+    model.provider === "deepseek" &&
+    spec.output.kind === "tool" &&
+    !["deepseek-v4-pro", "deepseek-flash"].includes(model.id)
+  )
+    throw new Error("Model has no audited tool support for a structured role");
 }
 export function createRealRuntime(): ModelRuntime {
   const models = createModels();
   models.setProvider(anthropicProvider());
   models.setProvider(openaiProvider());
-  return {
+  models.setProvider(deepseekProvider());
+  return environmentCredentials({
     mode: "real",
     models,
     resolve(spec) {
@@ -77,24 +93,11 @@ export function createRealRuntime(): ModelRuntime {
         throw new Error("Model is absent from the installed provider catalog");
       if (!getSupportedThinkingLevels(model).includes(route.thinkingLevel))
         throw new Error("Unsupported thinking level for configured model");
-      const variable =
-        route.provider === "anthropic"
-          ? "ANTHROPIC_API_KEY"
-          : route.provider === "openai"
-            ? "OPENAI_API_KEY"
-            : "";
-      if (!variable || !process.env[variable])
-        throw new Error(`Missing ${variable || "commercial API credential"}`);
+      validateRoleModel(spec, model);
+      processModelKey(route.provider);
       return { model, thinkingLevel: route.thinkingLevel };
     },
-    apiKey(provider) {
-      return provider === "anthropic"
-        ? process.env.ANTHROPIC_API_KEY
-        : provider === "openai"
-          ? process.env.OPENAI_API_KEY
-          : undefined;
-    },
-  };
+  });
 }
 /** Catalog lookup for offline replay; it never resolves credentials or performs a request. */
 export function resolveCatalogModel(spec: RoleSpec) {
@@ -102,11 +105,13 @@ export function resolveCatalogModel(spec: RoleSpec) {
     models = createModels();
   models.setProvider(anthropicProvider());
   models.setProvider(openaiProvider());
+  models.setProvider(deepseekProvider());
   const model = models.getModel(route.provider, route.modelId);
   if (
     !model ||
     !getSupportedThinkingLevels(model).includes(route.thinkingLevel)
   )
     throw new Error("Invalid replay catalog route");
+  validateRoleModel(spec, model);
   return { model, thinkingLevel: route.thinkingLevel };
 }

@@ -1,8 +1,13 @@
 import { lstat, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { createFauxRuntime, ROLES } from "@ruwen/agents";
-import { afterEach, expect, inject, it } from "vitest";
+import {
+  createFauxRuntime,
+  ROLES,
+  type RoleId,
+  resolveRoute,
+} from "@ruwen/agents";
+import { afterEach, expect, inject, it, vi } from "vitest";
 import {
   defaultFauxResponse,
   requestRole,
@@ -12,11 +17,14 @@ import { demoArchive } from "../../../scripts/lib/demo-archive.ts";
 import { runP3Smoke, smokeFaux } from "../../../scripts/lib/p3-smoke.ts";
 import {
   requestCostBound,
+  requestInputBound,
   SmokeBudget,
 } from "../../../scripts/lib/smoke-budget.ts";
+import { formatSmokePlan, smokePlan } from "../../../scripts/lib/smoke-plan.ts";
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
+  vi.unstubAllEnvs();
   for (const stop of cleanup.splice(0)) await stop();
 });
 async function folder() {
@@ -56,6 +64,14 @@ it("one faux run records the entire workflow and fresh-project replay matches th
   expect(record.candidate).not.toBe("");
   expect(record.memoryPreview).toBeTruthy();
   expect(record.maxUsd).toBe(5);
+  for (const call of record.calls) {
+    if (!call.usage) throw new Error("Missing usage");
+    expect(call.inputTokenBound).toBeGreaterThanOrEqual(
+      call.usage.input + call.usage.cacheRead + call.usage.cacheWrite,
+    );
+    expect(call.outputTokenBound).toBeGreaterThanOrEqual(call.usage.output);
+    expect(call.boundUsd).toBeGreaterThanOrEqual(call.usage.cost.total);
+  }
   expect(record.roles).toHaveLength(9); // coordinator + story + compiler + 6 chapter roles
   const offline = smokeFaux();
   let calls = 0;
@@ -117,7 +133,20 @@ it("rejects invalid caps and reserves the maximum pricing tier before a provider
       ],
     },
   };
-  expect(requestCostBound(model)).toBe(0.064);
+  const sample = {
+    messages: [
+      {
+        role: "system" as const,
+        content: "CURRENT_ROLE:xiaoshuo-zuozhe",
+        timestamp: 0,
+      },
+    ],
+  };
+  expect(requestCostBound(model, sample)).toBe(
+    Math.ceil(
+      ((requestInputBound(sample).tokens * 6 + 1000 * 4) / 1e6) * 1e10,
+    ) / 1e10,
+  );
   const budget = new SmokeBudget(0.01);
   let calls = 0;
   runtime.models.streamSimple = (() => {
@@ -146,6 +175,7 @@ it("rejects invalid caps and reserves the maximum pricing tier before a provider
 });
 
 it("counts actual cache usage, stops at the cap, and prevents concurrent or retried requests exceeding held budget", async () => {
+  let charge = 0.01;
   const response = (context: Parameters<typeof defaultFauxResponse>[0]) => ({
     ...defaultFauxResponse(context),
     usage: {
@@ -155,11 +185,11 @@ it("counts actual cache usage, stops at the cap, and prevents concurrent or retr
       cacheWrite: 2,
       totalTokens: 20,
       cost: {
-        input: 0.01,
+        input: charge,
         output: 0,
         cacheRead: 0,
         cacheWrite: 0,
-        total: 0.01,
+        total: charge,
         totalFromProvider: true,
       },
     },
@@ -189,12 +219,13 @@ it("counts actual cache usage, stops at the cap, and prevents concurrent or retr
       },
     ],
   };
-  const budget = new SmokeBudget(0.01),
+  charge = requestCostBound(model, context);
+  const budget = new SmokeBudget(charge),
     runtime = budget.wrap(source);
   const stream = runtime.models.streamSimple(model, context);
   expect(() => runtime.models.streamSimple(model, context)).toThrow("hard cap");
   expect((await stream.result()).stopReason).toBe("error");
-  expect(budget.spentUsd).toBe(0.01);
+  expect(budget.spentUsd).toBe(charge);
   expect(budget.heldUsd).toBe(0);
   expect(source.faux.state.callCount).toBe(1);
   expect(budget.calls[0]?.usage).toMatchObject({ cacheRead: 3, cacheWrite: 2 });
@@ -270,7 +301,7 @@ it("retains a conservative hold for unknown generation usage and refuses another
       ],
     };
   await runtime.models.streamSimple(model, context).result();
-  expect(budget.heldUsd).toBe(0.01);
+  expect(budget.heldUsd).toBe(requestCostBound(model, context));
   expect(budget.stopped).toBe(true);
   expect(() => runtime.models.streamSimple(model, context)).toThrow("hard cap");
   expect(source.faux.state.callCount).toBe(1);
@@ -356,4 +387,156 @@ it("takes a source ZIP without replacing source files or directory metadata", as
   expect(zip.byteLength).toBeGreaterThan(0);
   expect(await identity()).toEqual(before);
   expect(await readFile(file, "utf8")).toBe("read-only demo source");
+});
+
+it("bounds UTF-8 system/messages and both forms of tool schemas, independent of contextWindow", () => {
+  const runtime = createFauxRuntime(),
+    model = runtime.resolve(ROLES["xiaoshuo-zuozhe"]).model;
+  const context = {
+    systemPrompt: "系统😀",
+    messages: [
+      { role: "user" as const, content: '多字节\n引号"', timestamp: 0 },
+    ],
+    tools: [
+      {
+        name: "lookup",
+        description: "资料",
+        parameters: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "中".repeat(500) },
+          },
+        },
+      },
+    ],
+  };
+  const bound = requestInputBound(context);
+  expect(bound.utf8Bytes).toBe(
+    Buffer.byteLength(
+      JSON.stringify({
+        ...context,
+        messages: [{ role: "user", content: context.messages[0]?.content }],
+      }),
+      "utf8",
+    ),
+  );
+  expect(
+    requestInputBound({
+      ...context,
+      messages: context.messages.map((m) => ({ ...m, timestamp: Date.now() })),
+    }),
+  ).toEqual(bound);
+  expect(bound.tokens).toBeGreaterThan(bound.utf8Bytes);
+  expect(requestInputBound({ ...context, tools: [] }).tokens).toBeLessThan(
+    bound.tokens,
+  );
+  expect(
+    requestCostBound(
+      { ...model, cost: { input: 1, output: 1, cacheRead: 1, cacheWrite: 1 } },
+      context,
+      1000,
+    ),
+  ).toBe(
+    requestCostBound(
+      {
+        ...model,
+        contextWindow: 1,
+        cost: { input: 1, output: 1, cacheRead: 1, cacheWrite: 1 },
+      },
+      context,
+      1000,
+    ),
+  );
+  const transcript = {
+    messages: [
+      {
+        role: "system" as const,
+        content: "系统",
+        timestamp: 0,
+        toolsAdded: context.tools,
+      },
+    ],
+  };
+  expect(requestInputBound(transcript).utf8Bytes).toBeGreaterThan(1500);
+});
+
+it.each([
+  "default",
+  "deepseek",
+])("plans all demo tool turns with profile %s and no provider/fetch or recording, identifies the first budget block", async (profile) => {
+  vi.stubEnv("MODEL_PROFILE", profile);
+  const directory = await folder(),
+    fetch = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
+      throw new Error("Planner cannot fetch");
+    });
+  const report = await runP3Smoke({
+    url: inject("databaseUrl"),
+    directory,
+    mode: "record",
+    planOnly: true,
+    maxUsd: 5,
+  });
+  expect(report.status, report.failure ?? "").toBe("completed");
+  expect(report.providerCalls).toBe(0);
+  expect(fetch).not.toHaveBeenCalled();
+  const plan = smokePlan(report);
+  expect(plan.profile).toBe(profile);
+  expect(plan.requests).toHaveLength(11);
+  expect(plan.requests.filter((r) => r.role === "jiyi-weihuyuan")).toHaveLength(
+    2,
+  );
+  for (const r of plan.requests) {
+    const route = resolveRoute(ROLES[r.role as RoleId]);
+    expect(r.model).toBe(`${route.provider}/${route.modelId}`);
+  }
+  expect(formatSmokePlan(plan)).toContain("provider calls=0");
+  const enough = smokePlan({ ...report, maxUsd: plan.totalBoundUsd + 1 });
+  expect(enough.canFinish).toBe(true);
+  expect(enough.blockedAt).toBeNull();
+  const tiny = smokePlan({
+    ...report,
+    maxUsd: (plan.requests[0]?.boundUsd ?? 1) / 2,
+  });
+  expect(tiny.blockedAt).toBe(1);
+  const first = plan.requests[0],
+    second = plan.requests[1];
+  if (!first || !second) throw new Error("Missing plan requests");
+  expect(
+    smokePlan({ ...report, maxUsd: first.boundUsd + second.boundUsd / 2 })
+      .blockedAt,
+  ).toBe(2);
+  expect(
+    await import("node:fs/promises").then((io) => io.readdir(directory)),
+  ).toEqual([]);
+}, 30000);
+
+it("rejects unbounded image or post-measurement payload changes before a provider call", () => {
+  const source = createFauxRuntime(),
+    model = source.resolve(ROLES["xiaoshuo-zuozhe"]).model;
+  const context = {
+    messages: [
+      {
+        role: "system" as const,
+        content: "CURRENT_ROLE:xiaoshuo-zuozhe",
+        timestamp: 0,
+      },
+    ],
+  };
+  expect(() =>
+    new SmokeBudget()
+      .wrap(source)
+      .models.streamSimple(model, context, { onPayload: () => ({}) }),
+  ).toThrow("payload transformation");
+  expect(() =>
+    requestInputBound({
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "image", data: "", mimeType: "image/png" }],
+          timestamp: 0,
+        },
+      ],
+    }),
+  ).toThrow("text requests only");
+  expect(source.faux.state.callCount).toBe(0);
 });

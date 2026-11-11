@@ -6,6 +6,7 @@ coverage/
 !.env.example
 *.tsbuildinfo
 .next/
+.next-real-preview/
 apps/web/next-env.d.ts
 playwright-report/
 test-results/

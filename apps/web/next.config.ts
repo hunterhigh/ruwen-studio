@@ -1,7 +1,15 @@
 import path from "node:path";
 import type { NextConfig } from "next";
 
+const realPreview = process.env.RUWEN_LOCAL_REAL_PREVIEW === "1";
+
 const config: NextConfig = {
+  ...(realPreview
+    ? {
+        distDir: ".next-real-preview",
+        typescript: { tsconfigPath: "tsconfig.real-preview.json" },
+      }
+    : {}),
   poweredByHeader: false,
   devIndicators: false,
   logging: false,
@@ -23,7 +31,9 @@ const config: NextConfig = {
         ) => {
           if (
             request &&
-            /\/config\/(?:settings|health|observability)\.ts$/.test(request) &&
+            /\/config\/(?:settings|health|observability|real-preview)\.ts$/.test(
+              request,
+            ) &&
             context
           )
             callback(null, `commonjs ${path.resolve(context, request)}`);

@@ -30,6 +30,7 @@
     "vendor",
     "dist",
     "**/.next",
+    "**/.next-real-preview",
     "apps/web/next-env.d.ts",
     "test-results",
     "playwright-report"

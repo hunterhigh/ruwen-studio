@@ -23,6 +23,7 @@ import {
   coordinatorTape,
   replayCoordinatorTape,
 } from "./coordinator-tape.ts";
+import { processModelSecrets, redactModelValue } from "./model-credentials.ts";
 import { forwardStream } from "./stream.ts";
 
 const ordered = (value: unknown): unknown => {
@@ -237,6 +238,9 @@ export function tapeRuntime(
       });
     }
     const secret = options?.apiKey ?? base.apiKey?.(selected.provider);
+    const secrets = [
+      ...new Set([...(secret ? [secret] : []), ...processModelSecrets()]),
+    ];
     return forwardStream(upstream(selected, context, options), {
       signal: options?.signal,
       finish: async (response) => {
@@ -297,17 +301,16 @@ export function tapeRuntime(
           options: safeOptions(options),
           response: saved,
         };
-        const redactedPayload = secret
-          ? JSON.parse(JSON.stringify(payload).split(secret).join("[REDACTED]"))
-          : payload;
+        const redactedPayload = redactModelValue(payload, secrets);
         let content = JSON.stringify(
           coordinator
             ? coordinatorTape(hash, sources ?? [], redactedPayload)
-            : tape,
+            : redactModelValue(tape, secrets),
           null,
           2,
         );
-        if (secret) content = content.split(secret).join("[REDACTED]");
+        for (const key of secrets)
+          content = content.split(key).join("[REDACTED]");
         await mkdir(directory, { recursive: true });
         const temporary = `${file}.${randomUUID()}.tmp`;
         await writeFile(temporary, `${content}\n`, {

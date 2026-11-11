@@ -11,6 +11,12 @@ export * as handoff from "./handoff/index.ts";
 export { initProject } from "./init/index.ts";
 export * as candidateProblems from "./ledgers/candidate-problems.ts";
 export * as ledgers from "./ledgers/index.ts";
+export { previewV41Directory } from "./migration/local-preview.ts";
+export {
+  classifyV41Path,
+  migrateV41Preview,
+  type V41MigrationPreview,
+} from "./migration/v4-1-preview.ts";
 export * as packet from "./packet/index.ts";
 export * as registry from "./registry/index.ts";
 export {

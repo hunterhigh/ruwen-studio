@@ -14,6 +14,7 @@
     "demo:create": "node scripts/create-demo.ts",
     "benchmark:real": "node scripts/benchmark-real.ts",
     "redteam": "node scripts/redteam.ts",
+    "p3:smoke": "node scripts/p3-smoke.ts",
     "db:dev": "node scripts/dev-postgres.ts",
     "dev": "node scripts/preview.ts",
     "build:web": "pnpm --filter web build",

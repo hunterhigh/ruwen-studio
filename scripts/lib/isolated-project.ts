@@ -3,19 +3,15 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import EmbeddedPostgres from "embedded-postgres";
 import { WorkerService } from "../../apps/worker/src/service.ts";
 import {
   COORDINATOR_RECORDING_FORMAT,
   type ModelRuntime,
 } from "../../packages/agents/src/index.ts";
-import {
-  exportProjectZip,
-  importProjectZip,
-  LocalDirFS,
-} from "../../packages/core/src/index.ts";
+import { importProjectZip } from "../../packages/core/src/index.ts";
 import { PostgresFS } from "../../packages/db/src/index.ts";
+import { demoArchive } from "./demo-archive.ts";
 
 /** Tool-owned disposable DB; never connects to a user's development/production DATABASE_URL. */
 export async function isolatedDatabase() {
@@ -91,10 +87,7 @@ export async function isolatedProject(url: string, runtime: ModelRuntime) {
       [id, owner],
     );
     const fs = new PostgresFS(service.db, id, owner);
-    const source = new LocalDirFS(
-      fileURLToPath(new URL("../../fixtures/demo-project", import.meta.url)),
-    );
-    await importProjectZip(fs, await exportProjectZip(source));
+    await importProjectZip(fs, await demoArchive());
     return { service, fs };
   } catch (error) {
     await service.stop();

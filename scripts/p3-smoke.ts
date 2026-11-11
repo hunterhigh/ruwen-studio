@@ -1,6 +1,6 @@
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
+import { assertModelCredentialFiles } from "../packages/agents/src/index.ts";
 import { isolatedDatabase } from "./lib/isolated-project.ts";
 import { runP3Smoke } from "./lib/p3-smoke.ts";
 import { formatSmokePlan, smokePlan } from "./lib/smoke-plan.ts";
@@ -24,7 +24,7 @@ if (values.plan && (values.live || values.mode === "replay"))
 if (values.live && values.mode === "replay")
   throw new Error("Replay cannot enable a live upstream");
 if (values.live) {
-  if (existsSync(".env")) process.loadEnvFile(".env");
+  assertModelCredentialFiles();
   if (process.env.REAL_MODEL !== "1")
     throw new Error(
       "Live smoke requires explicit REAL_MODEL=1 and configured provider credentials; this command will incur provider cost",

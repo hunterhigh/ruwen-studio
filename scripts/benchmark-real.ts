@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  assertModelCredentialFiles,
   createRealRuntime,
   ROLE_IDS,
   ROLES,
@@ -14,11 +14,10 @@ import { startChapter } from "../packages/pipeline/src/index.ts";
 
 async function main() {
   const repo = fileURLToPath(new URL("../", import.meta.url));
-  const env = path.join(repo, ".env");
-  if (existsSync(env)) process.loadEnvFile(env);
+  assertModelCredentialFiles(repo);
   if (process.env.REAL_MODEL !== "1")
     throw new Error(
-      "P3真实验证尚未启用：请在本项目.env设置REAL_MODEL=1和ANTHROPIC_API_KEY。",
+      "P3真实验证尚未启用：只能在人类当前进程环境中设置REAL_MODEL=1与模型服务商key。",
     );
   const runtime = createRealRuntime();
   for (const id of ROLE_IDS) runtime.resolve(ROLES[id]);

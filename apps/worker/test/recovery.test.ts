@@ -51,6 +51,35 @@ function child(
       exited = true;
       resolve();
     });
+  }).then(async () => {
+    if (!task) return;
+    // OS exit precedes PostgreSQL noticing the dead connection. Recovery must wait
+    // for that session's advisory lock, rather than accidentally testing job deferral.
+    const deadline = Date.now() + 5000;
+    while (true) {
+      const client = await service.db.pool.connect();
+      try {
+        const key = `ruwen:project:${task.projectId}`;
+        const acquired = (
+          await client.query<{ locked: boolean }>(
+            "SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS locked",
+            [key],
+          )
+        ).rows[0]?.locked;
+        if (acquired) {
+          await client.query(
+            "SELECT pg_advisory_unlock(hashtextextended($1,0))",
+            [key],
+          );
+          return;
+        }
+      } finally {
+        client.release();
+      }
+      if (Date.now() > deadline)
+        throw new Error("Killed worker database lock was not released");
+      await delay(20);
+    }
   });
   cleanup.push(async () => {
     if (!exited) proc.kill("SIGKILL");

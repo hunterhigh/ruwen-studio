@@ -37,6 +37,8 @@ let ownedProjectId = "",
   ownedRunId = "";
 let foreignAccountId = "",
   ownedAccountId = "";
+let foreignReservationId = "",
+  ownedReservationId = "";
 const foreignCheckoutId = randomUUID(),
   ownedCheckoutId = randomUUID();
 const root = fileURLToPath(new URL("../../../", import.meta.url));
@@ -131,6 +133,20 @@ beforeAll(async () => {
   );
   expect(queued.status).toBe(202);
   ownedRunId = (await queued.json()).id as string;
+  foreignReservationId =
+    (
+      await services.worker.db.pool.query<{ id: string }>(
+        "SELECT id FROM credit_reservations WHERE run_id=$1",
+        [runId],
+      )
+    ).rows[0]?.id ?? "";
+  ownedReservationId =
+    (
+      await services.worker.db.pool.query<{ id: string }>(
+        "SELECT id FROM credit_reservations WHERE run_id=$1",
+        [ownedRunId],
+      )
+    ).rows[0]?.id ?? "";
   ownedAccountId =
     (
       await services.worker.db.pool.query<{ owner_id: string }>(
@@ -164,7 +180,8 @@ it("every private route rejects anonymous requests; owner mutations also need CS
       .replace(":runId", ownedRunId);
     const ownUrl = url
       .replace(":checkoutId", ownedCheckoutId)
-      .replace(":accountId", ownedAccountId);
+      .replace(":accountId", ownedAccountId)
+      .replace(":reservationId", ownedReservationId);
     expect(
       (
         await handleApi(
@@ -283,7 +300,8 @@ for (const route of API_ROUTES.filter((item) => item.resource)) {
       .replace(":projectId", projectId)
       .replace(":runId", runId)
       .replace(":checkoutId", foreignCheckoutId)
-      .replace(":accountId", foreignAccountId);
+      .replace(":accountId", foreignAccountId)
+      .replace(":reservationId", foreignReservationId);
     const result = await handleApi(
       request(
         url,

@@ -5,7 +5,7 @@ import { createServer } from "node:https";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { deploymentCanary } from "@ruwen/agents";
+import { assertModelCredentialFiles, deploymentCanary } from "@ruwen/agents";
 import type {
   NextBundlerOptions,
   NextServer,
@@ -15,10 +15,11 @@ import { generate } from "selfsigned";
 import { proxyClientIp, proxyConfiguration } from "../../../config/proxy.ts";
 import { securityHeaders } from "../src/server/security.ts";
 
-deploymentCanary();
-
 const root = fileURLToPath(new URL("../../../", import.meta.url)),
   directory = path.join(root, ".local/tls");
+assertModelCredentialFiles(root);
+assertModelCredentialFiles(fileURLToPath(new URL("../", import.meta.url)));
+deploymentCanary();
 const development = process.argv.includes("--dev");
 const proxy = proxyConfiguration();
 if (development && proxy) throw new Error("Proxy mode is production only");
@@ -146,3 +147,13 @@ const stop = () => {
 };
 process.once("SIGINT", stop);
 process.once("SIGTERM", stop);
+process.on("message", (message: unknown) => {
+  if (
+    message &&
+    typeof message === "object" &&
+    "type" in message &&
+    message.type === "ruwen-preview-stop"
+  )
+    stop();
+});
+process.once("disconnect", stop);

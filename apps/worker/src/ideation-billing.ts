@@ -1,6 +1,7 @@
 import {
   assertRunEnabled,
   BillingError,
+  currentBank,
   finishReservation,
   quoteRun,
   type RunQuote,
@@ -33,7 +34,7 @@ export function withIdeationBilling(
         const quote = await quoteRun(
           ideationSql(tx),
           actor.userId,
-          ["real", "record"].includes(options.modelMode) ? "live" : "sandbox",
+          currentBank(options.modelMode),
           "ideation",
         );
         const pending = quotes.get(tx) ?? new Map<string, RunQuote>();

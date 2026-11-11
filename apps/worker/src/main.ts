@@ -73,6 +73,17 @@ const stop = async () => {
   stopping = true;
   await health?.close();
   await worker.stop();
+  if (process.connected) process.disconnect();
 };
 process.once("SIGINT", stop);
 process.once("SIGTERM", stop);
+process.on("message", (message: unknown) => {
+  if (
+    message &&
+    typeof message === "object" &&
+    "type" in message &&
+    message.type === "ruwen-preview-stop"
+  )
+    void stop();
+});
+process.once("disconnect", stop);

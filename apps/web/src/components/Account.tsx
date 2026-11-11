@@ -56,8 +56,9 @@ export function Account() {
       <section className="account-note">
         <h2>余额与预留</h2>
         <p>
-          点数、价格及预留均待 P3
-          实测。沙箱点数只用于模拟或回放，不能支付真实模型运行；真实收费默认关闭。
+          {data?.localRealPreview
+            ? "本机 DeepSeek 试用使用赠送的沙箱点数记录用量；API 实际费用由 DeepSeek 预付余额支付，此处不收款。"
+            : "点数、价格及预留均待 P3 实测。沙箱点数只用于模拟或回放，不能支付真实模型运行；真实收费默认关闭。"}
         </p>
         <div className="billing-balances">
           {(["live", "sandbox"] as const).map((bank) => (

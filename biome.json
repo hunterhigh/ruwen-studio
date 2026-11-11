@@ -8,6 +8,7 @@
       "!fixtures",
       "!.local",
       "!**/.next",
+      "!**/.next-real-preview",
       "!test-results",
       "!playwright-report"
     ]

@@ -204,7 +204,7 @@ describe("36 upstream scenarios ported to TypeScript", () => {
     ).toContain("numbered or bulleted beat-sheet form");
   });
   it("test_migration_preview_is_read_only", async () => {
-    // V4.1 migration is explicitly outside P1. Its source remains opaque and untouched.
+    // Initializing a legacy tree still cannot silently migrate or overwrite it.
     const p = "legacy/author-voice/project-core.md";
     await fs.write(p, "旧项目声音");
     const before = await fs.sha256(p);
@@ -664,7 +664,7 @@ describe("36 upstream scenarios ported to TypeScript", () => {
       expect(checks.candidateProseErrors(content).length).toBeGreaterThan(0);
   });
   it("test_migration_preview_cannot_write_inside_source", async () => {
-    // The V4.1 migration command is deliberately unavailable, rather than silently writing a preview.
+    // The implemented preview rejects even an explicitly requested report inside its source.
     const { main } = await import("../bin/ruwen-core.ts");
     const p = "legacy-source/world.md";
     await fs.write(p, "旧资料");
@@ -677,7 +677,7 @@ describe("36 upstream scenarios ported to TypeScript", () => {
         "--output",
         fs.displayPath("legacy-source/preview.json"),
       ]),
-    ).rejects.toThrow("Unknown module");
+    ).rejects.toThrow("迁移预览输出必须位于源项目之外");
     expect(await fs.exists("legacy-source/preview.json")).toBe(false);
     expect(await fs.sha256(p)).toBe(before);
   });

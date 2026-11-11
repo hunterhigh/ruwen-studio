@@ -15,6 +15,7 @@
     "benchmark:real": "node scripts/benchmark-real.ts",
     "redteam": "node scripts/redteam.ts",
     "p3:smoke": "node scripts/p3-smoke.ts",
+    "p3:ping": "node scripts/p3-ping.ts",
     "db:dev": "node scripts/dev-postgres.ts",
     "db:migrate": "node apps/worker/scripts/migrate.ts",
     "db:backup": "node scripts/db-backup.ts",

@@ -1,3 +1,4 @@
+export { normalizeContext } from "@earendil-works/pi-ai";
 export { createFauxRuntime, FAUX_PROSE, fauxOutput } from "./faux.ts";
 export {
   createRealRuntime,

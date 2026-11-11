@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { exportProjectZip, importProjectZip } from "@ruwen/core";
+import { exportProjectZip, importProjectZip, registry } from "@ruwen/core";
 import { PostgresFS } from "@ruwen/db";
 import { afterEach, expect, it } from "vitest";
 import { fixture } from "../../worker/test/helpers.ts";
@@ -88,7 +88,7 @@ async function setup() {
   };
 }
 
-it("all eighteen routes authenticate, guard every path locator (including wrong parent), require CSRF, and reject without creating tasks, model intents or debits", async () => {
+it("all nineteen routes authenticate, guard every path locator (including wrong parent), require CSRF, and reject without creating tasks, model intents or debits", async () => {
   const p = await setup(),
     db = p.service.db;
   const counts = async () =>
@@ -103,7 +103,7 @@ it("all eighteen routes authenticate, guard every path locator (including wrong 
     ).rows[0];
   const before = await counts();
   const routes = API_ROUTES.filter((r) => r.ideation);
-  expect(routes).toHaveLength(18);
+  expect(routes).toHaveLength(19);
   for (const route of routes) {
     const ids = { projectId: p.fs.projectId, ...p.own.ids };
     const path = (values: Record<string, string>) =>
@@ -248,6 +248,191 @@ it("HTTP persists exact messages, accepts idempotently, approves a real handoff,
     (await (await p.call(`/tasks/${receipt.startedTaskId}`)).json()).value
       .status,
   ).toBe("CANCELLED");
+}, 30000);
+
+it.each([
+  "resource_file",
+  "current_chapter",
+] as const)("v1.2 HTTP %s is user-only, guarded, free of model admission, persisted and independently approved with a nullable task", async (kind) => {
+  const p = await setup(),
+    db = p.service.db;
+  const path = `/messages/${p.own.ids.messageId}/verbatim-previews`;
+  const resource = (await registry.readRegistry(p.fs)).resources.find(
+    (r) => r.type === "world" && r.status === "active",
+  );
+  if (!resource) throw new Error("Missing world resource");
+  const beforeText = await p.fs.readText(resource.path);
+  const counts = async () =>
+    (
+      await db.pool.query(
+        "SELECT (SELECT count(*) FROM pipeline_runs WHERE project_id=$1)::int runs,(SELECT count(*) FROM role_runs r JOIN pipeline_runs p ON p.id=r.run_id WHERE p.project_id=$1)::int roles,(SELECT count(*) FROM credit_reservations WHERE user_id=$2)::int reservations,(SELECT count(*) FROM credit_ledger WHERE user_id=$2)::int ledger",
+        [p.fs.projectId, p.fs.ownerId],
+      )
+    ).rows[0];
+  const before = await counts();
+  const request = {
+    clientRequestId: randomUUID(),
+    start: 1,
+    end: 8,
+    target:
+      kind === "current_chapter" ? { kind } : { kind, resourceId: resource.id },
+  };
+  expect((await p.call(path, "POST", request, { csrf: false })).status).toBe(
+    403,
+  );
+  expect(
+    (
+      await p.call(
+        `/messages/${p.foreign.ids.messageId}/verbatim-previews`,
+        "POST",
+        request,
+      )
+    ).status,
+  ).toBe(404);
+  const source = (
+    await db.pool.query<{ content: string }>(
+      "SELECT content FROM ideation_messages WHERE id=$1",
+      [p.own.ids.messageId],
+    )
+  ).rows[0];
+  if (!source) throw new Error("Missing source");
+  const literal = Array.from(source.content).slice(1, 8).join("");
+  const created = await p.call(path, "POST", request);
+  expect(created.status).toBe(201);
+  const preview = (await created.json()).value;
+  expect(preview).toMatchObject({
+    kind: "verbatim",
+    taskId: null,
+    origin: "user_explicit",
+    text: literal,
+    characterCount: 7,
+  });
+  expect((await (await p.call(path, "POST", request)).json()).value.id).toBe(
+    preview.id,
+  );
+  expect(await p.fs.readText(resource.path)).toBe(beforeText);
+  expect(await counts()).toEqual(before);
+  expect(
+    (await (await p.call(`/previews/${preview.id}`)).json()).value.taskId,
+  ).toBeNull();
+  expect(
+    (await (await p.call(`/sessions/${p.own.ids.sessionId}/previews`)).json())
+      .value.items,
+  ).toContainEqual(
+    expect.objectContaining({ id: preview.id, kind: "verbatim" }),
+  );
+  const approval = {
+    clientRequestId: randomUUID(),
+    expectedSha256: preview.sha256,
+    confirmed: true,
+  };
+  expect(
+    (
+      await p.call(`/previews/${preview.id}/approve`, "POST", approval, {
+        csrf: false,
+      })
+    ).status,
+  ).toBe(403);
+  const approved = await p.call(
+    `/previews/${preview.id}/approve`,
+    "POST",
+    approval,
+  );
+  expect(approved.status).toBe(200);
+  const receipt = (await approved.json()).value;
+  expect(receipt.startedTaskId).toBeNull();
+  expect(
+    (await (await p.call(`/decisions/${receipt.id}`)).json()).value.previewId,
+  ).toBe(preview.id);
+  if (kind === "resource_file")
+    expect(await p.fs.readText(resource.path)).toBe(
+      beforeText + preview.target.separator + literal,
+    );
+  else {
+    expect(await p.fs.readText(preview.target.file.path)).toBe(literal);
+    expect(
+      JSON.parse(await p.fs.readText(preview.target.manifest.path))
+        .user_authored_text,
+    ).toEqual({ path: preview.target.file.path, confirmed_verbatim: true });
+  }
+  expect(await counts()).toEqual(before);
+  const events = (
+    await db.pool.query<{
+      id: string;
+      data: { type: string; previewId?: string };
+    }>(
+      "SELECT id::text,data FROM ideation_events WHERE project_id=$1 AND session_id=$2 AND data->>'previewId'=$3 ORDER BY id",
+      [p.fs.projectId, p.own.ids.sessionId, preview.id],
+    )
+  ).rows;
+  expect(events.some((e) => e.data.type === "preview_changed")).toBe(true);
+  const after = String(BigInt(events[0]?.id ?? "1") - 1n);
+  const stream = await p.call(
+    `/sessions/${p.own.ids.sessionId}/events?after=${after}`,
+  );
+  const reader = stream.body?.getReader();
+  if (!reader) throw new Error("Missing verbatim SSE");
+  try {
+    const frame = new TextDecoder().decode((await reader.read()).value);
+    expect(frame).toContain("event: preview_changed");
+    expect(frame).toContain(preview.id);
+  } finally {
+    await reader.cancel();
+  }
+}, 30000);
+
+it("v1.2 resolves body target ownership before selection errors and rejects assistant sources; unknown targets create no preview", async () => {
+  const p = await setup();
+  const foreignFs = new PostgresFS(p.service.db, p.otherProject, p.otherUser);
+  const data = await registry.readRegistry(foreignFs),
+    first = data.resources[0];
+  if (!first) throw new Error("Missing foreign resource");
+  first.id = `foreign-only-${randomUUID()}`;
+  await foreignFs.write(registry.REGISTRY, JSON.stringify(data));
+  const before = (
+    await p.service.db.pool.query(
+      "SELECT count(*)::int n FROM ideation_previews WHERE project_id=$1",
+      [p.fs.projectId],
+    )
+  ).rows[0];
+  const bad = {
+    clientRequestId: randomUUID(),
+    start: -1,
+    end: 99999,
+    target: { kind: "resource_file", resourceId: first.id },
+  };
+  const denied = await p.call(
+    `/messages/${p.own.ids.messageId}/verbatim-previews`,
+    "POST",
+    bad,
+  );
+  expect(denied.status).toBe(404);
+  expect((await denied.json()).error.code).toBe("NOT_FOUND");
+  const assistant = (
+    await p.service.db.pool.query<{ id: string }>(
+      "SELECT id FROM ideation_messages WHERE project_id=$1 AND session_id=$2 AND role='assistant' LIMIT 1",
+      [p.fs.projectId, p.own.ids.sessionId],
+    )
+  ).rows[0];
+  if (!assistant) throw new Error("Missing assistant fixture");
+  expect(
+    (
+      await p.call(`/messages/${assistant.id}/verbatim-previews`, "POST", {
+        clientRequestId: randomUUID(),
+        start: 0,
+        end: 1,
+        target: { kind: "current_chapter" },
+      })
+    ).status,
+  ).toBe(400);
+  expect(
+    (
+      await p.service.db.pool.query(
+        "SELECT count(*)::int n FROM ideation_previews WHERE project_id=$1",
+        [p.fs.projectId],
+      )
+    ).rows[0],
+  ).toEqual(before);
 }, 30000);
 
 it.each([

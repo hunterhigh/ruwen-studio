@@ -4,7 +4,7 @@ import type {
   IdeationContextScope,
   IdeationCursor,
   IdeationMessage,
-  IdeationPreview,
+  IdeationPreviewV1_2 as IdeationPreview,
   IdeationResult,
   IdeationSession,
   IdeationSessionId,
@@ -26,6 +26,10 @@ import {
   taskStatus,
 } from "./ideation/copy.ts";
 import { PreviewCard, Structured } from "./ideation/PreviewCard.tsx";
+import {
+  VerbatimSelection,
+  type VerbatimTargetOption,
+} from "./ideation/VerbatimSelection.tsx";
 import { ProjectNav } from "./ProjectHome.tsx";
 import {
   applyRoleFrame,
@@ -67,12 +71,14 @@ export function IdeationStudio({
   compileSources,
   modelMode,
   chatLimit,
+  verbatimTargets,
 }: {
   projectId: string;
   compileScope: Omit<IdeationContextScope, "project" | "chapter">;
   compileSources: readonly { id: string; path: string; sha256: string }[];
   modelMode: string;
   chatLimit: number;
+  verbatimTargets: readonly VerbatimTargetOption[];
 }) {
   const router = useRouter();
   const [adapter] = useState(() => createIdeationClient(projectId));
@@ -346,7 +352,7 @@ export function IdeationStudio({
             </button>
           </form>
           <p className="fine-print">
-            会话中的原话留给协调员。下游只接收通过通讯门的委托。
+            会话原话留在本会话；你批准的逐字资料会按目标权限使用。下游委托仍须通过通讯门。
           </p>
         </aside>
         <section className="ideation-conversation" aria-label="协调员会话">
@@ -390,7 +396,30 @@ export function IdeationStudio({
                 <span className="eyebrow">
                   {item.role === "user" ? "你" : "协调员"}
                 </span>
-                <SafeMarkdown content={item.content} />
+                {item.role === "user" ? (
+                  <VerbatimSelection
+                    message={item}
+                    targets={verbatimTargets}
+                    busy={busy}
+                    onChoose={(request) => {
+                      void operation(async () => {
+                        const created = unwrap(
+                          await adapter.api.createVerbatimPreview({
+                            ...request,
+                            clientRequestId: newRequestId(),
+                          }),
+                        );
+                        setFilter("verbatim");
+                        setSelectedPreview(created.id);
+                        setNotice(
+                          "逐字预览已生成。请阅读选区和目标，再单独批准。",
+                        );
+                      });
+                    }}
+                  />
+                ) : (
+                  <SafeMarkdown content={item.content} />
+                )}
               </article>
             ))}
             {view && !view.messages.length && (

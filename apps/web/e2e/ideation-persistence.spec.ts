@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createDemo, signIn } from "./helpers.ts";
+import { createDemo, selectMessageRange, signIn } from "./helpers.ts";
 
 test("persisted faux project: conversation → handoff → downstream preview → compilation → chapter → two canonical approval gates", async ({
   page,
@@ -49,6 +49,20 @@ test("persisted faux project: conversation → handoff → downstream preview �
     path: testInfo.outputPath("persistent-generation.png"),
     fullPage: true,
   });
+  const source = page.getByLabel("你的消息原文，可选中文字", { exact: true });
+  const exact = "甲乙丙丁";
+  await selectMessageRange(
+    source,
+    raw.indexOf(exact),
+    raw.indexOf(exact) + exact.length,
+  );
+  await source
+    .locator("..")
+    .getByRole("button", { name: "逐字保留到本章", exact: true })
+    .click();
+  await expect(card).toContainText(exact);
+  await approve("批准逐字保留");
+  await expect(card.getByText("已批准", { exact: true })).toBeVisible();
   await page.goto(`/projects/${projectId}/chapters`);
   await page.getByLabel("章节号", { exact: true }).fill("1");
   await page.getByRole("button", { name: "开始写作", exact: true }).click();
@@ -80,4 +94,10 @@ test("persisted faux project: conversation → handoff → downstream preview �
     )
   ).json();
   expect(memory.text).toContain("粮车已经离开");
+  const manifest = await (
+    await page.request.get(
+      `/api/projects/${projectId}/files?path=${encodeURIComponent("authoring-ruwen-v5/manifests/author-manifest.json")}`,
+    )
+  ).json();
+  expect(JSON.parse(manifest.text).user_authored_text).toBeNull();
 });

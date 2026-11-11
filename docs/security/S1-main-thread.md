@@ -25,15 +25,15 @@ SafeMarkdown是唯一Markdown入口，跳过原始HTML并白名单清洗；图�
 
 ## S1-2：归属与事件
 
-49条注册映射中33条接收资源ID，全部经requireOwnership；包含项目、run、checkout、账户、预留，以及新接入的18条构思映射。构思核对projectId与sessionId/previewId/taskId/decisionId的项目关联，错父级也404。管理员跨账户/预留的例外仅由服务端allowlist授权并审计。逐路由A→B 404、匿名401、未知ID、路由声明/实际文件扫描与既有隐私扫描保留；缺新参数夹具或旁路路由使测试失败。
+50条注册映射中34条接收资源ID，全部经requireOwnership；包含项目、run、checkout、账户、预留，以及新接入的19条构思映射。构思核对projectId与sessionId/previewId/taskId/decisionId/messageId的项目关联，错父级也404。管理员跨账户/预留的例外仅由服务端allowlist授权并审计。逐路由A→B 404、匿名401、未知ID、路由声明/实际文件扫描与既有隐私扫描保留；缺新参数夹具或旁路路由使测试失败。
 
-章节SSE和导出沿用统一守卫；构思SSE只用pipeline.ideationSse，按帧/轮询重新认证和检查归属，注销/撤权后关闭。Last-Event-ID优先、游标排他重放；网页按(sessionId,runId,role)重置和去重。真实HTTP测试验证全部18条拒绝不新增任务、模型意图或扣费。
+章节SSE和导出沿用统一守卫；构思SSE只用pipeline.ideationSse，按帧/轮询重新认证和检查归属，注销/撤权后关闭。Last-Event-ID优先、游标排他重放；网页按(sessionId,runId,role)重置和去重。真实HTTP测试验证全部19条拒绝不新增任务、模型意图或扣费。
 
 安全正文链路只有provider→runRole/RoleSecurity放行的onDelta→worker事件落盘→已鉴权SSE；没有从原始provider、thinking或transcript补发的路径。既有approved-stream测试通过真实岗位/worker/Postgres/HTTP响应证明实时与回放只含放行前缀，不含被拦尾部、thinking/签名；失败不补写暂扣文本。两类reset浏览器验证更正和拒绝，以及跨会话/任务隔离。
 
 ## S1-3：CSRF、会话与登录
 
-应用及认证写请求核对Origin、Fetch Metadata、HttpOnly __Host Cookie对应CSRF头；所有18条构思映射的写操作同样测试。支付webhook独立按原始体验签，不放宽用户写请求。Cookie为HttpOnly/Secure/SameSite=Lax；魔法链接15分钟/一次性、登录轮换会话、全设备撤销。IP/邮箱持久限流，入口覆盖连接IP并HMAC证明，不信任客户端XFF。真实认证SDK与浏览器验证通过；SMTP实际投递、Google真实回调仍待配置。
+应用及认证写请求核对Origin、Fetch Metadata、HttpOnly __Host Cookie对应CSRF头；所有19条构思映射的写操作同样测试。支付webhook独立按原始体验签，不放宽用户写请求。Cookie为HttpOnly/Secure/SameSite=Lax；魔法链接15分钟/一次性、登录轮换会话、全设备撤销。IP/邮箱持久限流，入口覆盖连接IP并HMAC证明，不信任客户端XFF。真实认证SDK与浏览器验证通过；SMTP实际投递、Google真实回调仍待配置。
 
 ## S1-4：冻结、费用复核与审计
 
@@ -44,3 +44,5 @@ config/runtime.json保留3.5配置并标注待P3实测。security_events累计�
 冻结→拒绝零任务/零调用/零新增扣费→人工解冻→再次冻结，以及费用核对/幂等/账本恒等式均有集成和浏览器覆盖。**边界**：3.5中的协调员频率、一次性邮箱名单和用户自调每日限额未全部实现，不宣称3.5全量验收。真实支付沙箱/模型/红队实测、生产运维与上线前渗透仍保留各阶段闸门。
 
 完整验收结果见[phase-5](../reports/phase-5.md)、[计费修正](../reports/billing-reconciliation-2026-11-11.md)与[构思接入](../reports/ideation-http-integration-2026-11-11.md)。vendor和I1–I13未改，既有提示词防护保持现状。
+
+本轮v1.2新增消息选区接口及目标资源归属，NULL任务预览按项目/会话校验；SafeMarkdown增加只读原文选择，未新增HTML入口。独立开发预览Cookie前缀按端口区分，防止覆盖3000试用会话；默认及生产Cookie属性保持。真实持久化、CSRF、零模型/扣费和SSE均通过，见verbatim-ui-2026-11-11报告。

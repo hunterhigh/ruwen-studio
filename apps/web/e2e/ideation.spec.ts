@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { previewConfiguration } from "../../../config/preview.ts";
 import { createDemo, signIn } from "./helpers.ts";
 import { ideationHttpFixture } from "./ideation-http-fixture.ts";
 
@@ -93,7 +94,7 @@ test("persisted conversations: switching, clean handoff, safe user Markdown, clo
     fullPage: true,
   });
   const otherContext = await browser.newContext({
-    baseURL: "https://localhost:3000",
+    baseURL: previewConfiguration().baseUrl,
     ignoreHTTPSErrors: true,
   });
   try {

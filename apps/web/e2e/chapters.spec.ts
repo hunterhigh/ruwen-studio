@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { exportProjectZip, LocalDirFS, type ProjectFS } from "@ruwen/core";
+import { previewConfiguration } from "../../../config/preview.ts";
 
 import { createDemo, signIn } from "./helpers.ts";
 
@@ -72,7 +73,7 @@ test("account can sign out every device using the CSRF-protected session endpoin
   await signIn(page, email);
   const secondContext = await browser.newContext({
     ignoreHTTPSErrors: true,
-    baseURL: "https://localhost:3000",
+    baseURL: previewConfiguration().baseUrl,
   });
   try {
     const second = await secondContext.newPage();

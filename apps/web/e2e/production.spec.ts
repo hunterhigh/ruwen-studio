@@ -2,6 +2,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
+import { previewConfiguration } from "../../../config/preview.ts";
 
 let server: ChildProcess;
 test.beforeAll(async () => {
@@ -9,13 +10,12 @@ test.beforeAll(async () => {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     NODE_ENV: "production",
-    PORT: "3001",
-    BETTER_AUTH_URL: "https://localhost:3001",
+    PORT: String(previewConfiguration().productionPort),
+    BETTER_AUTH_URL: previewConfiguration().productionUrl,
     BETTER_AUTH_SECRET: (
       await readFile(`${root}/.local/preview-auth-secret`, "utf8")
     ).trim(),
-    DATABASE_URL:
-      "postgresql://ruwen:local_test_only@127.0.0.1:54329/ruwen_dev",
+    DATABASE_URL: previewConfiguration().databaseUrl,
     MODEL_MODE: "faux",
     LOCAL_PREVIEW: "0",
     RUWEN_SKIP_ENV_FILE: "1",
@@ -36,7 +36,7 @@ test.beforeAll(async () => {
       20000,
     );
     server.stdout?.on("data", (chunk: Buffer) => {
-      if (chunk.toString().includes("https://localhost:3001")) {
+      if (chunk.toString().includes(previewConfiguration().productionUrl)) {
         clearTimeout(timer);
         resolve();
       }
@@ -68,7 +68,9 @@ test("production build enforces CSP without browser violations and disables prev
       violations.push(message.text());
   });
   page.on("pageerror", (error) => errors.push(error.message));
-  const response = await page.goto("https://localhost:3001/sign-in");
+  const response = await page.goto(
+    `${previewConfiguration().productionUrl}/sign-in`,
+  );
   expect(response?.status()).toBe(200);
   expect(response?.headers()["content-security-policy"]).not.toMatch(
     /unsafe-inline|unsafe-eval/,
@@ -81,7 +83,9 @@ test("production build enforces CSP without browser violations and disables prev
   ).toBeEnabled();
   expect(
     (
-      await page.request.get("https://localhost:3001/api/preview/mail")
+      await page.request.get(
+        `${previewConfiguration().productionUrl}/api/preview/mail`,
+      )
     ).status(),
   ).toBe(404);
   expect(violations).toEqual([]);

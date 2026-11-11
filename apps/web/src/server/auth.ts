@@ -8,7 +8,13 @@ import { betterAuth } from "better-auth/minimal";
 import { magicLink } from "better-auth/plugins/magic-link";
 import nodemailer from "nodemailer";
 import { releasePolicy, runtimeSettings } from "../../../../config/settings.ts";
-import { clientIp, HttpError, hash, loginLimit } from "./security.ts";
+import {
+  COOKIE_PREFIX,
+  clientIp,
+  HttpError,
+  hash,
+  loginLimit,
+} from "./security.ts";
 
 export interface AuthEnvironment {
   baseURL: string;
@@ -43,7 +49,7 @@ export function createWebAuth(db: Database, options: AuthEnvironment) {
         sameSite: "lax",
         path: "/",
       },
-      cookiePrefix: "ruwen",
+      cookiePrefix: COOKIE_PREFIX,
     },
     session: { expiresIn: runtimeSettings().preview.sessionHours * 3600 },
     logger: { disabled: true },

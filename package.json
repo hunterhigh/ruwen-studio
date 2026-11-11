@@ -22,6 +22,7 @@
     "db:restore": "node scripts/db-restore.ts",
     "test:containers": "node scripts/container-smoke.ts",
     "dev": "node scripts/preview.ts",
+    "preview:real": "node scripts/preview-real.ts",
     "build:web": "pnpm --filter web build",
     "test:e2e": "pnpm build:web && playwright test",
     "demo:db": "node scripts/demo-db.ts",

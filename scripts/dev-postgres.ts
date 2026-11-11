@@ -3,9 +3,13 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import EmbeddedPostgres from "embedded-postgres";
-import { previewConfiguration } from "../config/preview.ts";
+import {
+  previewConfiguration,
+  previewDataDirectory,
+} from "../config/preview.ts";
 
-const directory = fileURLToPath(new URL("../.local/postgres", import.meta.url));
+const root = fileURLToPath(new URL("../", import.meta.url));
+const directory = path.join(previewDataDirectory(root), "postgres");
 const preview = previewConfiguration();
 await mkdir(path.dirname(directory), { recursive: true });
 // Public local-development credential; server only listens on loopback.
@@ -47,6 +51,17 @@ const stop = async () => {
   if (stopping) return;
   stopping = true;
   await cluster.stop();
+  if (process.connected) process.disconnect();
 };
 process.once("SIGINT", stop);
 process.once("SIGTERM", stop);
+process.on("message", (message: unknown) => {
+  if (
+    message &&
+    typeof message === "object" &&
+    "type" in message &&
+    message.type === "ruwen-preview-stop"
+  )
+    void stop();
+});
+process.once("disconnect", stop);

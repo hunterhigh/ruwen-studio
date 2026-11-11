@@ -1,5 +1,6 @@
 import { balance, currentBank, dailyBudget } from "@ruwen/billing";
 import type { Database } from "@ruwen/db";
+import { isLocalRealPreview } from "../../../../config/real-preview.ts";
 import { releasePolicy, runtimeSettings } from "../../../../config/settings.ts";
 
 export async function billingAccount(
@@ -82,6 +83,7 @@ export async function billingAccount(
       );
       return {
         balance: (bank === "live" ? live : sandbox).balance,
+        localRealPreview: isLocalRealPreview(),
         bank,
         banks: { live, sandbox },
         daily: {

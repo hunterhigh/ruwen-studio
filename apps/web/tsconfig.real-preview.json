@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": ".next-real-preview/cache/tsconfig.tsbuildinfo"
+  },
+  "include": [
+    "next-env.d.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    ".next-real-preview/types/**/*.ts",
+    ".next-real-preview/dev/types/**/*.ts"
+  ],
+  "exclude": ["node_modules", "test", "scripts"]
+}

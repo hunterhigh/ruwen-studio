@@ -1,0 +1,32 @@
+# Supply --app explicitly; no app/account is created by this template.
+primary_region = "nrt"
+kill_signal = "SIGTERM"
+kill_timeout = 30
+[build]
+  dockerfile = "deploy/Dockerfile.web"
+[deploy]
+  release_command = "node scripts/production-entry.ts migrate"
+[env]
+  HTTP_FROM_PROXY = "1"
+  TRUST_PROXY_PROVIDER = "fly"
+  PORT = "8080"
+  WORKER_QUEUE = "ruwen-staging"
+  MODEL_MODE = "faux"
+  REAL_MODEL = "0"
+  P3_GATE_PASSED = "0"
+  REAL_CHARGING_ENABLED = "0"
+  INVITE_ONLY = "1"
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  min_machines_running = 1
+  [[http_service.checks]]
+    grace_period = "90s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/api/health"
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

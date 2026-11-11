@@ -6,6 +6,8 @@ import {
   deploymentCanary,
   MODEL_MODES,
 } from "@ruwen/agents";
+import { workerHealth } from "../../../config/health.ts";
+import { reportError } from "../../../config/observability.ts";
 import { runtimeSettings } from "../../../config/settings.ts";
 import { configuredIdeation } from "./ideation-config.ts";
 import { WorkerService } from "./service.ts";
@@ -42,10 +44,23 @@ const worker = new WorkerService(process.env.DATABASE_URL, {
   ),
   runtime: () => modelRuntime(),
   runtimeForRequest: modelRuntime,
-  onError: (error) =>
-    console.error(JSON.stringify({ event: "worker_error", name: error.name })),
+  onError: (error) => reportError("worker_error", error),
 });
+const healthPort = Number(
+  process.env.HEALTH_PORT ?? (process.env.NODE_ENV === "production" ? 8081 : 0),
+);
+if (!Number.isInteger(healthPort) || healthPort < 0 || healthPort > 65535)
+  throw new Error("Invalid worker health port");
+const health = healthPort
+  ? workerHealth(
+      worker.db,
+      healthPort,
+      process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1",
+    )
+  : null;
+await health?.listen();
 await worker.start();
+health?.setReady(true);
 console.log(
   JSON.stringify({ event: "worker_ready", mode: process.env.MODEL_MODE }),
 );
@@ -53,6 +68,7 @@ let stopping = false;
 const stop = async () => {
   if (stopping) return;
   stopping = true;
+  await health?.close();
   await worker.stop();
 };
 process.once("SIGINT", stop);

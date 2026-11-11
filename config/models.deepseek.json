@@ -1,0 +1,20 @@
+{
+  "tiers": {
+    "strong": {
+      "provider": "deepseek",
+      "modelId": "deepseek-v4-pro",
+      "thinkingLevel": "high"
+    },
+    "standard": {
+      "provider": "deepseek",
+      "modelId": "deepseek-flash",
+      "thinkingLevel": "high"
+    },
+    "cheap": {
+      "provider": "deepseek",
+      "modelId": "deepseek-flash",
+      "thinkingLevel": "off"
+    }
+  },
+  "roleOverrides": {}
+}

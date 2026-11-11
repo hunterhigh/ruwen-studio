@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { lstat, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createFauxRuntime, ROLES } from "@ruwen/agents";
@@ -8,6 +8,7 @@ import {
   requestRole,
 } from "../../../packages/agents/src/faux.ts";
 import { forwardStream } from "../../../packages/agents/src/runtime/stream.ts";
+import { demoArchive } from "../../../scripts/lib/demo-archive.ts";
 import { runP3Smoke, smokeFaux } from "../../../scripts/lib/p3-smoke.ts";
 import {
   requestCostBound,
@@ -309,3 +310,50 @@ it("reports a corrected author attempt once without counting normal tool turns a
   );
   expect(report.candidateDrafts).toHaveLength(2);
 }, 30000);
+
+it("disables hidden SDK transport retries even when a caller requests them", async () => {
+  let retries: number | undefined;
+  const source = createFauxRuntime([
+    (context, options) => {
+      retries = options?.maxRetries;
+      return defaultFauxResponse(context);
+    },
+  ]);
+  const runtime = new SmokeBudget(5).wrap(source),
+    model = source.resolve(ROLES["xiaoshuo-zuozhe"]).model;
+  await runtime.models
+    .streamSimple(
+      model,
+      {
+        messages: [
+          {
+            role: "system",
+            content: "CURRENT_ROLE:xiaoshuo-zuozhe",
+            timestamp: 0,
+          },
+        ],
+      },
+      { maxRetries: 5 },
+    )
+    .result();
+  expect(retries).toBe(0);
+  expect(source.faux.state.callCount).toBe(1);
+});
+
+it("takes a source ZIP without replacing source files or directory metadata", async () => {
+  const root = await folder(),
+    file = path.join(root, "note.md");
+  await writeFile(file, "read-only demo source");
+  const identity = async () =>
+    Promise.all(
+      [root, file].map(async (p) => {
+        const s = await lstat(p, { bigint: true });
+        return [s.ino, s.mtimeNs, s.ctimeNs];
+      }),
+    );
+  const before = await identity();
+  const zip = await demoArchive(root);
+  expect(zip.byteLength).toBeGreaterThan(0);
+  expect(await identity()).toEqual(before);
+  expect(await readFile(file, "utf8")).toBe("read-only demo source");
+});

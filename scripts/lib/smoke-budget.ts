@@ -118,13 +118,13 @@ export class SmokeBudget {
       this.heldUsd += bound;
       const sources = readSources?.().slice();
       try {
+        // SDK transport retries have no independent usage receipt. Only role-level,
+        // individually budgeted corrections are permitted by this tool.
+        const requestOptions = { ...options, maxTokens, maxRetries: 0 };
         const hash = stableRequestHash(
           model,
           context as Parameters<typeof stableRequestHash>[1],
-          {
-            ...options,
-            maxTokens,
-          },
+          requestOptions,
         );
         const file = base.privateStorageRoot
           ? path.join(
@@ -133,7 +133,7 @@ export class SmokeBudget {
             )
           : undefined;
         return forwardStream(
-          base.models.streamSimple(model, context, { ...options, maxTokens }),
+          base.models.streamSimple(model, context, requestOptions),
           {
             signal: options?.signal,
             finish: async (message) => {

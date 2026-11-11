@@ -94,7 +94,11 @@ it("all eighteen routes authenticate, guard every path locator (including wrong 
   const counts = async () =>
     (
       await db.pool.query(
-        "SELECT (SELECT count(*) FROM pipeline_runs)::int tasks,(SELECT count(*) FROM role_runs)::int models,(SELECT count(*) FROM credit_ledger)::int ledger",
+        "SELECT (SELECT count(*) FROM pipeline_runs WHERE project_id=ANY($1::uuid[]))::int tasks,(SELECT count(*) FROM role_runs r JOIN pipeline_runs p ON p.id=r.run_id WHERE p.project_id=ANY($1::uuid[]))::int models,(SELECT count(*) FROM credit_ledger WHERE user_id=ANY($2::uuid[]))::int ledger",
+        [
+          [p.fs.projectId, p.otherProject],
+          [p.fs.ownerId, p.otherUser],
+        ],
       )
     ).rows[0];
   const before = await counts();

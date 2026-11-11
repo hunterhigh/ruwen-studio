@@ -44,7 +44,7 @@ test("persisted faux project: conversation → handoff → downstream preview �
     card.getByRole("button", { name: "批准章节情境", exact: true }),
   ).toBeVisible();
   await approve("批准章节情境");
-  await expect(card).toContainText("已批准");
+  await expect(card.getByText("已批准", { exact: true })).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath("persistent-generation.png"),
     fullPage: true,

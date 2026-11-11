@@ -1,6 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
+import {
+  clearChapterExactText,
+  ensureExactTextChapter,
+} from "./ideation/exact-text.ts";
 
 export type * from "./ideation/contract.ts";
+export { withIdeationV1_2 } from "./ideation/service-v1-2.ts";
 export {
   type IdeationSessionOptions,
   IdeationSessions,
@@ -430,6 +435,7 @@ export async function startChapter(
       run.targetBeforeSha256 = await fs.sha256(run.target);
     await checkpoint(fs, run, "READINESS_OK", ctx);
     if (!run.packetSha256) {
+      await ensureExactTextChapter(fs, manifest, run.chapter);
       const compiled = await packet.compilePacket(fs, manifest);
       run.paths.source_packet = compiled.output;
       run.paths.packet = `${runDirectory(id)}/packet.md`;
@@ -692,6 +698,7 @@ export async function approveCandidate(
         Boolean(run.targetBeforeSha256),
         decision.expectedTargetSha256,
       );
+      await clearChapterExactText(tx, run.paths.manifest, run.chapter);
       move(run, "CANDIDATE_APPROVED");
       await syncProblemStatus(tx, run, ctx);
       await write(tx, runPath(id), run);

@@ -22,11 +22,11 @@ import type {
   IdeationTaskStatus,
 } from "@ruwen/pipeline";
 import type { PgBoss } from "pg-boss";
-import { rawCoordinatorSources } from "../../../packages/pipeline/src/ideation/backend.ts";
 import {
   assertNoOriginalWording,
   OriginalWordingStream,
 } from "../../../packages/pipeline/src/ideation/privacy.ts";
+import { downstreamOriginalSources } from "../../../packages/pipeline/src/ideation/published.ts";
 import {
   appendIdeationEvent,
   IdeationFailure,
@@ -267,18 +267,27 @@ export class IdeationRunner {
       };
       timer = setInterval(poll, 100);
       poll();
-      const raw = await service.store.transaction(actor, async (tx) => {
-        const boundary = (
-          await tx.sql<{ session_revision: number }>(
-            "SELECT session_revision FROM ideation_tasks WHERE run_id=$1",
-            [task.id],
-          )
-        ).rows[0]?.session_revision;
-        return rawCoordinatorSources(tx, actor, task.sessionId, boundary);
-      });
-      const wording = new OriginalWordingStream(raw, (text) =>
-        event(task.sessionId, { type: "delta", role, text: text as never }),
-      );
+      const raw = coordinator
+        ? []
+        : await service.store.transaction(actor, async (tx) => {
+            const boundary = (
+              await tx.sql<{ session_revision: number }>(
+                "SELECT session_revision FROM ideation_tasks WHERE run_id=$1",
+                [task.id],
+              )
+            ).rows[0]?.session_revision;
+            return downstreamOriginalSources(
+              tx,
+              actor,
+              task.sessionId,
+              boundary,
+            );
+          });
+      const wording = coordinator
+        ? undefined
+        : new OriginalWordingStream(raw, (text) =>
+            event(task.sessionId, { type: "delta", role, text: text as never }),
+          );
       let hiddenQuote = false;
       let result: RoleResult;
       try {
@@ -348,10 +357,16 @@ export class IdeationRunner {
             : {}),
           onPrompt: (prompt) => persistPrivatePrompt(fs, prompt),
           onDelta: (text) => {
-            if (!wording.push(text)) hiddenQuote = true;
+            if (coordinator)
+              event(task.sessionId, {
+                type: "delta",
+                role,
+                text: text as never,
+              });
+            else if (!wording?.push(text)) hiddenQuote = true;
           },
           onAttemptReset: (_role, reason) => {
-            wording.reset();
+            wording?.reset();
             hiddenQuote = false;
             event(task.sessionId, { type: "reset", role, reason });
           },
@@ -374,21 +389,8 @@ export class IdeationRunner {
       }
       completedResult = result;
       if (requestGuardFailure) throw requestGuardFailure;
-      wording.finish();
-      if (hiddenQuote && !coordinator)
-        throw new IdeationFailure("OUTPUT_BLOCKED");
-      if (hiddenQuote) {
-        event(task.sessionId, {
-          type: "reset",
-          role,
-          reason: "security_refusal",
-        });
-        event(task.sessionId, {
-          type: "delta",
-          role,
-          text: "回复已保存，请在会话中查看。" as never,
-        });
-      }
+      wording?.finish();
+      if (hiddenQuote) throw new IdeationFailure("OUTPUT_BLOCKED");
       await eventTail;
       if (eventError) throw eventError;
       await this.options.onBoundary?.("role_response", role, job.runId);

@@ -500,7 +500,7 @@ it("creation-check rejects copied original wording before any immutable preview 
   ).not.toContain(raw);
 }, 30000);
 
-it("raw quotes split across safe deltas remain coordinator-only; thinking/canaries never reach messages, cache, previews or event replay", async () => {
+it("own-session raw quotes stream without refusal; existing private-content boundaries remain intact", async () => {
   const raw = "RAW_PRIVATE_WORDING_不能跨增量拼接后流入事件_甲乙丙丁戊己庚辛";
   const thought = "THINKING_SENTINEL_只有模型私有内存";
   const runtime = createFauxRuntime([
@@ -532,9 +532,15 @@ it("raw quotes split across safe deltas remain coordinator-only; thinking/canari
     await p.service.listIdeationEvents(p.actor, { sessionId: p.session.id }),
   ).items;
   expect(events.some((e) => e.type === "delta")).toBe(true);
-  expect(events.some((e) => e.type === "reset")).toBe(true);
-  expect(JSON.stringify(events)).not.toContain(raw);
-  expect(JSON.stringify(events)).not.toContain(raw.slice(0, 12));
+  expect(
+    events.some((e) => e.type === "reset" && e.reason === "security_refusal"),
+  ).toBe(false);
+  expect(
+    events
+      .filter((e) => e.type === "delta")
+      .map((e) => e.text)
+      .join(""),
+  ).toContain(raw);
   const messages = value(
     await p.service.listIdeationMessages(p.actor, { sessionId: p.session.id }),
   ).items;

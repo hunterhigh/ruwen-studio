@@ -1,6 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
 
 export type * from "./ideation/contract.ts";
+export {
+  type IdeationSessionOptions,
+  IdeationSessions,
+} from "./ideation/sessions.ts";
+export { ideationSse } from "./ideation/sse.ts";
 
 import {
   type Data,

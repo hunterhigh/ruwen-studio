@@ -10,6 +10,7 @@ const events = new Set([
   "uncaught_error",
   "unhandled_rejection",
   "library_output",
+  "library_error",
   "migration_complete",
   "migration_failed",
   "role_started",
@@ -51,6 +52,23 @@ export function safeLogRecord(
     record.mode = fields.mode;
   if (typeof fields.error_type === "string" && errors.has(fields.error_type))
     record.error_type = fields.error_type;
+  if (
+    typeof fields.error_code === "string" &&
+    [
+      "ENOENT",
+      "EACCES",
+      "EROFS",
+      "ERR_MODULE_NOT_FOUND",
+      "MODULE_NOT_FOUND",
+      "ERR_INVALID_URL",
+      "ECONNREFUSED",
+      "ENOTFOUND",
+      "42P01",
+      "42501",
+      "28P01",
+    ].includes(fields.error_code)
+  )
+    record.error_code = fields.error_code;
   for (const key of ["duration_ms", "attempt", "status"])
     if (
       typeof fields[key] === "number" &&
@@ -127,6 +145,8 @@ export function reportError(
   logEvent(event, {
     ...fields,
     error_type: error instanceof Error ? error.name : "Error",
+    error_code:
+      error instanceof Error && "code" in error ? error.code : undefined,
   });
 }
 export const flushObservability = () =>
@@ -140,5 +160,9 @@ export function withLogContext<T>(
 /** Container entrypoint guards third-party console output too; local preview output stays unchanged. */
 export function protectConsole() {
   for (const method of ["log", "info", "warn", "error", "debug"] as const)
-    console[method] = () => logEvent("library_output");
+    console[method] = (...args: unknown[]) => {
+      const error = args.find((arg) => arg instanceof Error);
+      if (error) reportError("library_error", error);
+      else logEvent("library_output");
+    };
 }

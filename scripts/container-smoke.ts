@@ -27,9 +27,34 @@ async function docker(args: string[], allowFailure = false) {
         reject(new Error("Docker is required for image acceptance")),
       );
       child.once("exit", (code) => {
-        if (code && !allowFailure)
+        if (code && !allowFailure) {
+          for (const line of output.split("\n")) {
+            try {
+              const item = JSON.parse(line) as {
+                check?: unknown;
+                status?: unknown;
+              };
+              if (
+                typeof item.check === "string" &&
+                [
+                  "proxy_page",
+                  "proxy_csrf",
+                  "proxy_valid_csrf",
+                  "proxy_cross_site",
+                ].includes(item.check) &&
+                typeof item.status === "number" &&
+                item.status >= 100 &&
+                item.status < 600
+              )
+                process.stderr.write(
+                  `${JSON.stringify({ event: "container_check", check: item.check, status: item.status })}\n`,
+                );
+            } catch {
+              /* Drop non-metadata. */
+            }
+          }
           reject(new Error(`Container acceptance command failed: ${args[0]}`));
-        else resolve({ code: code ?? 1, output: output.trim() });
+        } else resolve({ code: code ?? 1, output: output.trim() });
       });
     },
   );
@@ -64,6 +89,7 @@ async function waitFor(check: () => Promise<boolean>) {
   }
   throw new Error("Container readiness timed out");
 }
+let phase = "prepare";
 try {
   process.env.POSTGRES_PASSWORD = randomBytes(32).toString("hex");
   process.env.DATABASE_URL = `postgresql://ruwen:${process.env.POSTGRES_PASSWORD}@${names.db}:5432/ruwen_staging`;
@@ -76,6 +102,7 @@ try {
   // Only this isolated CI Docker network; operators must configure their actual trusted peers.
   process.env.TRUSTED_PROXY_CIDRS = "127.0.0.1/32";
   process.env.FAUX_CHARACTER_DELAY_MS = "0";
+  phase = "network";
   await docker(["network", "create", network]);
   await docker([
     "run",
@@ -109,6 +136,7 @@ try {
         )
       ).code === 0,
   );
+  phase = "migrate";
   await docker([
     "run",
     "--rm",
@@ -134,6 +162,7 @@ try {
       service === "web" ? webImage : workerImage,
     ]);
   for (const service of ["worker", "web"] as const) {
+    phase = `health_${service}`;
     await waitFor(
       async () =>
         (
@@ -143,6 +172,7 @@ try {
           )
         ).code === 0,
     );
+    phase = `readonly_${service}`;
     const inspect = await docker([
       "inspect",
       "--format",
@@ -161,6 +191,7 @@ try {
       "import {writeFileSync} from 'node:fs';try{writeFileSync('/ROOTFS_WRITE_TEST','x');process.exit(1)}catch(e){if(e.code!=='EROFS')process.exit(2)}",
     ]);
   }
+  phase = "proxy_http";
   await docker([
     "exec",
     names.web,
@@ -171,9 +202,11 @@ try {
     import assert from 'node:assert/strict';
     const headers={'fly-client-ip':'203.0.113.7','host':'studio.test.invalid'};
     const page=await fetch('http://127.0.0.1:8080/sign-in',{headers});
+    console.log(JSON.stringify({check:'proxy_page',status:page.status}));
     assert.equal(page.status,200);
     assert(!/unsafe-inline|unsafe-eval/.test(page.headers.get('content-security-policy')));
     const csrf=await fetch('http://127.0.0.1:8080/api/csrf',{headers});
+    console.log(JSON.stringify({check:'proxy_csrf',status:csrf.status}));
     assert.equal(csrf.status,200);
     assert.match(csrf.headers.get('set-cookie'),/HttpOnly/i);
     assert.match(csrf.headers.get('set-cookie'),/Secure/i);
@@ -182,9 +215,11 @@ try {
     const cookie=csrf.headers.get('set-cookie').split(';')[0];
     const login={email:'container-check@test.invalid',name:'容器测试',invitationCode:'INTENTIONALLY_INVALID_INVITATION'};
     const allowed=await fetch('http://127.0.0.1:8080/api/login',{method:'POST',headers:{...headers,origin:'https://studio.test.invalid','content-type':'application/json','x-csrf-token':token,cookie},body:JSON.stringify(login)});
+    console.log(JSON.stringify({check:'proxy_valid_csrf',status:allowed.status}));
     assert.equal(allowed.status,400); // Valid CSRF reaches invitation validation, never mail/model generation.
     assert.match((await allowed.json()).error,/邀请码/);
     const crossSite=await fetch('http://127.0.0.1:8080/api/login',{method:'POST',headers:{...headers,origin:'https://other.test.invalid','content-type':'application/json','x-csrf-token':token,cookie},body:JSON.stringify(login)});
+    console.log(JSON.stringify({check:'proxy_cross_site',status:crossSite.status}));
     assert.equal(crossSite.status,403);
     const denied=await fetch('http://127.0.0.1:8080/api/projects');
     assert.equal(denied.status,400); // Missing platform IP cannot reach authentication.
@@ -192,6 +227,7 @@ try {
     assert.equal(account.status,401);
   `,
   ]);
+  phase = "faux_chapter";
   await docker([
     "exec",
     "--env",
@@ -201,6 +237,7 @@ try {
     "scripts/container-chapter-smoke.ts",
   ]);
   for (const service of ["worker", "web"] as const) {
+    phase = `shutdown_${service}`;
     await docker(["stop", "--time", "30", names[service]]);
     assert.equal(
       (
@@ -218,20 +255,53 @@ try {
     `${JSON.stringify({ event: "container_acceptance_passed", services: 2, nonRoot: true, readonlyRootfs: true, independentMigration: true, databaseHealth: true, proxyCookiesAndCsp: true, gracefulShutdown: true, readonlyFauxChapter: true })}\n`,
   );
 } catch {
-  process.stderr.write('{"event":"container_acceptance_failed"}\n');
+  process.stderr.write(
+    `${JSON.stringify({ event: "container_acceptance_failed", phase })}\n`,
+  );
   // Application entrypoints already restrict logs to operational metadata.
   for (const service of ["web", "worker"] as const) {
     const logs = await docker(["logs", names[service]], true);
     for (const line of logs.output.split("\n")) {
       try {
         const record = JSON.parse(line) as { event?: string };
+        const errorType =
+          "error_type" in record &&
+          typeof record.error_type === "string" &&
+          [
+            "Error",
+            "TypeError",
+            "RangeError",
+            "BillingError",
+            "RoleExecutionError",
+            "RoleTruncatedError",
+          ].includes(record.error_type)
+            ? record.error_type
+            : undefined;
+        const errorCode =
+          "error_code" in record &&
+          typeof record.error_code === "string" &&
+          [
+            "ENOENT",
+            "EACCES",
+            "EROFS",
+            "ERR_MODULE_NOT_FOUND",
+            "MODULE_NOT_FOUND",
+            "ERR_INVALID_URL",
+            "ECONNREFUSED",
+            "ENOTFOUND",
+            "42P01",
+            "42501",
+            "28P01",
+          ].includes(record.error_code)
+            ? record.error_code
+            : undefined;
         if (
-          /^(?:startup_failed|worker_error|web_ready|worker_ready|library_output)$/.test(
+          /^(?:startup_failed|worker_error|web_ready|worker_ready|library_output|library_error|uncaught_error|unhandled_rejection)$/.test(
             record.event ?? "",
           )
         )
           process.stderr.write(
-            `${JSON.stringify({ service, event: record.event })}\n`,
+            `${JSON.stringify({ service, event: record.event, error_type: errorType, error_code: errorCode })}\n`,
           );
       } catch {
         /* Never forward raw output. */

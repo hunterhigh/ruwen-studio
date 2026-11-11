@@ -1,4 +1,5 @@
 import type { Database, PostgresFS } from "@ruwen/db";
+import { isLocalRealPreview } from "../../../config/real-preview.ts";
 import { releasePolicy, runtimeSettings } from "../../../config/settings.ts";
 import { assertDailyBudget } from "./daily-budget.ts";
 
@@ -30,10 +31,12 @@ export class BillingError extends Error {
     this.status = status;
   }
 }
-export const currentBank = (): Bank =>
-  ["real", "record"].includes(process.env.MODEL_MODE ?? "faux")
-    ? "live"
-    : "sandbox";
+export const currentBank = (mode = process.env.MODEL_MODE ?? "faux"): Bank =>
+  isLocalRealPreview()
+    ? "sandbox"
+    : ["real", "record"].includes(mode)
+      ? "live"
+      : "sandbox";
 export async function initializeBilling(db: Database) {
   const settings = runtimeSettings();
   const threshold = Number(

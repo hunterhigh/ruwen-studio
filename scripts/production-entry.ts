@@ -6,7 +6,7 @@ import {
   reportError,
 } from "../config/observability.ts";
 
-// Run only in the production images. Do not load local .env files.
+// Shared sanitized service entrypoint for production images and the isolated human-started preview.
 process.env.RUWEN_SKIP_ENV_FILE = "1";
 protectConsole();
 const fatal = async (event: string, error: unknown) => {

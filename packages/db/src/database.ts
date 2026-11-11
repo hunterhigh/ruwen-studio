@@ -69,6 +69,25 @@ export class Database {
       }
     });
   }
+  /** Production startup verifies immutable migrations; only the release step may apply DDL. */
+  async verifyMigrations(): Promise<void> {
+    const directory = new URL("../migrations/", import.meta.url);
+    const files = (await readdir(directory))
+      .filter((name) => /^\d{4}_.+\.sql$/.test(name))
+      .sort();
+    const applied = await this.pool.query<{ id: string; sha256: string }>(
+      "SELECT id,sha256 FROM ruwen_migrations",
+    );
+    const hashes = new Map(applied.rows.map((row) => [row.id, row.sha256]));
+    for (const file of files) {
+      const content = await readFile(new URL(file, directory));
+      if (
+        hashes.get(file.slice(0, 4)) !==
+        createHash("sha256").update(content).digest("hex")
+      )
+        throw new Error("Database migration step is required");
+    }
+  }
   close() {
     return this.pool.end();
   }

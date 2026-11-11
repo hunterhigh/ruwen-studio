@@ -3,6 +3,7 @@ import { createPayments, type PaymentService } from "@ruwen/billing";
 import type { IdeationServiceV1_2 } from "@ruwen/pipeline";
 import { withIdeationV1_2 } from "@ruwen/pipeline";
 import { configuredIdeation, WorkerService } from "worker";
+import { reportError } from "../../../../config/observability.ts";
 import { runtimeSettings } from "../../../../config/settings.ts";
 import {
   type AuthEnvironment,
@@ -52,6 +53,7 @@ export function getServices(): Promise<WebServices> {
     };
     const ideation = configuredIdeation();
     const worker = new WorkerService(url, {
+      onError: (error) => reportError("worker_error", error),
       ideation,
       ...(process.env.WORKER_QUEUE ? { queue: process.env.WORKER_QUEUE } : {}),
       runtime: () =>

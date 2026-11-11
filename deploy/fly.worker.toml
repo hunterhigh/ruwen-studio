@@ -1,0 +1,23 @@
+primary_region = "nrt"
+kill_signal = "SIGTERM"
+kill_timeout = 30
+[build]
+  dockerfile = "deploy/Dockerfile.worker"
+[env]
+  HEALTH_PORT = "8081"
+  WORKER_QUEUE = "ruwen-staging"
+  MODEL_MODE = "faux"
+  REAL_MODEL = "0"
+  P3_GATE_PASSED = "0"
+  REAL_CHARGING_ENABLED = "0"
+  INVITE_ONLY = "1"
+[checks.worker]
+  type = "http"
+  port = 8081
+  path = "/health"
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "60s"
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

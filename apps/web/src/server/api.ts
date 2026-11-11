@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { FAUX_SCENARIOS, ROLE_IDS, type RoleResult } from "@ruwen/agents";
 import {
@@ -544,12 +545,18 @@ export async function handleApi(
         ),
       );
     }
-    if (route.pattern === "/api/health")
-      return json({
-        ok: true,
-        mode: process.env.MODEL_MODE ?? "faux",
-        p3GatePassed: releasePolicy().p3GatePassed,
-      });
+    if (route.pattern === "/api/health") {
+      const { databaseReady } = await import("../../../../config/health.ts");
+      const ok = await databaseReady(db);
+      return json(
+        {
+          ok,
+          mode: process.env.MODEL_MODE ?? "faux",
+          p3GatePassed: releasePolicy().p3GatePassed,
+        },
+        ok ? 200 : 503,
+      );
+    }
     if (route.pattern === "/api/csrf") {
       const token = csrfToken(request);
       return json({ token }, 200, {
@@ -739,14 +746,21 @@ export async function handleApi(
         else if (demo)
           await importProjectZip(
             fs,
-            await exportProjectZip(
-              new LocalDirFS(
-                path.join(
-                  services.environment.workspaceRoot,
-                  "fixtures/demo-project",
+            process.env.RUWEN_BUNDLED_DEMO === "1"
+              ? await readFile(
+                  path.join(
+                    services.environment.workspaceRoot,
+                    "fixtures/demo-project.zip",
+                  ),
+                )
+              : await exportProjectZip(
+                  new LocalDirFS(
+                    path.join(
+                      services.environment.workspaceRoot,
+                      "fixtures/demo-project",
+                    ),
+                  ),
                 ),
-              ),
-            ),
           );
         else await initProject(fs, `project-${id}`);
         if (importing) {

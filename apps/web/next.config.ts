@@ -21,7 +21,11 @@ const config: NextConfig = {
           { request, context }: { request?: string; context?: string },
           callback: (error: Error | null, result?: string) => void,
         ) => {
-          if (request?.endsWith("/config/settings.ts") && context)
+          if (
+            request &&
+            /\/config\/(?:settings|health|observability)\.ts$/.test(request) &&
+            context
+          )
             callback(null, `commonjs ${path.resolve(context, request)}`);
           else if (
             request &&

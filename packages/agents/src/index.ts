@@ -15,6 +15,7 @@ export {
 export { ideationRoleSpec } from "./roles/expression-phase.ts";
 export { ROLES } from "./roles/index.ts";
 export { runRole } from "./run-role.ts";
+export { COORDINATOR_RECORDING_FORMAT } from "./runtime/coordinator-tape.ts";
 export {
   createApplicationRuntime,
   MODEL_MODES,

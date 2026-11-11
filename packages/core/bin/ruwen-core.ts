@@ -7,6 +7,10 @@ import { LocalDirFS } from "../src/fs/local-dir-fs.ts";
 import * as handoff from "../src/handoff/index.ts";
 import { initProject } from "../src/init/index.ts";
 import * as ledgers from "../src/ledgers/index.ts";
+import {
+  previewV41Directory,
+  writeV41PreviewReport,
+} from "../src/migration/local-preview.ts";
 import * as packet from "../src/packet/index.ts";
 import * as registry from "../src/registry/index.ts";
 import {
@@ -104,6 +108,7 @@ const flags: Record<
     booleans: [],
   },
   "init-project": { strings: ["project-root", "project-id"], booleans: [] },
+  "migrate-v4-1-preview": { strings: ["project-root", "output"], booleans: [] },
 };
 const aliases: Record<string, string> = {
   registry: "resource-registry",
@@ -187,6 +192,11 @@ export async function main(args: string[]): Promise<number> {
   let result: unknown;
   let exitCode = 0;
   switch (module) {
+    case "migrate-v4-1-preview":
+      result = await previewV41Directory(root);
+      if (get("output"))
+        await writeV41PreviewReport(root, required("output"), result);
+      break;
     case "init-project":
       result = await initProject(fs, required("project-id"));
       break;

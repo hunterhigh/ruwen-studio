@@ -50,8 +50,9 @@ export async function billingAccount(
         amount: string;
         remaining: string;
         status: string;
+        held_usd: string;
       }>(
-        "SELECT id,run_id,bank,amount::text,remaining::text,status FROM credit_reservations WHERE user_id=$1 AND status IN ('active','review') ORDER BY created_at DESC",
+        "SELECT id,run_id,bank,amount::text,remaining::text,status,(remaining/cost_markup/credits_per_usd)::text held_usd FROM credit_reservations WHERE user_id=$1 AND status IN ('active','review') ORDER BY created_at DESC",
         [userId],
       );
       const checkouts = await tx.query<{
@@ -67,6 +68,18 @@ export async function billingAccount(
         "SELECT id,provider,plan_id,credits::text,price_minor,status,external_url,prepared_at FROM billing_checkouts WHERE user_id=$1 ORDER BY created_at DESC LIMIT 20",
         [userId],
       );
+      const reviews = await tx.query<{
+        id: string;
+        run_id: string;
+        action: string;
+        actual_cost_usd: string | null;
+        charged_credits: string;
+        reason: string;
+        created_at: Date;
+      }>(
+        "SELECT v.id,r.run_id,v.action,v.actual_cost_usd::text,v.charged_credits::text,v.reason,v.created_at FROM credit_reservation_reviews v JOIN credit_reservations r ON r.id=v.reservation_id WHERE r.user_id=$1 ORDER BY v.created_at DESC LIMIT 100",
+        [userId],
+      );
       return {
         balance: (bank === "live" ? live : sandbox).balance,
         bank,
@@ -75,6 +88,7 @@ export async function billingAccount(
         usage: usage.rows,
         ledger: ledger.rows,
         reservations: reservations.rows,
+        reviews: reviews.rows,
         checkouts: checkouts.rows,
         sandboxEnabled,
         plans: runtimeSettings().billing.plans,

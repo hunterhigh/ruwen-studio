@@ -1,7 +1,12 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import path from "node:path";
 import { FAUX_SCENARIOS, ROLE_IDS, type RoleResult } from "@ruwen/agents";
-import { BillingError, createPayments, unfreezeAccount } from "@ruwen/billing";
+import {
+  BillingError,
+  createPayments,
+  resolveReservation,
+  unfreezeAccount,
+} from "@ruwen/billing";
 import {
   checks,
   exportProjectZip,
@@ -18,6 +23,7 @@ import {
   adminAllowed,
   adminRiskReview,
   auditAdmin,
+  pendingReservations,
 } from "./admin-review.ts";
 import { newMailbox, previewMail, redeemInvitation } from "./auth.ts";
 import { billingAccount } from "./billing-account.ts";
@@ -39,7 +45,12 @@ import type { WebServices } from "./services.ts";
 export interface RouteDefinition {
   method: string;
   pattern: string;
-  resource?: "projectId" | "runId" | "checkoutId" | "accountId";
+  resource?:
+    | "projectId"
+    | "runId"
+    | "checkoutId"
+    | "accountId"
+    | "reservationId";
   authentication?: "signature";
   foreignCase?: string;
 }
@@ -146,6 +157,13 @@ export const API_ROUTES: readonly RouteDefinition[] = [
   },
   { method: "GET", pattern: "/api/admin" },
   { method: "POST", pattern: "/api/admin/invitations" },
+  { method: "GET", pattern: "/api/admin/reservations" },
+  {
+    method: "POST",
+    pattern: "/api/admin/reservations/:reservationId/resolve",
+    resource: "reservationId",
+    foreignCase: "foreign reservation review",
+  },
   {
     method: "POST",
     pattern: "/api/admin/accounts/:accountId/unfreeze",
@@ -578,9 +596,13 @@ export async function handleApi(
     )
       ? route.pattern.endsWith("/invitations")
         ? "invitation_create"
-        : route.resource === "accountId"
-          ? "account_unfreeze"
-          : "dashboard_data"
+        : route.pattern.endsWith("/resolve")
+          ? "reservation_resolve"
+          : route.pattern === "/api/admin/reservations"
+            ? "reservation_list"
+            : route.resource === "accountId"
+              ? "account_unfreeze"
+              : "dashboard_data"
       : undefined;
     const owned =
       route.resource === "projectId" || route.resource === "runId"
@@ -597,6 +619,13 @@ export async function handleApi(
         db,
         user.id,
         { accountId: params.accountId ?? "" },
+        services.adminEmails,
+      );
+    if (route.resource === "reservationId")
+      await requireOwnership(
+        db,
+        user.id,
+        { reservationId: params.reservationId ?? "" },
         services.adminEmails,
       );
     if (request.method !== "GET")
@@ -861,6 +890,28 @@ export async function handleApi(
     if (route.pattern.startsWith("/api/admin")) {
       if (!isAdmin(services, user.email))
         throw new HttpError(404, "资源不存在。");
+      if (route.resource === "reservationId") {
+        const data = await body(request);
+        if (
+          data.confirmed !== true ||
+          !["settle", "release"].includes(String(data.action))
+        )
+          throw new HttpError(400, "请明确确认核对方式和理由。");
+        return json(
+          await resolveReservation(db, user.id, params.reservationId ?? "", {
+            action: data.action as "settle" | "release",
+            reason: string(data.reason, 2000),
+            expectedRemaining: string(data.expectedRemaining, 30),
+            ...(data.action === "settle"
+              ? { actualCostUsd: string(data.actualCostUsd, 30) }
+              : {}),
+          }),
+        );
+      }
+      if (route.pattern === "/api/admin/reservations") {
+        await auditAdmin(db.pool, user.id, "reservation_list", true);
+        return json(await pendingReservations(db));
+      }
       if (request.method === "POST") {
         const code = randomBytes(18).toString("hex");
         await db.transaction(async (client) => {
@@ -897,9 +948,13 @@ export async function handleApi(
         actorId,
         pathname.endsWith("/unfreeze")
           ? "account_unfreeze"
-          : pathname.endsWith("/invitations")
-            ? "invitation_create"
-            : "dashboard_data",
+          : pathname.endsWith("/resolve")
+            ? "reservation_resolve"
+            : pathname === "/api/admin/reservations"
+              ? "reservation_list"
+              : pathname.endsWith("/invitations")
+                ? "invitation_create"
+                : "dashboard_data",
         false,
       );
     }

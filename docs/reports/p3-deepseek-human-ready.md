@@ -2,7 +2,7 @@
 - 第1项PR #28已合并；凭据限制#29、路由#30、ping#31、DeepSeek预算#32分别提交，依次CI全绿合并。
 - docs/p3-deepseek-human-run.md提供人类PowerShell步骤、两条live命令、随机canary、报告路径和失败处理。
 测试结果
-- 本机全量75文件680测试、构建、22条浏览器测试通过；新增ping仅faux，双profile计划和录制/replay冒烟12测试通过。
+- 最终代码本机全量77文件688测试及构建通过；22条浏览器测试通过，新增ping仅faux，双profile计划和录制/replay冒烟12测试通过。
 - 离线DeepSeek计划11请求上界$0.8595032321，1.2美元可容纳固定演示，provider calls=0；完整输出见p3-deepseek-plan.md。
 - 每个合并以最新main的fast/full/containers CI全绿为准；未读取真实key或执行任何live命令。
 未完成与风险

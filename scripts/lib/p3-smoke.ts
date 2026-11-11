@@ -11,9 +11,15 @@ import {
   createApplicationRuntime,
   createFauxRuntime,
   type ModelRuntime,
+  ROLES,
   type RoleId,
   type RoleResult,
 } from "../../packages/agents/src/index.ts";
+import {
+  resolveCatalogModel,
+  roleGenerationPolicy,
+} from "../../packages/agents/src/models.ts";
+import { localResponse } from "../../packages/agents/src/runtime/local-response.ts";
 import type {
   IdeationActor,
   IdeationPreview,
@@ -22,33 +28,41 @@ import type {
 } from "../../packages/pipeline/src/ideation/contract.ts";
 import { loadRun } from "../../packages/pipeline/src/index.ts";
 import { isolatedProject } from "./isolated-project.ts";
-import { SmokeBudget } from "./smoke-budget.ts";
+import {
+  requestCostBound,
+  requestInputBound,
+  SmokeBudget,
+} from "./smoke-budget.ts";
 
 const value = <T>(result: IdeationResult<T>): T => {
   if (!result.ok) throw new Error(`Ideation: ${result.error.code}`);
   return result.value;
 };
-export function smokeFaux() {
+function demoReplies() {
   let conversations = 0;
-  return createFauxRuntime(
-    Array.from({ length: 100 }, () => (context) => {
-      if (
-        requestRole(context) === "chuangyi-xietiaoyuan" &&
-        conversations++ === 0
-      )
-        return {
-          ...defaultFauxResponse(context),
-          content: [
-            {
-              type: "text",
-              text: "可以先讨论驿站里各方的利益，再由你决定是否交接。",
-            },
-          ],
-          stopReason: "stop",
-        };
-      return defaultFauxResponse(context);
-    }),
-  );
+  return (
+    context: Parameters<typeof defaultFauxResponse>[0],
+  ): ReturnType<typeof defaultFauxResponse> => {
+    if (
+      requestRole(context) === "chuangyi-xietiaoyuan" &&
+      conversations++ === 0
+    )
+      return {
+        ...defaultFauxResponse(context),
+        content: [
+          {
+            type: "text",
+            text: "可以先讨论驿站里各方的利益，再由你决定是否交接。",
+          },
+        ],
+        stopReason: "stop",
+      };
+    return defaultFauxResponse(context);
+  };
+}
+export function smokeFaux() {
+  const reply = demoReplies();
+  return createFauxRuntime(Array.from({ length: 100 }, () => reply));
 }
 export interface SmokeOptions {
   url: string;
@@ -57,10 +71,12 @@ export interface SmokeOptions {
   maxUsd?: number;
   live?: boolean;
   upstream?: ModelRuntime;
+  /** Internal offline mode: local fixed replies only, no provider dispatch or recording. */
+  planOnly?: boolean;
 }
 export async function runP3Smoke(options: SmokeOptions) {
   const directory = path.resolve(options.directory);
-  await mkdir(directory, { recursive: true });
+  if (!options.planOnly) await mkdir(directory, { recursive: true });
   const planFile = path.join(directory, "smoke-plan.json");
   const plan =
     options.mode === "replay"
@@ -71,17 +87,92 @@ export async function runP3Smoke(options: SmokeOptions) {
       : { version: 1, upstream: options.live ? "real" : "faux" };
   if (plan.version !== 1 || !["real", "faux"].includes(plan.upstream))
     throw new Error("Unsupported smoke recording plan");
-  if (options.mode === "record")
+  if (options.mode === "record" && !options.planOnly)
     await writeFile(planFile, `${JSON.stringify(plan, null, 2)}\n`, {
       flag: "wx",
     });
-  const upstream =
-    options.upstream ?? (plan.upstream === "faux" ? smokeFaux() : undefined);
-  const base = createApplicationRuntime({
-    mode: options.mode,
-    workspaceRoot: directory,
-    ...(upstream ? { upstream } : {}),
-  });
+  const upstream = options.planOnly
+    ? undefined
+    : (options.upstream ??
+      (plan.upstream === "faux" ? smokeFaux() : undefined));
+  const fixed = options.planOnly ? createFauxRuntime([]) : undefined;
+  let base =
+    fixed ??
+    createApplicationRuntime({
+      mode: options.mode,
+      workspaceRoot: directory,
+      ...(upstream ? { upstream } : {}),
+    });
+  const planned: {
+    phase: string;
+    role: string;
+    model: string;
+    inputBytes: number;
+    framingTokens: number;
+    inputTokens: number;
+    outputTokens: number;
+    boundUsd: number;
+  }[] = [];
+  let planningState: { callCount: number } | undefined;
+  if (fixed) {
+    planningState = fixed.faux.state;
+    const respond = demoReplies();
+    // Even an accidental delegation to this runtime fails before any faux provider call.
+    fixed.models.streamSimple = () => {
+      throw new Error("Planner cannot dispatch a provider");
+    };
+    const models = new Proxy(fixed.models, {
+      get(target, key) {
+        if (key === "streamSimple")
+          return ((selected, context) => {
+            const role = requestRole(
+              context as Parameters<typeof requestRole>[0],
+            );
+            const { model } = resolveCatalogModel(ROLES[role]),
+              outputTokens = Math.min(
+                roleGenerationPolicy(role).maxTokens,
+                model.maxTokens,
+              ),
+              input = requestInputBound(context);
+            planned.push({
+              phase: budget.phase,
+              role,
+              model: `${model.provider}/${model.id}`,
+              inputBytes: input.utf8Bytes,
+              framingTokens: input.framingTokens,
+              inputTokens: input.tokens,
+              outputTokens,
+              boundUsd: requestCostBound(model, context, outputTokens),
+            });
+            const normalized = context as Parameters<
+              typeof defaultFauxResponse
+            >[0];
+            const reply = respond(normalized);
+            return localResponse({
+              ...reply,
+              api: selected.api,
+              provider: selected.provider,
+              model: selected.id,
+            });
+          }) as ModelRuntime["models"]["streamSimple"];
+        if (
+          [
+            "stream",
+            "complete",
+            "completeSimple",
+            "streamDeferred",
+            "fetchDeferred",
+          ].includes(String(key))
+        )
+          return () => {
+            throw new Error("Planner cannot dispatch a provider");
+          };
+        const v = Reflect.get(target, key);
+        return typeof v === "function" ? v.bind(target) : v;
+      },
+    });
+    base = { ...fixed, models };
+  }
   const budget = new SmokeBudget(options.maxUsd ?? 5),
     runtime = budget.wrap(base);
   const steps: { phase: string; status: string }[] = [];
@@ -289,6 +380,8 @@ export async function runP3Smoke(options: SmokeOptions) {
     mode: options.mode,
     upstream: plan.upstream,
     p3GatePassed: false,
+    planned,
+    providerCalls: planningState?.callCount ?? null,
     status: failure ? "failed" : "completed",
     failure,
     maxUsd: budget.capUsd,
@@ -308,13 +401,15 @@ export async function runP3Smoke(options: SmokeOptions) {
       })),
     memoryPreview,
   };
-  await writeFile(
-    path.join(directory, `report-${options.mode}.json`),
-    `${JSON.stringify(report, null, 2)}\n`,
-  );
-  await writeFile(
-    path.join(directory, `candidate-${options.mode}.md`),
-    candidate,
-  );
+  if (!options.planOnly) {
+    await writeFile(
+      path.join(directory, `report-${options.mode}.json`),
+      `${JSON.stringify(report, null, 2)}\n`,
+    );
+    await writeFile(
+      path.join(directory, `candidate-${options.mode}.md`),
+      candidate,
+    );
+  }
   return report;
 }

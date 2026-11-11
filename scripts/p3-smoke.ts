@@ -3,6 +3,7 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import { isolatedDatabase } from "./lib/isolated-project.ts";
 import { runP3Smoke } from "./lib/p3-smoke.ts";
+import { formatSmokePlan, smokePlan } from "./lib/smoke-plan.ts";
 
 const { values } = parseArgs({
   options: {
@@ -10,6 +11,7 @@ const { values } = parseArgs({
     "max-usd": { type: "string", default: "5" },
     output: { type: "string" },
     live: { type: "boolean", default: false },
+    plan: { type: "boolean", default: false },
   },
 });
 if (!["faux", "record", "replay"].includes(values.mode))
@@ -17,6 +19,8 @@ if (!["faux", "record", "replay"].includes(values.mode))
 const maxUsd = Number(values["max-usd"]);
 if (!Number.isFinite(maxUsd) || maxUsd <= 0)
   throw new Error("--max-usd must be finite and positive");
+if (values.plan && (values.live || values.mode === "replay"))
+  throw new Error("--plan cannot use --live or --mode replay");
 if (values.live && values.mode === "replay")
   throw new Error("Replay cannot enable a live upstream");
 if (values.live) {
@@ -44,15 +48,21 @@ try {
     mode: values.mode === "replay" ? "replay" : "record",
     maxUsd,
     live: values.live,
+    planOnly: values.plan,
   });
-  console.log(
-    `${report.status}: ${report.steps.map((s) => `${s.phase}=${s.status}`).join(" → ")}`,
-  );
-  console.log(
-    `USD ${report.costUsd.toFixed(6)} spent, ${report.heldUsd.toFixed(6)} held / cap ${maxUsd}`,
-  );
-  console.log(`Report and full candidate: ${directory}`);
-  if (report.status !== "completed") process.exitCode = 1;
+  if (values.plan) {
+    console.log(formatSmokePlan(smokePlan(report)));
+    if (report.status !== "completed") process.exitCode = 1;
+  } else {
+    console.log(
+      `${report.status}: ${report.steps.map((s) => `${s.phase}=${s.status}`).join(" → ")}`,
+    );
+    console.log(
+      `USD ${report.costUsd.toFixed(6)} spent, ${report.heldUsd.toFixed(6)} held / cap ${maxUsd}`,
+    );
+    console.log(`Report and full candidate: ${directory}`);
+    if (report.status !== "completed") process.exitCode = 1;
+  }
 } finally {
   await database.close();
 }

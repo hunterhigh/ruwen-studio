@@ -37,7 +37,8 @@ export const errorCopy: Record<IdeationUiErrorCode, string> = {
   RATE_LIMITED: "操作过于频繁，请稍后手动重试。",
   PROVIDER_UNAVAILABLE: "模型服务暂不可用，请稍后手动重试。",
   INTERNAL_ERROR: "本次操作未完成，请刷新核对状态。",
-  INSUFFICIENT_CREDITS: "余额不足，请到账户页查看可用点数。",
+  INSUFFICIENT_CREDITS:
+    "可用余额不足或今日额度已用尽，请到账户页查看点数与每日上限。",
   ACCOUNT_FROZEN: "账户运行已冻结，等待人工复核。你仍可阅读已有内容。",
   BILLING_DISABLED: "真实收费尚未开放。当前不会发起付款。",
 };

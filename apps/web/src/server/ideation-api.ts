@@ -256,6 +256,11 @@ export async function handleIdeation(
     actor,
     data as never,
   );
+  if (!result.ok && result.error.code === "RATE_LIMITED")
+    await services.worker.db.pool.query(
+      "INSERT INTO security_events(user_id,project_id,kind,score) VALUES($1,$2,'rate_limited',1)",
+      [userId, params.projectId],
+    );
   return Response.json(result, {
     status: result.ok
       ? endpoint.created

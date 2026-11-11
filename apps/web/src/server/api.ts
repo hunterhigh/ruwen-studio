@@ -6,6 +6,7 @@ import {
   createPayments,
   resolveReservation,
   unfreezeAccount,
+  updateDailyLimit,
 } from "@ruwen/billing";
 import {
   checks,
@@ -31,6 +32,7 @@ import {
 } from "./admin-review.ts";
 import { newMailbox, previewMail, redeemInvitation } from "./auth.ts";
 import { billingAccount } from "./billing-account.ts";
+import { disposableEmail } from "./email-policy.ts";
 import {
   handleIdeation,
   IDEATION_ROUTES,
@@ -150,6 +152,12 @@ export const API_ROUTES: readonly RouteDefinition[] = [
     foreignCase: "foreign cancellation",
   },
   { method: "GET", pattern: "/api/account" },
+  {
+    method: "POST",
+    pattern: "/api/billing/accounts/:accountId/daily-limit",
+    resource: "accountId",
+    foreignCase: "foreign daily point limit",
+  },
   { method: "POST", pattern: "/api/billing/checkout" },
   {
     method: "POST",
@@ -571,6 +579,8 @@ export async function handleApi(
         email,
         services.environment.secret,
       );
+      if (disposableEmail(email))
+        throw new HttpError(403, "暂不支持此邮箱服务，请使用常用邮箱。");
       const existing = await db.pool.query(
         "SELECT id FROM users WHERE email=$1",
         [email],
@@ -642,7 +652,7 @@ export async function handleApi(
         db,
         user.id,
         { accountId: params.accountId ?? "" },
-        services.adminEmails,
+        adminAction ? services.adminEmails : [],
       );
     if (route.resource === "reservationId")
       await requireOwnership(
@@ -655,6 +665,13 @@ export async function handleApi(
       requireCsrf(request, services.environment.baseURL);
     if (adminAction && !isAdmin(services, user.email)) {
       throw new HttpError(404, "资源不存在。");
+    }
+    if (route.pattern === "/api/billing/accounts/:accountId/daily-limit") {
+      const data = await body(request);
+      if (Object.keys(data).length !== 1 || !("limitCredits" in data))
+        throw new HttpError(400, "只接受每日点数上限。");
+      await updateDailyLimit(db, user.id, data.limitCredits);
+      return json({ saved: true });
     }
     if (route.ideation) {
       const data =

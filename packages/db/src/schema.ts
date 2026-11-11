@@ -365,6 +365,7 @@ export const billingAccounts = pgTable("billing_accounts", {
     .primaryKey()
     .references(() => users.id),
   frozenAt: timestamp("frozen_at", { withTimezone: true }),
+  dailyCreditLimit: bigint("daily_credit_limit", { mode: "bigint" }),
   frozenScore: bigint("frozen_score", { mode: "bigint" }),
   reviewedScore: bigint("reviewed_score", { mode: "bigint" })
     .notNull()
@@ -378,6 +379,18 @@ export const accountRiskAudit = pgTable("account_risk_audit", {
   actorId: uuid("actor_id").references(() => users.id),
   action: text("action").notNull(),
   score: bigint("score", { mode: "bigint" }).notNull(),
+  createdAt: time("created_at"),
+});
+export const accountLimitAudit = pgTable("account_limit_audit", {
+  id: id(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+  actorId: uuid("actor_id")
+    .notNull()
+    .references(() => users.id),
+  previousLimit: bigint("previous_limit", { mode: "bigint" }),
+  newLimit: bigint("new_limit", { mode: "bigint" }),
   createdAt: time("created_at"),
 });
 export const billingCheckouts = pgTable(

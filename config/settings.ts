@@ -19,6 +19,11 @@ export function runtimeSettings(): RuntimeSettings {
       settings.billing.payment.webhookSkewSeconds,
       settings.billing.payment.requestTimeoutMs,
       settings.riskReview.freezeScore,
+      settings.riskReview.userChapterConcurrency,
+      settings.riskReview.coordinatorTurnsPerHour,
+      settings.riskReview.coordinatorWindowSeconds,
+      settings.riskReview.dailyPlanPercent,
+      settings.riskReview.dailyMaximumCredits,
       settings.stream.pollIntervalMs,
       settings.stream.heartbeatMs,
       settings.stream.maxConnectionMs,
@@ -39,7 +44,22 @@ export function runtimeSettings(): RuntimeSettings {
         plan.credits,
         plan.priceMinor,
       ]),
-    ].every(Number.isSafeInteger)
+    ].every(Number.isSafeInteger) ||
+    !settings.billing.plans.some(
+      (p) => p.id === settings.riskReview.dailyDefaultPlanId,
+    ) ||
+    !Array.isArray(settings.riskReview.disposableEmailDomains) ||
+    !settings.riskReview.disposableEmailDomains.every((d) =>
+      /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/.test(d),
+    ) ||
+    ![
+      settings.riskReview.coordinatorTurnsPerHour,
+      settings.riskReview.coordinatorWindowSeconds,
+      settings.riskReview.dailyMaximumCredits,
+      settings.riskReview.dailyPlanPercent,
+      settings.riskReview.userChapterConcurrency,
+    ].every(Number.isSafeInteger) ||
+    settings.riskReview.dailyPlanPercent > 100
   )
     throw new Error(
       "Invalid runtime settings; placeholders must be explicit positive values and release gates must be boolean",

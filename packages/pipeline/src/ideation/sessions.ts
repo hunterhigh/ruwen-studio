@@ -105,6 +105,7 @@ export async function appendIdeationEvent(
   );
 }
 export interface IdeationSessionOptions {
+  queue?: string;
   modelMode: IdeationSession["capabilities"]["modelMode"];
   externalSearch?: boolean;
   /** Main thread supplies billing/freeze guards. Called after all ownership, inside acceptance transaction. */
@@ -113,6 +114,7 @@ export interface IdeationSessionOptions {
     actor: IdeationActor,
     runId: IdeationRunId,
   ) => Promise<RunStartErrorCode | undefined>;
+  /** Bind a reservation after the run row exists, in the same uncommitted acceptance transaction. */
   onRunAccepted?: (
     tx: IdeationTransaction,
     actor: IdeationActor,
@@ -290,6 +292,9 @@ export class IdeationSessions implements SessionMethods {
     actor: IdeationActor,
     runId: IdeationRunId,
   ) {
+    // Generic recording retains requests; coordinator wording must not become a tape snapshot.
+    if (this.options.modelMode === "record")
+      ideationFail("PRECONDITION_FAILED");
     if (!this.options.beforeRun && this.options.modelMode !== "faux")
       ideationFail("BILLING_DISABLED");
     const failure = await this.options.beforeRun?.(tx, actor, runId);
@@ -352,11 +357,16 @@ export class IdeationSessions implements SessionMethods {
           "UPDATE ideation_sessions SET revision=$2,current_turn_id=$3,updated_at=now() WHERE id=$1",
           [session.id, revision, turnId],
         );
-        await tx.sql("INSERT INTO ideation_outbox(run_id) VALUES($1)", [
+        await tx.sql(
+          "INSERT INTO ideation_outbox(run_id,queue_name) VALUES($1,$2)",
+          [turnId, this.options.queue ?? "ruwen-work"],
+        );
+        const reservationFailure = await this.options.onRunAccepted?.(
+          tx,
+          actor,
           turnId,
-        ]);
-        const refused = await this.options.onRunAccepted?.(tx, actor, turnId);
-        if (refused) ideationFail(refused);
+        );
+        if (reservationFailure) ideationFail(reservationFailure);
         await appendIdeationEvent(tx, actor, session.id, turnId, {
           type: "message_changed",
           messageId,

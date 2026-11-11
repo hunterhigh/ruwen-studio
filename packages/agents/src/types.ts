@@ -83,6 +83,8 @@ export interface RoleContext {
   onDelta?: (delta: string, role: RoleId) => void;
   onAttemptReset?: (role: RoleId, reason: AttemptResetReason) => void;
   onRequest?: (context: TranscriptContext, role: RoleId) => void;
+  /** Coordinator only: reloaded from the authorized server message store before EVERY provider request. */
+  loadCoordinatorInput?: () => Promise<Data>;
   onResourceRead?: (resource: Data, role: RoleId) => void;
   search?: SearchProvider;
   searchApproved?: boolean;

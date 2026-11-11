@@ -56,6 +56,8 @@ import {
 } from "@ruwen/pipeline";
 import { PgBoss } from "pg-boss";
 import { runtimeSettings } from "../../../config/settings.ts";
+import type { IdeationSessionOptions } from "../../../packages/pipeline/src/ideation/sessions.ts";
+import { IdeationRunner } from "./ideation-runner.ts";
 import { persistPrivatePrompt } from "./private-prompts.ts";
 import { recordRoleSecurityEvents } from "./security-events.ts";
 import { streamSink } from "./stream-events.ts";
@@ -68,6 +70,7 @@ type Kind =
   | "memory_preview"
   | "memory"
   | "cancel"
+  | "ideation"
   | "dispatch";
 export interface Task {
   kind: Kind;
@@ -78,6 +81,7 @@ export interface Task {
   lockDeferrals?: number;
 }
 export interface WorkerOptions {
+  ideation?: Omit<IdeationSessionOptions, "modelMode" | "queue">;
   runtime: () => ModelRuntime;
   runtimeForRequest?: (request: Data) => ModelRuntime;
   queue?: string;
@@ -129,6 +133,7 @@ export function queueExpirySeconds(
   return seconds;
 }
 export class WorkerService {
+  readonly ideationRunner: IdeationRunner;
   readonly db: Database;
   readonly boss: PgBoss;
   readonly queue: string;
@@ -167,6 +172,12 @@ export class WorkerService {
     });
     this.options = options;
     this.queue = options.queue ?? "ruwen-work";
+    this.ideationRunner = new IdeationRunner(
+      this.db,
+      this.boss,
+      this.queue,
+      options,
+    );
     this.boss.on("error", (error) => options.onError?.(error));
   }
   async start(consume = true) {
@@ -184,7 +195,8 @@ export class WorkerService {
       await this.boss.updateQueue(this.queue, {
         expireInSeconds: this.scheduling.expireInSeconds,
       });
-      if (consume)
+      if (consume) {
+        this.ideationRunner.start();
         await this.boss.work<Task>(
           this.queue,
           {
@@ -195,7 +207,9 @@ export class WorkerService {
             for (const job of jobs) await this.handle(job.data, job.signal);
           },
         );
+      }
     } catch (error) {
+      await this.ideationRunner.stop();
       await this.boss.stop({ graceful: false }).catch(() => {});
       await this.db.close().catch(() => {});
       throw error;
@@ -203,6 +217,7 @@ export class WorkerService {
   }
   async stop() {
     for (const control of this.active.values()) control.abort();
+    await this.ideationRunner.stop();
     await this.boss.stop({ graceful: true, timeout: 10000 });
     await this.db.close();
   }
@@ -607,6 +622,8 @@ export class WorkerService {
     });
   }
   async handle(task: Task, jobSignal?: AbortSignal) {
+    if (task.kind === "ideation")
+      return this.ideationRunner.handle(task, jobSignal);
     const fs = new PostgresFS(this.db, task.projectId, task.ownerId);
     const connection = await this.db.pool.connect();
     const control = new AbortController();

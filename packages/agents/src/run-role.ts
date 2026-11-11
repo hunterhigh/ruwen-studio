@@ -416,6 +416,36 @@ export async function runRole(
       });
     },
     getApiKey: (provider) => ctx.runtime.apiKey?.(provider),
+    ...(ctx.loadCoordinatorInput
+      ? {
+          prepareRequest: async ({ context }) => {
+            if (id !== "chuangyi-xietiaoyuan")
+              throw new RoleOutputError(
+                "Conversation reload is coordinator-only",
+              );
+            const fresh = await ctx.loadCoordinatorInput?.();
+            if (!fresh)
+              throw new RoleOutputError("Coordinator context is unavailable");
+            assertInputLimits(fresh);
+            const current = await prepareInput(id, fresh, ctx);
+            Object.assign(input, current);
+            security.detector.addMaterial(current);
+            const first = context.messages.findIndex(
+              (message) => message.role === "user",
+            );
+            return {
+              context: {
+                ...context,
+                messages: context.messages.map((message, index) =>
+                  index === first && message.role === "user"
+                    ? { ...message, content: spec.buildUserMessage(current) }
+                    : message,
+                ),
+              },
+            };
+          },
+        }
+      : {}),
     beforeToolCall: async ({ toolCall, assistantMessage }, signal) => {
       security.observe(assistantMessage);
       if (security.failure || security.streamFailure)
@@ -613,6 +643,16 @@ export async function runRole(
           security.record(
             reply === INTERNAL_REFUSAL ? "internal_refusal" : "content_refusal",
           );
+          output = reply;
+          return complete();
+        }
+        if (
+          ctx.loadCoordinatorInput &&
+          !submitted &&
+          reply &&
+          message.stopReason === "stop" &&
+          message.content.every((block) => block.type !== "toolCall")
+        ) {
           output = reply;
           return complete();
         }

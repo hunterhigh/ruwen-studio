@@ -65,6 +65,8 @@ function child(
       exited = true;
       resolve();
     });
+  }).then(async () => {
+    if (task) await waitProjectReleased(service, task.projectId);
   });
   cleanup.push(async () => {
     if (!exited) proc.kill("SIGKILL");
@@ -162,7 +164,6 @@ it("SIGKILL after successful editor persistence preserves exactly one pending pr
   );
   process.proc.kill("SIGKILL");
   await process.closed;
-  await waitProjectReleased(p.service, p.fs.projectId);
   await p.service.handle(task);
   expect((await loadRun(p.fs, id)).status).toBe("AWAITING_CANDIDATE_APPROVAL");
   expect(await ledgers.readEntries(p.fs, candidateProblems.PATH)).toHaveLength(
@@ -199,7 +200,6 @@ it.each([
   await first.wait("fault");
   first.proc.kill("SIGKILL");
   await first.closed;
-  await waitProjectReleased(p.service, p.fs.projectId);
   const second = child(p.service, p.task);
   const result = await second.wait("completed");
   const expected =

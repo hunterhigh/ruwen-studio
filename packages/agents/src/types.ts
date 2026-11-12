@@ -12,6 +12,7 @@ import type {
 } from "@earendil-works/pi-ai";
 import type { Schema } from "@earendil-works/pi-schema";
 import type { ProjectFS, SecurityEvent } from "@ruwen/core";
+import type { ToolValidationFailure } from "./tools/validation-feedback.ts";
 
 export type Json =
   | null
@@ -60,6 +61,8 @@ export interface ModelRuntime {
   models: Models;
   resolve(role: RoleSpec): { model: Model<Api>; thinkingLevel: ThinkingLevel };
   apiKey?(provider: string): string | undefined;
+  /** Internal diagnostic metadata only; no argument values, user wording or model text. */
+  onToolValidationError?(role: RoleId, failure: ToolValidationFailure): void;
 }
 export interface SearchProvider {
   search(query: string, signal?: AbortSignal): Promise<Data[]>;

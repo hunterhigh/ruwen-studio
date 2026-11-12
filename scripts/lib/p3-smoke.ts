@@ -371,9 +371,10 @@ export async function runP3Smoke(options: SmokeOptions) {
       providerDurationMs: calls.reduce((n, c) => n + c.durationMs, 0),
       retries: Number(retries.find((r) => r.role === role)?.count ?? 0),
       truncated: calls.some((c) => c.stopReason === "length"),
-      failures: calls.flatMap((c) =>
-        c.failureOriginal ? [c.failureOriginal] : [],
-      ),
+      failures: calls.flatMap((c) => [
+        ...(c.failureOriginal ? [c.failureOriginal] : []),
+        ...(c.validationFailures ?? []),
+      ]),
     };
   });
   const report = {

@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { Agent } from "@earendil-works/pi-agent-core";
 import type { Usage } from "@earendil-works/pi-ai";
-import { compile } from "@earendil-works/pi-schema";
 import {
   applyEditorialEdits,
   applySectionEdits,
@@ -33,6 +32,10 @@ import {
   readAuthorizedResource,
   roleTools,
 } from "./tools/index.ts";
+import {
+  toolValidationMessage,
+  toolValidator,
+} from "./tools/validation-feedback.ts";
 import {
   type AttemptResetReason,
   type Data,
@@ -392,7 +395,7 @@ export async function runRole(
     tools.push(submit);
   }
   const validators = new Map(
-    tools.map((tool) => [tool.name, compile(tool.parameters)]),
+    tools.map((tool) => [tool.name, toolValidator(tool.parameters)]),
   );
   const runtime = new Agent({
     sessionId: createHash("sha256")
@@ -463,11 +466,20 @@ export async function runRole(
           reason: "role_already_finished",
         };
       const validator = validators.get(toolCall.name);
-      if (!validator || !validator.check(toolCall.arguments))
+      if (!validator)
         return {
           block: true,
           terminate: true,
           reason: "strict_schema_required",
+        };
+      if (!validator.check(toolCall.arguments))
+        return {
+          block: true,
+          terminate: true,
+          reason: toolValidationMessage({
+            tool: toolCall.name,
+            issues: validator.issues(toolCall.arguments),
+          }),
         };
       return undefined;
     },
@@ -506,6 +518,17 @@ export async function runRole(
       if (!["error", "aborted"].includes(event.message.stopReason) || generated)
         usage.push(structuredClone(event.message.usage));
       security.observe(event.message);
+      for (const block of event.message.content) {
+        if (block.type !== "toolCall") continue;
+        const validator = validators.get(block.name);
+        if (!validator || validator.check(block.arguments)) continue;
+        const failure = {
+          tool: block.name,
+          issues: validator.issues(block.arguments),
+        };
+        lastValidationError = toolValidationMessage(failure);
+        ctx.runtime.onToolValidationError?.(id, failure);
+      }
     }
     if (event.type === "message_update") {
       const delta = event.assistantMessageEvent;

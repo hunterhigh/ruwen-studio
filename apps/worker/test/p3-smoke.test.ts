@@ -342,6 +342,82 @@ it("reports a corrected author attempt once without counting normal tool turns a
   expect(report.candidateDrafts).toHaveLength(2);
 }, 30000);
 
+it.each([
+  false,
+  true,
+])("reports the real handoff field failure and preserves one correction (always invalid=%s)", async (alwaysInvalid) => {
+  const directory = await folder(),
+    base = smokeFaux();
+  const bad = createFauxRuntime(
+    Array.from({ length: 2 }, () => (context) => {
+      const response = defaultFauxResponse(context);
+      const call = response.content.find(
+        (b) => b.type === "toolCall" && b.name === "propose_handoff",
+      );
+      if (!call || call.type !== "toolCall") throw new Error("Missing handoff");
+      (call.arguments.payload as Record<string, unknown>).open_realization =
+        "保留动作与对白的选择";
+      return response;
+    }),
+  );
+  const original = base.models.streamSimple.bind(base.models);
+  let turns = 0;
+  base.models.streamSimple = ((model, context, options) => {
+    const role = requestRole(context as Parameters<typeof requestRole>[0]);
+    if (role === "chuangyi-xietiaoyuan") {
+      turns++;
+      if (turns === 2 || (alwaysInvalid && turns === 3))
+        return bad.models.streamSimple(model, context, options);
+      if (turns === 3)
+        expect(
+          JSON.stringify(
+            context.messages.filter((m) => m.role === "toolResult"),
+          ),
+        ).toContain("/payload/open_realization: expected array, got string");
+    }
+    return original(model, context, options);
+  }) as typeof original;
+  const report = await runP3Smoke({
+    url: inject("databaseUrl"),
+    directory,
+    mode: "record",
+    upstream: base,
+  });
+  expect(report.status, report.failure ?? "").toBe(
+    alwaysInvalid ? "failed" : "completed",
+  );
+  const coordinator = report.roles.find(
+    (r) => r.role === "chuangyi-xietiaoyuan",
+  );
+  expect(coordinator?.retries).toBe(1);
+  expect(coordinator?.failures).toHaveLength(alwaysInvalid ? 2 : 1);
+  expect(coordinator?.failures[0]).toMatchObject({
+    tool: "propose_handoff",
+    issues: [
+      {
+        path: "/payload/open_realization",
+        keyword: "type",
+        message: "expected array, got string",
+      },
+    ],
+  });
+  expect(report.calls.flatMap((c) => c.validationFailures ?? [])).toHaveLength(
+    alwaysInvalid ? 2 : 1,
+  );
+  expect(turns).toBe(3);
+  if (alwaysInvalid) {
+    expect(report.failure).toContain("CREATION_CHECK_FAILED");
+    expect(report.steps.map((s) => s.phase)).toEqual([
+      "conversation",
+      "communication_gate",
+    ]);
+    expect(report.candidate).toBe("");
+  } else {
+    expect(report.steps.at(-1)?.status).toBe("AWAITING_MEMORY_APPROVAL");
+    expect(report.candidate.length).toBeGreaterThan(0);
+  }
+}, 30000);
+
 it("disables hidden SDK transport retries even when a caller requests them", async () => {
   let retries: number | undefined;
   const source = createFauxRuntime([

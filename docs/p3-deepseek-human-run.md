@@ -1,5 +1,7 @@
 # 人类在 PowerShell 运行 DeepSeek P3 验证
 
+若当前PowerShell找不到`pnpm`，使用Node自带的`corepack.cmd pnpm`替代下文命令中的`pnpm`；它读取仓库固定的pnpm版本。可先设置`$env:COREPACK_ENABLE_DOWNLOAD_PROMPT = '0'`避免首次下载询问。2026-11-12首次运行已留下失败证据`smoke-01`；下一轮改用`.local/p3-deepseek/smoke-02`等新目录，原目录不可重复record。修复合并后仍须由人类验证完整流程，faux通过不等于真实通过。
+
 前提：你已在**当前自己的 PowerShell 窗口**临时设置 `DEEPSEEK_API_KEY`。不要把值贴给 Codex，不写 .env、脚本、配置、终端录制或其他文件。以下命令均不含 key 值。此目录已安装 Node/pnpm、依赖和 vendor 子模块；工具创建独立临时数据库，无需设置 DATABASE_URL，不修改演示源项目。
 
 先进入本次准备好的仓库 worktree。窗口中的环境变量只会由随后的人类命令继承；Codex 不执行这些 live 命令。

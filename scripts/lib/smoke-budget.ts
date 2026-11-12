@@ -8,6 +8,7 @@ import {
 } from "../../packages/agents/src/runtime/coordinator-tape.ts";
 import { forwardStream } from "../../packages/agents/src/runtime/stream.ts";
 import { stableRequestHash } from "../../packages/agents/src/runtime/tapes.ts";
+import type { ToolValidationFailure } from "../../packages/agents/src/tools/validation-feedback.ts";
 
 type Model = ReturnType<ModelRuntime["resolve"]>["model"];
 export type SmokeRequest = Parameters<
@@ -31,6 +32,7 @@ export interface SmokeCall {
   failureOriginal?: unknown;
   recordedResponse?: unknown;
   tape?: string;
+  validationFailures?: ToolValidationFailure[];
 }
 export class SmokeBudgetError extends Error {}
 /** Text byte fallback bound; keep the JSON envelope as allowance for message/tool framing. */
@@ -307,6 +309,14 @@ export class SmokeBudget {
     return {
       ...base,
       models,
+      onToolValidationError: (role, failure) => {
+        const call = this.calls.findLast((entry) => entry.role === role);
+        if (call) {
+          call.validationFailures ??= [];
+          call.validationFailures.push(structuredClone(failure));
+        }
+        base.onToolValidationError?.(role, failure);
+      },
       ...(bind
         ? {
             bindCoordinatorSources: (read: () => readonly string[]) =>

@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { assertModelCredentialFiles } from "../packages/agents/src/index.ts";
@@ -44,6 +45,14 @@ const directory = path.resolve(
 );
 if (values.mode === "replay" && !values.output)
   throw new Error("Replay requires --output pointing to a previous recording");
+if (
+  !values.plan &&
+  values.mode !== "replay" &&
+  existsSync(path.join(directory, "smoke-plan.json"))
+)
+  throw new Error(
+    "Recording already exists. Choose a NEW --output directory (for example .local/p3-deepseek/smoke-02); existing evidence is preserved and no model request was sent.",
+  );
 const database = await isolatedDatabase();
 try {
   const report = await runP3Smoke({

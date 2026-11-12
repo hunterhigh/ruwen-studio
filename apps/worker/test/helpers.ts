@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { fileURLToPath } from "node:url";
 import { createFauxRuntime } from "@ruwen/agents";
-import { exportProjectZip, importProjectZip, LocalDirFS } from "@ruwen/core";
+import { importProjectZip } from "@ruwen/core";
 import { PostgresFS } from "@ruwen/db";
 import { inject } from "vitest";
+import { demoArchive } from "../../../scripts/lib/demo-archive.ts";
 import { type WorkerOptions, WorkerService } from "../src/service.ts";
 export async function fixture(
   options: Partial<WorkerOptions> = {},
@@ -28,10 +28,7 @@ export async function fixture(
     [id, owner],
   );
   const fs = new PostgresFS(service.db, id, owner);
-  const source = new LocalDirFS(
-    fileURLToPath(new URL("../../../fixtures/demo-project", import.meta.url)),
-  );
-  await importProjectZip(fs, await exportProjectZip(source));
+  await importProjectZip(fs, await demoArchive());
   return { service, fs };
 }
 export async function waitStatus(

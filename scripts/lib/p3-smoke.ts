@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createIdeationService } from "../../apps/worker/src/ideation-service.ts";
@@ -21,6 +21,12 @@ import {
   roleGenerationPolicy,
 } from "../../packages/agents/src/models.ts";
 import { localResponse } from "../../packages/agents/src/runtime/local-response.ts";
+import {
+  exportProjectZip,
+  importProjectZip,
+  registry,
+  state,
+} from "../../packages/core/src/index.ts";
 import type {
   IdeationActor,
   IdeationPreview,
@@ -28,6 +34,11 @@ import type {
   IdeationRunId,
 } from "../../packages/pipeline/src/ideation/contract.ts";
 import { loadRun } from "../../packages/pipeline/src/index.ts";
+import {
+  customSmokeProject,
+  customSmokeScope,
+} from "./custom-smoke-project.ts";
+import { customSmokeReplies } from "./custom-smoke-replies.ts";
 import { isolatedProject } from "./isolated-project.ts";
 import {
   requestCostBound,
@@ -39,7 +50,8 @@ const value = <T>(result: IdeationResult<T>): T => {
   if (!result.ok) throw new Error(`Ideation: ${result.error.code}`);
   return result.value;
 };
-function demoReplies() {
+function demoReplies(custom = false) {
+  if (custom) return customSmokeReplies();
   let conversations = 0;
   return (
     context: Parameters<typeof defaultFauxResponse>[0],
@@ -61,11 +73,13 @@ function demoReplies() {
     return defaultFauxResponse(context);
   };
 }
-export function smokeFaux() {
-  const reply = demoReplies();
+export function smokeFaux(custom = false) {
+  const reply = demoReplies(custom);
   return createFauxRuntime(Array.from({ length: 100 }, () => reply));
 }
 export interface SmokeOptions {
+  /** Private coordinator input; never serialized into a report or a handoff snapshot. */
+  brief?: string;
   url: string;
   directory: string;
   mode: "record" | "replay";
@@ -76,16 +90,35 @@ export interface SmokeOptions {
   planOnly?: boolean;
 }
 export async function runP3Smoke(options: SmokeOptions) {
+  const custom = options.brief !== undefined;
+  if (
+    custom &&
+    (!options.brief?.trim() || Array.from(options.brief).length > 12000)
+  )
+    throw new Error("Custom brief must contain 1–12000 characters");
+  const briefSha256 = custom
+    ? createHash("sha256")
+        .update(options.brief as string)
+        .digest("hex")
+    : undefined;
   const directory = path.resolve(options.directory);
   if (!options.planOnly) await mkdir(directory, { recursive: true });
   const planFile = path.join(directory, "smoke-plan.json");
-  const plan =
+  const plan: {
+    version: number;
+    upstream: string;
+    briefSha256?: string;
+    bootstrapSha256?: string;
+  } =
     options.mode === "replay"
-      ? (JSON.parse(await readFile(planFile, "utf8")) as {
-          version: number;
-          upstream: string;
-        })
-      : { version: 1, upstream: options.live ? "real" : "faux" };
+      ? JSON.parse(await readFile(planFile, "utf8"))
+      : {
+          version: 1,
+          upstream: options.live ? "real" : "faux",
+          ...(custom ? { briefSha256 } : {}),
+        };
+  if (plan.briefSha256 !== briefSha256)
+    throw new Error("Replay requires the SAME --brief-file as its recording");
   if (plan.version !== 1 || !["real", "faux"].includes(plan.upstream))
     throw new Error("Unsupported smoke recording plan");
   if (options.mode === "record" && !options.planOnly)
@@ -95,7 +128,7 @@ export async function runP3Smoke(options: SmokeOptions) {
   const upstream = options.planOnly
     ? undefined
     : (options.upstream ??
-      (plan.upstream === "faux" ? smokeFaux() : undefined));
+      (plan.upstream === "faux" ? smokeFaux(custom) : undefined));
   const fixed = options.planOnly ? createFauxRuntime([]) : undefined;
   let base =
     fixed ??
@@ -117,7 +150,7 @@ export async function runP3Smoke(options: SmokeOptions) {
   let planningState: { callCount: number } | undefined;
   if (fixed) {
     planningState = fixed.faux.state;
-    const respond = demoReplies();
+    const respond = demoReplies(custom);
     // Even an accidental delegation to this runtime fails before any faux provider call.
     fixed.models.streamSimple = () => {
       throw new Error("Planner cannot dispatch a provider");
@@ -181,7 +214,34 @@ export async function runP3Smoke(options: SmokeOptions) {
     candidate = "",
     memoryPreview: unknown = null;
   let results: { role: RoleId; result: RoleResult }[] = [];
-  const project = await isolatedProject(options.url, runtime);
+  const project = await isolatedProject(
+    options.url,
+    runtime,
+    custom
+      ? async (fs) => {
+          const archive = path.join(directory, "custom-bootstrap.zip");
+          if (options.mode === "replay") {
+            const bytes = await readFile(archive);
+            if (
+              createHash("sha256").update(bytes).digest("hex") !==
+              plan.bootstrapSha256
+            )
+              throw new Error("Custom bootstrap hash mismatch");
+            await importProjectZip(fs, bytes);
+          } else {
+            await customSmokeProject(fs);
+            if (!options.planOnly) {
+              const bytes = await exportProjectZip(fs);
+              plan.bootstrapSha256 = createHash("sha256")
+                .update(bytes)
+                .digest("hex");
+              await writeFile(archive, bytes, { flag: "wx" });
+              await writeFile(planFile, `${JSON.stringify(plan, null, 2)}\n`);
+            }
+          }
+        }
+      : undefined,
+  );
   const { service: worker, fs } = project;
   let retries: { role: string; count: string }[] = [];
   try {
@@ -254,12 +314,14 @@ export async function runP3Smoke(options: SmokeOptions) {
         }),
       );
     await send(
-      "想先讨论驿站中送信人与粮车的冲突，不固定人物的决定。",
+      options.brief ?? "想先讨论驿站中送信人与粮车的冲突，不固定人物的决定。",
       0,
       "conversation",
     );
     await send(
-      "请把尚未解决的关系压力整理成干净委托，交给故事构思师。",
+      custom
+        ? "请把以上明确的场景、关系变化、语调、篇幅和开放结尾整理成干净委托，交给故事构思师形成可写入故事资料的预览；其余细节保持开放。"
+        : "请把尚未解决的关系压力整理成干净委托，交给故事构思师。",
       1,
       "communication_gate",
     );
@@ -267,19 +329,47 @@ export async function runP3Smoke(options: SmokeOptions) {
     const dispatched = await approve(handoff);
     if (!dispatched.startedTaskId) throw new Error("Handoff did not dispatch");
     await handle(dispatched.startedTaskId, "downstream_preview");
-    await pending("file_patch");
+    const storyPreview = await pending("file_patch");
+    let sources: { resourceId: never; expectedSha256: never }[] = [];
+    if (custom) {
+      if (storyPreview.kind !== "file_patch" || !storyPreview.patches.length)
+        throw new Error(
+          "CUSTOM_STORY_PREVIEW_EMPTY: no approved material can carry the custom scene into compilation",
+        );
+      await approve(storyPreview);
+      const data = await registry.readRegistry(fs);
+      const changed = data.resources.filter((r) =>
+        storyPreview.registryChanges.some((c) => c.resourceId === r.id),
+      );
+      const story = changed.find((r) => r.type === "story");
+      if (!story) throw new Error("CUSTOM_STORY_RESOURCE_REQUIRED");
+      await state.reconcileState(fs, { outline: story.path });
+      sources = changed
+        .filter((r) => ["story", "character", "world"].includes(r.type))
+        .map((r) => ({
+          resourceId: r.id as never,
+          expectedSha256: r.source_sha256 as never,
+        }));
+    }
     const compile = value(
       await service.requestIdeationCompilation(actor, {
         sessionId: session.id,
         clientRequestId: randomUUID() as never,
         chapter: "001",
-        scope: {
-          volume: "v1",
-          arc: "station",
-          scene_type: "travel",
-          pov: "林川",
-        },
-        sources: [],
+        scope: custom
+          ? {
+              volume: customSmokeScope.volume,
+              arc: customSmokeScope.arc,
+              scene_type: customSmokeScope.scene_type,
+              pov: customSmokeScope.pov,
+            }
+          : {
+              volume: "v1",
+              arc: "station",
+              scene_type: "travel",
+              pov: "林川",
+            },
+        sources,
       }),
     );
     await handle(compile.id, "compilation");
@@ -404,6 +494,8 @@ export async function runP3Smoke(options: SmokeOptions) {
   const report = {
     version: 1,
     profile: modelProfile(),
+    scenario: custom ? "custom" : "station-demo",
+    ...(custom ? { briefSha256 } : {}),
     mode: options.mode,
     upstream: plan.upstream,
     p3GatePassed: false,
@@ -419,6 +511,8 @@ export async function runP3Smoke(options: SmokeOptions) {
     roles,
     calls: budget.calls,
     candidate,
+    candidateCharacters: Array.from(candidate).length,
+    candidateHanCharacters: (candidate.match(/\p{Script=Han}/gu) ?? []).length,
     candidateDrafts: budget.calls
       .filter((c) => c.role === "xiaoshuo-zuozhe")
       .map((c) => ({

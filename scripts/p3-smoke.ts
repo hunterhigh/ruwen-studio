@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { assertModelCredentialFiles } from "../packages/agents/src/index.ts";
@@ -15,6 +16,7 @@ const { values } = parseArgs({
     live: { type: "boolean", default: false },
     plan: { type: "boolean", default: false },
     profile: { type: "string" },
+    "brief-file": { type: "string" },
   },
 });
 if (values.profile) process.env.MODEL_PROFILE = values.profile;
@@ -22,6 +24,11 @@ modelProfile();
 if (!["faux", "record", "replay"].includes(values.mode))
   throw new Error("--mode must be faux, record, or replay");
 const maxUsd = Number(values["max-usd"]);
+const brief = values["brief-file"]
+  ? new TextDecoder("utf-8", { fatal: true })
+      .decode(await readFile(path.resolve(values["brief-file"])))
+      .replace(/^\uFEFF/, "")
+  : undefined;
 if (!Number.isFinite(maxUsd) || maxUsd <= 0)
   throw new Error("--max-usd must be finite and positive");
 if (values.plan && (values.live || values.mode === "replay"))
@@ -62,6 +69,7 @@ try {
     maxUsd,
     live: values.live,
     planOnly: values.plan,
+    ...(brief !== undefined ? { brief } : {}),
   });
   if (values.plan) {
     console.log(formatSmokePlan(smokePlan(report)));

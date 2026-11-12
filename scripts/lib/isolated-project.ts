@@ -9,7 +9,10 @@ import {
   COORDINATOR_RECORDING_FORMAT,
   type ModelRuntime,
 } from "../../packages/agents/src/index.ts";
-import { importProjectZip } from "../../packages/core/src/index.ts";
+import {
+  importProjectZip,
+  type ProjectFS,
+} from "../../packages/core/src/index.ts";
 import { PostgresFS } from "../../packages/db/src/index.ts";
 import { demoArchive } from "./demo-archive.ts";
 
@@ -68,7 +71,11 @@ export async function isolatedDatabase() {
   }
 }
 
-export async function isolatedProject(url: string, runtime: ModelRuntime) {
+export async function isolatedProject(
+  url: string,
+  runtime: ModelRuntime,
+  initialize?: (fs: ProjectFS) => Promise<unknown>,
+) {
   const service = new WorkerService(url, {
     runtime: () => runtime,
     queue: `ruwen-tool-${randomUUID()}`,
@@ -87,7 +94,8 @@ export async function isolatedProject(url: string, runtime: ModelRuntime) {
       [id, owner],
     );
     const fs = new PostgresFS(service.db, id, owner);
-    await importProjectZip(fs, await demoArchive());
+    if (initialize) await initialize(fs);
+    else await importProjectZip(fs, await demoArchive());
     return { service, fs };
   } catch (error) {
     await service.stop();

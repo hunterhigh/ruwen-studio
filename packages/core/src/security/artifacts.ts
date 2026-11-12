@@ -14,6 +14,9 @@ const resultFields = [
   "durationMs",
   "readResources",
   "securityEvents",
+  "failures",
+  "dropped_reactions",
+  "anchor_adjusted",
 ] as const;
 const object = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);

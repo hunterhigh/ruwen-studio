@@ -3,7 +3,8 @@ import { previewConfiguration } from "./config/preview.ts";
 
 const preview = previewConfiguration();
 export default defineConfig({
-  testDir: "./apps/web/e2e",
+  testDir: "./apps",
+  testMatch: "**/e2e/**/*.spec.ts",
   timeout: 120000,
   expect: { timeout: 30000 },
   workers: 1,

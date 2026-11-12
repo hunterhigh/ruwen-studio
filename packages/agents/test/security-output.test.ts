@@ -130,7 +130,11 @@ it("public upstream text genuinely present in user material can be quoted, and i
   const runtime = createFauxRuntime([
     fauxAssistantMessage(
       fauxToolCall("submit_reading", {
-        reactions: [{ anchor: "反派", type: "noticed", note: source }],
+        reactions: Array.from({ length: 3 }, () => ({
+          anchor: "反派",
+          type: "noticed",
+          note: source,
+        })),
       }),
       { stopReason: "toolUse" },
     ),

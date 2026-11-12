@@ -101,6 +101,10 @@ export interface RoleContext {
   searchApproved?: boolean;
 }
 export interface RoleResult {
+  failures?: { role: RoleId; attempt: number; error: string }[];
+  /** Rejected entries are retained here when coverage failure prevents a valid output. */
+  dropped_reactions?: Data[];
+  anchor_adjusted?: Data[];
   /** True only when an in-flight generation ended without a final usage result. */
   usageUnknown?: boolean;
   runtimeMode?: ModelRuntime["mode"];

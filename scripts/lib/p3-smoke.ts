@@ -371,10 +371,34 @@ export async function runP3Smoke(options: SmokeOptions) {
       providerDurationMs: calls.reduce((n, c) => n + c.durationMs, 0),
       retries: Number(retries.find((r) => r.role === role)?.count ?? 0),
       truncated: calls.some((c) => c.stopReason === "length"),
-      failures: calls.flatMap((c) => [
-        ...(c.failureOriginal ? [c.failureOriginal] : []),
-        ...(c.validationFailures ?? []),
-      ]),
+      failures: results
+        .filter((r) => r.role === role)
+        .flatMap((r) => r.result.failures ?? []),
+      dropped_reactions: results
+        .filter((r) => r.role === role)
+        .flatMap((r) => {
+          if (r.result.dropped_reactions) return r.result.dropped_reactions;
+          const output = r.result.output;
+          return typeof output === "object" &&
+            Array.isArray(output.dropped_reactions)
+            ? output.dropped_reactions
+            : [];
+        }),
+      anchor_adjusted: results
+        .filter((r) => r.role === role)
+        .flatMap((r) => {
+          if (r.result.anchor_adjusted) return r.result.anchor_adjusted;
+          const output = r.result.output;
+          return typeof output === "object" && Array.isArray(output.reactions)
+            ? output.reactions.filter(
+                (reaction) =>
+                  reaction &&
+                  typeof reaction === "object" &&
+                  !Array.isArray(reaction) &&
+                  reaction.anchor_adjusted,
+              )
+            : [];
+        }),
     };
   });
   const report = {

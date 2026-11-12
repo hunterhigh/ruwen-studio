@@ -99,7 +99,10 @@ export async function assemblePrompt(
       : spec.id === "jiyi-weihuyuan"
         ? "\n平台提交格式：先按需读取资源；patches只引用本次实际读取的path与base_sha256。每项sections按完整Markdown标题heading替换其正文replacement，保留标题及其他小节；标题必须存在且唯一，不得引入同级或更高标题。每资源最多8小节，每小节最多4000字；不返回整份new_content。"
         : "";
-  const content = `${fragments.join("\n\n")}\n\n${PLATFORM_NOTE}\n\nCURRENT_ROLE:${spec.id}${editing}\n${format}${spec.platformFormat ? `\n${spec.platformFormat}` : ""}\n\n${securityNote(spec.id)}`;
+  const anchors = ["qinggan-duzhe", "wenxue-bianji"].includes(spec.id)
+    ? "\n平台锚点格式：每个非空锚点须为当前正文中连续6–30字的原文，原样复制，不得改写人名或代词；编辑表示篇首/篇尾的空锚点仍允许。情感读者至少提交3条有效阅读反应。"
+    : "";
+  const content = `${fragments.join("\n\n")}\n\n${PLATFORM_NOTE}\n\nCURRENT_ROLE:${spec.id}${editing}\n${format}${spec.platformFormat ? `\n${spec.platformFormat}` : ""}${anchors}\n\n${securityNote(spec.id)}`;
   return {
     content,
     sha256: createHash("sha256").update(content, "utf8").digest("hex"),

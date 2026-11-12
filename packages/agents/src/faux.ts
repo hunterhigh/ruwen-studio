@@ -35,18 +35,21 @@ export function fauxOutput(id: RoleId, input: Data = {}): Data | string {
   switch (id) {
     case "xiaoshuo-zuozhe":
       return FAUX_PROSE;
-    case "qinggan-duzhe":
+    case "qinggan-duzhe": {
+      const prose = Array.from(String(input.prose ?? FAUX_PROSE));
       return {
-        reactions: [
-          {
-            anchor: Array.from(String(input.prose ?? FAUX_PROSE))
-              .slice(0, 8)
-              .join(""),
-            type: "noticed",
-            note: "先注意到正在离开的粮车。",
-          },
-        ],
+        reactions: [0, 8, 16].map((offset) => ({
+          anchor: prose
+            .slice(
+              offset < prose.length ? offset : 0,
+              offset < prose.length ? offset + 8 : 8,
+            )
+            .join(""),
+          type: "noticed",
+          note: "先注意到正在离开的粮车。",
+        })),
       };
+    }
     case "wenxue-bianji":
       return { decision: "LOCAL_EDIT", edits: [], problems: [] };
     case "qingjie-heyanyuan":

@@ -13,6 +13,7 @@ import {
 import {
   createFauxRuntime,
   FAUX_PROSE,
+  fauxOutput,
   RoleAbortError,
   type RoleContext,
   RoleTimeoutError,
@@ -258,7 +259,12 @@ it("submit terminates a mixed tool batch before any subsequent resource read", a
   const runtime = createFauxRuntime([
     fauxAssistantMessage(
       [
-        fauxToolCall("submit_reading", { reactions: [] }),
+        fauxToolCall(
+          "submit_reading",
+          fauxOutput("qinggan-duzhe", {
+            prose: FAUX_PROSE,
+          }) as import("../src/types.ts").Data,
+        ),
         fauxToolCall("read_resource", { id: "private" }),
       ],
       { stopReason: "toolUse" },
@@ -269,7 +275,9 @@ it("submit terminates a mixed tool batch before any subsequent resource read", a
     { prose: FAUX_PROSE },
     { ...ctx(), runtime },
   );
-  expect(result.output).toEqual({ reactions: [] });
+  expect(result.output).toEqual(
+    fauxOutput("qinggan-duzhe", { prose: FAUX_PROSE }),
+  );
   expect(runtime.faux.state.callCount).toBe(1);
   expect(JSON.stringify(result.transcript)).not.toContain("OUTLINE_SECRET_483");
 });

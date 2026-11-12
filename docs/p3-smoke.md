@@ -1,6 +1,6 @@
 # P3 冒烟工具
 
-工具参数未通过严格schema校验时，工具错误返回字段路径、期望类型和实际类型，仍只纠正一次，不接受SDK隐式转换。每次调用的`validationFailures`及岗位`failures`保留这些不含参数值的元数据，区分“provider请求完成”和“业务交接失败”；系统提示词及既有通用纠正消息不变。已有`smoke-plan.json`的record目录在数据库启动前拒绝，下一轮应指定新目录（例如`smoke-02`）；旧失败记录保留，不沿用修改后请求哈希继续执行。
+工具参数未通过严格schema校验时，工具错误返回字段路径、期望类型和实际类型，仍只纠正一次，不接受SDK隐式转换。每次调用的`validationFailures`保留不含参数值的schema元数据；岗位`failures`记录逐尝试错误，区分“provider请求完成”和“业务交接失败”。上游提示词原文保持不变。已有`smoke-plan.json`的record目录在数据库启动前拒绝，下一轮应指定新目录（例如`smoke-02`）；旧失败记录保留，不沿用修改后请求哈希继续执行。
 
 工具强制设置 SDK `maxRetries=0`，禁用没有独立用量凭据的传输重试；岗位纠正重试仍逐请求计量。replay 报告中的费用为原录制用量，不产生新的 provider 费用。
 
@@ -30,3 +30,11 @@ pnpm p3:smoke --live --max-usd 5 --output .local/p3-smoke/human-run
 DeepSeek 离线预算使用 `pnpm p3:smoke --plan --profile deepseek --max-usd 1.2`，无需 key，既不调用模型也不提高上限。计划读取所选 profile 的模型目录费率和共用岗位预算；报告同时记录 profile。完整人类流程见 `docs/p3-deepseek-human-run.md`。
 
 `--live` 只改变录制上游；账本在独立工具数据库中始终使用沙箱点数，按既有配置记账，不开启真实收费。实际 provider 费用由美元预算单独计量。live 录制也可使用普通 replay 命令，无需 key。一次 smoke 不等于 P3 门已通过，报告 p3GatePassed 始终为 false。本批仅用 faux/replay 验证，未配置 key、未执行 live。
+
+## 读者锚点诊断
+
+情感读者的原文锚点先精确匹配；失败时按NFKC、去空白后的码点计算 `1 - Levenshtein距离 / 两者较长长度`。仅在相似度≥0.85、长度差≤原锚点20%、且只对应正文一处时自动对齐，`anchor_adjusted`保存原锚点和分数；同一位置的重叠搜索窗口合并，重复位置不自动选择。
+
+无法对齐时，一次纠正消息逐条列出错误锚点和正文原句，要求原样复制。重试后仍无匹配的条目移入`dropped_reactions`；有效反应须至少3条且不少于最终提交总数的一半。剔除条目不传给文学编辑。编辑替换锚点与文学问题定位仍精确校验，不对齐、不剔除，编辑改动比例和批准门不变。
+
+冒烟报告每岗的`failures`包含`role`、从1开始的`attempt`和`error`原文（沿用凭据/安全处理）；恢复成功也保留先前错误。每岗还汇总`dropped_reactions`和`anchor_adjusted`。网页现有“项目资料”页可打开`authoring-ruwen-v5/reports/runs/<runId>/qinggan-duzhe.json`查看完整剔除/调整记录；本并行线程不修改`apps/web`，章节批注侧栏仍只呈现有效反应。

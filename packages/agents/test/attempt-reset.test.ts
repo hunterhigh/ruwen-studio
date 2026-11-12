@@ -102,7 +102,11 @@ it("structured overlap correction resets exactly once before its second provider
   const reading = (note: string) =>
     fauxAssistantMessage(
       fauxToolCall("submit_reading", {
-        reactions: [{ anchor: "正文", type: "noticed", note }],
+        reactions: Array.from({ length: 3 }, () => ({
+          anchor: "正文",
+          type: "noticed",
+          note,
+        })),
       }),
       { stopReason: "toolUse" },
     );
@@ -149,9 +153,18 @@ it("format reset discards old display text without weakening cross-message priva
   const runtime = createFauxRuntime([
     fauxAssistantMessage(quote.slice(0, 30).join("")),
     fauxAssistantMessage(quote.slice(30).join("")),
-    fauxAssistantMessage(fauxToolCall("submit_reading", { reactions: [] }), {
-      stopReason: "toolUse",
-    }),
+    fauxAssistantMessage(
+      fauxToolCall("submit_reading", {
+        reactions: Array.from({ length: 3 }, () => ({
+          anchor: "正文",
+          type: "noticed",
+          note: "注意到变化。",
+        })),
+      }),
+      {
+        stopReason: "toolUse",
+      },
+    ),
   ]);
   const reasons: string[] = [];
   const result = await runRole(

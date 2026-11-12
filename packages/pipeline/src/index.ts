@@ -513,7 +513,10 @@ export async function startChapter(
           fs,
           run,
           CHAPTER_ROLES.editor,
-          { prose: author.output, reading: asData(reading.output) },
+          {
+            prose: author.output,
+            reading: { reactions: asData(reading.output).reactions ?? [] },
+          },
           ctx,
         )
       ).output,

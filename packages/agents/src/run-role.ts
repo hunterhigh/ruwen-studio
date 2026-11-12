@@ -33,6 +33,13 @@ import {
   roleTools,
 } from "./tools/index.ts";
 import {
+  anchorCorrection,
+  editorAnchorIssues,
+  ProseAnchorError,
+  ReaderCoverageError,
+  readerReactions,
+} from "./tools/prose-anchors.ts";
+import {
   toolValidationMessage,
   toolValidator,
 } from "./tools/validation-feedback.ts";
@@ -168,21 +175,16 @@ async function validateOutput(
     );
     if (errors.length) throw new RoleOutputError(errors.join("；"));
   }
-  if (id === "qinggan-duzhe" && Array.isArray(output.reactions))
-    for (const reaction of output.reactions) {
-      if (
-        !object(reaction) ||
-        typeof reaction.anchor !== "string" ||
-        !String(input.prose).includes(reaction.anchor)
-      )
-        throw new RoleOutputError(
-          "Reader anchor must occur in the current prose",
-        );
-    }
   if (id === "wenxue-bianji") {
     if (!Array.isArray(output.edits) || !Array.isArray(output.problems))
       throw new RoleOutputError(
         "Editor requires anchored edits and problem records",
+      );
+    const issues = editorAnchorIssues(output, String(input.prose));
+    if (issues.length)
+      throw new ProseAnchorError(
+        issues,
+        "Edit anchor not found or is not unique",
       );
     if (
       output.decision !== "LOCAL_EDIT" &&
@@ -360,6 +362,16 @@ export async function runRole(
   let limitReached = false;
   let timedOut = false;
   let lastValidationError: string | undefined;
+  let anchorError: ProseAnchorError | undefined;
+  let attemptNumber = 0;
+  let finalOutputAttempt = false;
+  let droppedReactions: Data[] | undefined;
+  let adjustedReactions: Data[] | undefined;
+  const failures: NonNullable<RoleResult["failures"]> = [];
+  const recordFailure = (error: string) => {
+    if (!failures.some((f) => f.attempt === attemptNumber && f.error === error))
+      failures.push({ role: id, attempt: attemptNumber, error });
+  };
   let inFlight = false;
   let generated = false;
   const maxTurns = Math.max(
@@ -377,9 +389,21 @@ export async function runRole(
         if (security.inspect(value))
           throw new RoleSecurityError(SECURITY_ROLE_FAILURE);
         try {
+          if (id === "qinggan-duzhe")
+            value = readerReactions(
+              value,
+              String(input.prose),
+              finalOutputAttempt,
+            );
           await validateOutput(id, value, input, readBodies);
         } catch (error) {
           lastValidationError = (error as Error).message;
+          anchorError = error instanceof ProseAnchorError ? error : undefined;
+          if (error instanceof ReaderCoverageError && finalOutputAttempt) {
+            droppedReactions = error.dropped_reactions;
+            adjustedReactions = error.anchor_adjusted;
+          }
+          recordFailure(lastValidationError);
           throw error;
         }
         output = structuredClone(value);
@@ -527,6 +551,7 @@ export async function runRole(
           issues: validator.issues(block.arguments),
         };
         lastValidationError = toolValidationMessage(failure);
+        recordFailure(lastValidationError);
         ctx.runtime.onToolValidationError?.(id, failure);
       }
     }
@@ -593,6 +618,20 @@ export async function runRole(
       durationMs: performance.now() - started,
       readResources: [...reads.values()],
       securityEvents: structuredClone(security.events),
+      ...(adjustedReactions?.length && !security.failure
+        ? { anchor_adjusted: structuredClone(adjustedReactions) }
+        : {}),
+      ...(droppedReactions?.length && !security.failure
+        ? { dropped_reactions: structuredClone(droppedReactions) }
+        : {}),
+      ...(failures.length
+        ? {
+            failures: failures.map((f) => ({
+              ...f,
+              error: security.failure ? SECURITY_ROLE_FAILURE : redact(f.error),
+            })),
+          }
+        : {}),
     };
   };
   const complete = () => {
@@ -610,6 +649,10 @@ export async function runRole(
     let correction = formatCorrection;
     let resetReason: AttemptResetReason = "format_correction";
     for (let attempt = 0; attempt < ROLE_OUTPUT_ATTEMPTS; attempt++) {
+      attemptNumber++;
+      finalOutputAttempt = attempt === ROLE_OUTPUT_ATTEMPTS - 1;
+      lastValidationError = undefined;
+      anchorError = undefined;
       const attemptStart = runtime.state.messages.length;
       if (ctx.signal?.aborted) throw new RoleAbortError("Role cancelled");
       if (prompted) {
@@ -627,6 +670,7 @@ export async function runRole(
       if (security.streamFailure)
         throw new RoleOutputError(security.streamFailure);
       if (security.failure) {
+        recordFailure(SECURITY_ROLE_FAILURE);
         output = "";
         if (id === "chuangyi-xietiaoyuan") {
           ctx.onAttemptReset?.(id, "security_refusal");
@@ -711,15 +755,24 @@ export async function runRole(
           .map((block) => (block.type === "text" ? block.text : ""))
           .join("")
           .trim();
-        if (prose && !checks.candidateProseErrors(prose).length) {
+        const proseErrors = checks.candidateProseErrors(prose);
+        if (prose && !proseErrors.length) {
           output = prose;
           return complete();
         }
+        lastValidationError =
+          proseErrors.join("；") || "Role returned empty prose";
       }
       if (submitted) return complete();
       if (limitReached)
         throw new RoleTurnLimitError("Role exceeded its turn budget");
-      correction = formatCorrection;
+      if (!failures.some((f) => f.attempt === attemptNumber))
+        recordFailure(
+          lastValidationError ?? "Role did not submit a valid result",
+        );
+      correction = anchorError
+        ? `${formatCorrection}\n${anchorCorrection(anchorError)}`
+        : formatCorrection;
       resetReason = "format_correction";
     }
     throw new RoleOutputError(
@@ -745,6 +798,8 @@ export async function runRole(
       : error instanceof RoleExecutionError
         ? error
         : new RoleProviderError(redact((error as Error).message));
+    if (!failures.some((f) => f.attempt === attemptNumber))
+      recordFailure(failure.message);
     failure.partial = snapshot();
     throw failure;
   } finally {

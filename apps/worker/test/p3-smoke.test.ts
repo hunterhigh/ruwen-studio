@@ -392,14 +392,11 @@ it.each([
   expect(coordinator?.retries).toBe(1);
   expect(coordinator?.failures).toHaveLength(alwaysInvalid ? 2 : 1);
   expect(coordinator?.failures[0]).toMatchObject({
-    tool: "propose_handoff",
-    issues: [
-      {
-        path: "/payload/open_realization",
-        keyword: "type",
-        message: "expected array, got string",
-      },
-    ],
+    role: "chuangyi-xietiaoyuan",
+    attempt: 1,
+    error: expect.stringContaining(
+      "/payload/open_realization: expected array, got string",
+    ),
   });
   expect(report.calls.flatMap((c) => c.validationFailures ?? [])).toHaveLength(
     alwaysInvalid ? 2 : 1,
@@ -446,6 +443,74 @@ it("disables hidden SDK transport retries even when a caller requests them", asy
   expect(retries).toBe(0);
   expect(source.faux.state.callCount).toBe(1);
 });
+
+it.each([
+  false,
+  true,
+])("reader diagnostics survive persistence and smoke reporting (too few valid=%s)", async (tooFew) => {
+  const directory = await folder(),
+    base = smokeFaux();
+  const bad = createFauxRuntime(
+    Array.from({ length: 2 }, () => (context) => {
+      const response = defaultFauxResponse(context);
+      const call = response.content.find(
+        (b) => b.type === "toolCall" && b.name === "submit_reading",
+      );
+      if (!call || call.type !== "toolCall") throw new Error("Missing reading");
+      const reactions = call.arguments.reactions as Record<string, unknown>[];
+      if (tooFew) reactions.splice(2);
+      reactions.push({
+        anchor: "星际舰队已经飞出银河系",
+        type: "noticed",
+        note: "这条无法定位。",
+      });
+      return response;
+    }),
+  );
+  const original = base.models.streamSimple.bind(base.models);
+  base.models.streamSimple = ((model, context, options) => {
+    const role = requestRole(context as Parameters<typeof requestRole>[0]);
+    if (role === "qinggan-duzhe")
+      return bad.models.streamSimple(model, context, options);
+    if (role === "wenxue-bianji")
+      expect(JSON.stringify(context)).not.toContain("星际舰队已经飞出银河系");
+    return original(model, context, options);
+  }) as typeof original;
+  const report = await runP3Smoke({
+    url: inject("databaseUrl"),
+    directory,
+    mode: "record",
+    upstream: base,
+  });
+  expect(report.status, report.failure ?? "").toBe(
+    tooFew ? "failed" : "completed",
+  );
+  const reader = report.roles.find((r) => r.role === "qinggan-duzhe");
+  expect(reader?.failures).toHaveLength(tooFew ? 2 : 1);
+  expect(reader?.dropped_reactions).toHaveLength(1);
+  expect(reader?.failures[0]).toMatchObject({
+    role: "qinggan-duzhe",
+    attempt: 1,
+    error: expect.stringContaining("星际舰队已经飞出银河系"),
+  });
+  if (tooFew) {
+    expect(reader?.failures[1]).toMatchObject({
+      attempt: 2,
+      error: expect.stringContaining("Insufficient valid reader reactions"),
+    });
+    expect(report.steps.at(-1)?.status).toBe("FAILED");
+  } else {
+    expect(reader?.dropped_reactions).toHaveLength(1);
+    expect(report.steps.at(-1)?.status).toBe("AWAITING_MEMORY_APPROVAL");
+    const saved = JSON.parse(
+      await readFile(path.join(directory, "report-record.json"), "utf8"),
+    );
+    expect(
+      saved.roles.find((r: { role: string }) => r.role === "qinggan-duzhe")
+        .dropped_reactions,
+    ).toHaveLength(1);
+  }
+}, 30000);
 
 it("takes a source ZIP without replacing source files or directory metadata", async () => {
   const root = await folder(),

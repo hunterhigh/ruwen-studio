@@ -66,6 +66,11 @@ it("does not auto-align two distinct similar occurrences and restores original U
       ?.text,
   ).toBe("ＡＢＣ　骑手缓缓走进院门。");
   expect(
+    proseMatches("e\u0301映着窗外的黄昏", "é映着窗外的黄昏").unique?.text,
+  ).toBe("e\u0301映着窗外的黄昏");
+  expect(proseMatches("ﬁ", "f").unique).toBeUndefined();
+  expect(proseMatches("ﬁ", "fi").unique?.text).toBe("ﬁ");
+  expect(
     proseMatches("院门关闭。", "另一座星球的陌生故事").unique,
   ).toBeUndefined();
 });

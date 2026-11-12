@@ -35,15 +35,16 @@ function normalized(text: string) {
   const chars: string[] = [],
     starts: number[] = [],
     ends: number[] = [];
-  let offset = 0;
-  for (const original of text) {
+  for (const { segment: original, index: offset } of new Intl.Segmenter(
+    undefined,
+    { granularity: "grapheme" },
+  ).segment(text)) {
     for (const char of original.normalize("NFKC")) {
       if (/\s/u.test(char)) continue;
       chars.push(char);
       starts.push(offset);
       ends.push(offset + original.length);
     }
-    offset += original.length;
   }
   return { chars, starts, ends };
 }
@@ -107,6 +108,12 @@ export function proseMatches(prose: string, anchor: string) {
     }
     const span = source.chars.slice(start, end),
       length = span.length;
+    // Never return half a normalized grapheme (e.g. f matched inside the original ligature ﬁ).
+    if (
+      (start > 0 && source.starts[start] === source.starts[start - 1]) ||
+      (end < n && source.ends[end - 1] === source.ends[end])
+    )
+      continue;
     if (Math.abs(length - m) > m * 0.2) continue;
     const edits =
       start === starts[end] ? (previous[end] ?? 0) : distance(query, span);

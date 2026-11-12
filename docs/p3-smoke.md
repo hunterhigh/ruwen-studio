@@ -1,5 +1,14 @@
 # P3 冒烟工具
 
+自定义构思使用 `--brief-file <UTF-8文本文件>`（1–12000字符，可带BOM）。原文只作为协调员数据库会话输入；报告/录制计划只保存其sha256，录制继续使用来源引用格式，不把原话塞入下游。工具新建中性临时项目，不继承驿站演示设定；故事预览非空且经测试账户批准后，刷新状态来源，再编译和写作。空故事预览会停止，避免拿旧场景继续写。基础资料的预置批准/非正典试写与原演示夹具采用同一个初始化函数；它们只是独立工具夹具，不代表生产项目批准。
+
+```powershell
+corepack.cmd pnpm p3:smoke --plan --brief-file .local/p3-deepseek/garden-brief.txt --profile deepseek --max-usd 1.2
+corepack.cmd pnpm p3:smoke --live --brief-file .local/p3-deepseek/garden-brief.txt --profile deepseek --max-usd 1.2 --output .local/p3-deepseek/garden-01
+```
+
+输入文本由人类保存在独立私有文件中，不提交Git。重放必须提供同一个 `--brief-file`，且不得更改内容；中性初始化归档 `custom-bootstrap.zip` 固定基础资料版本并校验sha256，防止初始化时间影响录制哈希。原文不进入这个初始化归档。`--plan`只使用真实输入和本地示意回复估算流程，不预测真实内容，也不生成归档或录制。每次实际请求仍重新检查原费用上限。报告中的`candidateCharacters`和`candidateHanCharacters`用于核对实际篇幅；模型是否实现约三千字、语调和开放式结尾仍需阅读实测产物判断。
+
 工具参数未通过严格schema校验时，工具错误返回字段路径、期望类型和实际类型，仍只纠正一次，不接受SDK隐式转换。每次调用的`validationFailures`保留不含参数值的schema元数据；岗位`failures`记录逐尝试错误，区分“provider请求完成”和“业务交接失败”。上游提示词原文保持不变。已有`smoke-plan.json`的record目录在数据库启动前拒绝，下一轮应指定新目录（例如`smoke-02`）；旧失败记录保留，不沿用修改后请求哈希继续执行。
 
 工具强制设置 SDK `maxRetries=0`，禁用没有独立用量凭据的传输重试；岗位纠正重试仍逐请求计量。replay 报告中的费用为原录制用量，不产生新的 provider 费用。

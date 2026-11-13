@@ -16,5 +16,16 @@
       "thinkingLevel": "off"
     }
   },
-  "roleOverrides": {}
+  "roleOverrides": {
+    "qingjie-heyanyuan": {
+      "provider": "deepseek",
+      "modelId": "deepseek-flash",
+      "thinkingLevel": "high"
+    },
+    "xianshi-heyanyuan": {
+      "provider": "deepseek",
+      "modelId": "deepseek-flash",
+      "thinkingLevel": "high"
+    }
+  }
 }

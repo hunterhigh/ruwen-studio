@@ -17,6 +17,7 @@ const { values } = parseArgs({
     plan: { type: "boolean", default: false },
     profile: { type: "string" },
     "brief-file": { type: "string" },
+    "continue-on-verdict": { type: "boolean", default: false },
   },
 });
 if (values.profile) process.env.MODEL_PROFILE = values.profile;
@@ -69,20 +70,22 @@ try {
     maxUsd,
     live: values.live,
     planOnly: values.plan,
+    continueOnVerdict: values["continue-on-verdict"],
     ...(brief !== undefined ? { brief } : {}),
   });
   if (values.plan) {
     console.log(formatSmokePlan(smokePlan(report)));
     if (report.status !== "completed") process.exitCode = 1;
   } else {
+    if (report.warning) console.log(`⚠ ${report.warning}`);
     console.log(
-      `${report.status}: ${report.steps.map((s) => `${s.phase}=${s.status}`).join(" → ")}`,
+      `${report.stop?.label ?? report.status}: ${report.steps.map((s) => `${s.phase}=${s.status}`).join(" → ")}`,
     );
     console.log(
       `USD ${report.costUsd.toFixed(6)} spent, ${report.heldUsd.toFixed(6)} held / cap ${maxUsd}`,
     );
     console.log(`Report and full candidate: ${directory}`);
-    if (report.status !== "completed") process.exitCode = 1;
+    if (report.status === "failed") process.exitCode = 1;
   }
 } finally {
   await database.close();

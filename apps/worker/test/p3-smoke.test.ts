@@ -12,6 +12,7 @@ import {
   defaultFauxResponse,
   requestRole,
 } from "../../../packages/agents/src/faux.ts";
+import { decodeUserMessage } from "../../../packages/agents/src/messages.ts";
 import { forwardStream } from "../../../packages/agents/src/runtime/stream.ts";
 import { demoArchive } from "../../../scripts/lib/demo-archive.ts";
 import { runP3Smoke, smokeFaux } from "../../../scripts/lib/p3-smoke.ts";
@@ -21,6 +22,7 @@ import {
   SmokeBudget,
 } from "../../../scripts/lib/smoke-budget.ts";
 import { formatSmokePlan, smokePlan } from "../../../scripts/lib/smoke-plan.ts";
+import { WorkerService } from "../src/service.ts";
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -254,8 +256,10 @@ it("reports truncation and safe failed original drafts rather than promoting a p
     directory,
     mode: "record",
     upstream: base,
+    continueOnVerdict: true,
   });
   expect(report.status).toBe("failed");
+  expect(report.verdictReviews).toEqual([]);
   expect(
     report.roles.find((r) => r.role === "xiaoshuo-zuozhe")?.truncated,
   ).toBe(true);
@@ -680,4 +684,174 @@ it("rejects unbounded image or post-measurement payload changes before a provide
     }),
   ).toThrow("text requests only");
   expect(source.faux.state.callCount).toBe(0);
+});
+
+function withFailedVerifier(failed: "qingjie-heyanyuan" | "xianshi-heyanyuan") {
+  const base = smokeFaux();
+  const bad = createFauxRuntime(
+    Array.from({ length: 10 }, () => (context) => {
+      const data = context.messages
+        .filter((m) => m.role === "user")
+        .map((m) =>
+          decodeUserMessage(
+            typeof m.content === "string"
+              ? m.content
+              : m.content
+                  .filter((b) => b.type === "text")
+                  .map((b) => (b.type === "text" ? b.text : ""))
+                  .join(""),
+          ),
+        )
+        .find((d) => d?.prose);
+      const response = defaultFauxResponse(context);
+      const tool = response.content.find(
+        (c) => c.type === "toolCall" && c.name === "submit_verdict",
+      );
+      if (!tool || tool.type !== "toolCall")
+        throw new Error("Missing verdict tool");
+      tool.arguments = {
+        pass: false,
+        issues:
+          failed === "qingjie-heyanyuan"
+            ? [
+                {
+                  promise: String((data?.locked_events as string[])[0]),
+                  problem: "order",
+                  evidence: "测试核验意见原文：顺序需复核。",
+                },
+              ]
+            : [
+                {
+                  category: "knowledge_source",
+                  rule_ref: "xiaoyan-yingsheding",
+                  evidence: "测试核验意见原文：人物知识来源需复核。",
+                },
+              ],
+      };
+      return response;
+    }),
+  );
+  const original = base.models.streamSimple.bind(base.models);
+  base.models.streamSimple = ((model, context, options) =>
+    requestRole(context as Parameters<typeof requestRole>[0]) === failed
+      ? bad.models.streamSimple(model, context, options)
+      : original(model, context, options)) as typeof original;
+  return base;
+}
+it.each([
+  "qingjie-heyanyuan",
+  "xianshi-heyanyuan",
+] as const)("distinguishes designed %s returns and requires the explicit smoke-only review to reach memory", async (role) => {
+  const stopped = await runP3Smoke({
+    url: inject("databaseUrl"),
+    directory: await folder(),
+    mode: "record",
+    upstream: withFailedVerifier(role),
+  });
+  expect(stopped.status, stopped.failure ?? "").toBe("stopped");
+  expect(stopped.failure).toBeNull();
+  expect(stopped.stop?.label).toBe("流程按设计停止");
+  expect(stopped.stop?.reason).toContain("测试核验意见原文");
+  expect(stopped.workflowCompleted).toBe(false);
+  expect(stopped.memoryPreview).toBeNull();
+  expect(stopped.verdictReviews).toEqual([]);
+  expect(stopped.verdicts.find((v) => v.role === role)?.output).toHaveProperty(
+    "pass",
+    false,
+  );
+  const directory = await folder();
+  const continued = await runP3Smoke({
+    url: inject("databaseUrl"),
+    directory,
+    mode: "record",
+    upstream: withFailedVerifier(role),
+    continueOnVerdict: true,
+  });
+  expect(continued.status, continued.failure ?? "").toBe(
+    "completed_with_verdict_override",
+  );
+  expect(continued.p3GatePassed).toBe(false);
+  expect(continued.workflowCompleted).toBe(true);
+  expect(continued.steps.at(-1)?.status).toBe("AWAITING_MEMORY_APPROVAL");
+  expect(continued.memoryPreview).toBeTruthy();
+  expect(continued.warning).toContain("测试模拟决定");
+  expect(
+    continued.verdicts.find((v) => v.role === role)?.output,
+  ).toHaveProperty("pass", false);
+  expect(continued.verdictReviews).toHaveLength(1);
+  expect(continued.verdictReviews[0]).toMatchObject({
+    actor: "smoke-test-user",
+    testOnly: true,
+    label: "人类驳回核验意见",
+    role,
+    candidateSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+    audit: { change: "human_rejects_verdict", result: "smoke_only_continue" },
+    originalVerdict: { pass: false },
+  });
+  expect(continued.roles.find((r) => r.role === role)?.retries).toBe(0);
+  expect(
+    await readFile(path.join(directory, "summary-record.md"), "utf8"),
+  ).toContain("# ⚠ 冒烟专用");
+  await expect(
+    runP3Smoke({ url: inject("databaseUrl"), directory, mode: "replay" }),
+  ).rejects.toThrow("SAME --continue-on-verdict");
+  const replay = await runP3Smoke({
+    url: inject("databaseUrl"),
+    directory,
+    mode: "replay",
+    continueOnVerdict: true,
+  });
+  expect(replay.status, replay.failure ?? "").toBe(
+    "completed_with_verdict_override",
+  );
+  expect(replay.candidate).toBe(continued.candidate);
+  expect(replay.verdictReviews).toHaveLength(1);
+  expect(replay.verdicts).toEqual(continued.verdicts);
+}, 60000);
+it("production worker queues cannot enable smoke-only verdict review", () => {
+  expect(
+    () =>
+      new WorkerService(inject("databaseUrl"), {
+        runtime: () => createFauxRuntime(),
+        smokeVerdictReview: async () => true,
+      }),
+  ).toThrow("disposable tool queue");
+});
+
+it("the smoke-only continue switch cannot bypass an editor restage", async () => {
+  const base = smokeFaux();
+  const bad = createFauxRuntime([
+    (context) => {
+      const response = defaultFauxResponse(context);
+      const call = response.content.find(
+        (c) => c.type === "toolCall" && c.name === "submit_edit",
+      );
+      if (!call || call.type !== "toolCall")
+        throw new Error("Missing editor tool");
+      call.arguments = {
+        ...call.arguments,
+        decision: "RESTAGE",
+        edits: [],
+        return_reason: "场景需要重新构思。",
+      };
+      return response;
+    },
+  ]);
+  const original = base.models.streamSimple.bind(base.models);
+  base.models.streamSimple = ((model, context, options) =>
+    requestRole(context as Parameters<typeof requestRole>[0]) ===
+    "wenxue-bianji"
+      ? bad.models.streamSimple(model, context, options)
+      : original(model, context, options)) as typeof original;
+  const report = await runP3Smoke({
+    url: inject("databaseUrl"),
+    directory: await folder(),
+    mode: "record",
+    upstream: base,
+    continueOnVerdict: true,
+  });
+  expect(report.status, report.failure ?? "").toBe("stopped");
+  expect(report.stop?.reason).toContain("场景需要重新构思");
+  expect(report.memoryPreview).toBeNull();
+  expect(report.verdictReviews).toEqual([]);
 });

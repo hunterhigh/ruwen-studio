@@ -4,7 +4,10 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import EmbeddedPostgres from "embedded-postgres";
-import { WorkerService } from "../../apps/worker/src/service.ts";
+import {
+  type WorkerOptions,
+  WorkerService,
+} from "../../apps/worker/src/service.ts";
 import {
   COORDINATOR_RECORDING_FORMAT,
   type ModelRuntime,
@@ -75,16 +78,26 @@ export async function isolatedProject(
   url: string,
   runtime: ModelRuntime,
   initialize?: (fs: ProjectFS) => Promise<unknown>,
+  smokeVerdictReview?: WorkerOptions["smokeVerdictReview"],
 ) {
+  const owner = randomUUID(),
+    id = randomUUID();
   const service = new WorkerService(url, {
     runtime: () => runtime,
     queue: `ruwen-tool-${randomUUID()}`,
     ideation: { coordinatorRecordingFormat: COORDINATOR_RECORDING_FORMAT },
+    ...(smokeVerdictReview
+      ? {
+          smokeVerdictReview: (fs, ...args) => {
+            if (fs.projectId !== id || fs.ownerId !== owner)
+              throw new Error("Smoke verdict review project mismatch");
+            return smokeVerdictReview(fs, ...args);
+          },
+        }
+      : {}),
   });
   await service.start(false);
   try {
-    const owner = randomUUID(),
-      id = randomUUID();
     await service.db.pool.query("INSERT INTO users(id,email) VALUES($1,$2)", [
       owner,
       `${owner}@tool.invalid`,

@@ -13,14 +13,13 @@ const policy = {
 };
 const source = `开头${"甲".repeat(90)}左旧右${"乙".repeat(90)}结尾`;
 const edit: EditorialEdit = {
-  anchor_before: "左",
-  anchor_after: "右",
+  original: "旧",
   replacement: "新😀",
   kind: "fact",
   reason: "核对事实",
 };
 describe("deterministic local edits", () => {
-  it("preserves every byte outside the anchored range and derives honest change records", () => {
+  it("preserves every byte outside the selected original and derives honest change records", () => {
     const result = applyEditorialEdits(source, [edit], policy);
     expect(result.text).toBe(source.replace("左旧右", "左新😀右"));
     expect(result.changes).toEqual([
@@ -28,9 +27,9 @@ describe("deterministic local edits", () => {
     ]);
   });
   it.each([
-    ["not unique", { anchor_before: "甲" }],
-    ["not found", { anchor_after: "不存在" }],
-    ["reversed", { anchor_before: "右", anchor_after: "左" }],
+    ["not unique", { original: "甲" }],
+    ["not found", { original: "不存在" }],
+    ["Invalid editorial", { original: "" }],
     ["proportion", { replacement: "字".repeat(40) }],
   ])("rejects %s", (error, value) =>
     expect(() =>
@@ -56,27 +55,83 @@ describe("deterministic local edits", () => {
       applyEditorialEdits(source, [], { ...policy, maxChangedRatio: 1 }),
     ).toThrow("policy");
   });
-  it("supports explicit BOF/EOF contexts without permitting a whole chapter rewrite", () => {
+  it("supports original passages at either end without permitting a whole chapter rewrite", () => {
     expect(
-      applyEditorialEdits(
-        source,
-        [
-          {
-            ...edit,
-            anchor_before: "",
-            anchor_after: "甲".repeat(90),
-          },
-        ],
-        policy,
-      ).text,
-    ).toContain("新😀");
+      applyEditorialEdits(source, [{ ...edit, original: "开头" }], policy).text,
+    ).toBe(source.replace("开头", "新😀"));
+    expect(
+      applyEditorialEdits(source, [{ ...edit, original: "结尾" }], policy).text,
+    ).toBe(source.replace("结尾", "新😀"));
+    expect(() =>
+      applyEditorialEdits(source, [{ ...edit, original: source }], policy),
+    ).toThrow("proportion");
     expect(() =>
       applyEditorialEdits(
         source,
-        [{ ...edit, anchor_before: "", anchor_after: "" }],
+        [{ ...edit, anchor_before: "左" } as EditorialEdit],
         policy,
       ),
-    ).toThrow("proportion");
+    ).toThrow("Legacy boundary");
+  });
+  it("replaces the garden sentence in full and preserves its following opening quotation mark", () => {
+    const original = "不是夸奖，不是比较，是他记得她站在旧墙边。可这不能说。";
+    const garden = `${"远处灯火亮着。".repeat(80)}他张了张口。${original}\n\n“没什么，只是园子大，反而不亲近。”`;
+    const replacement = "他记得她站在旧墙边。";
+    const result = applyEditorialEdits(
+      garden,
+      [{ ...edit, original, replacement }],
+      policy,
+    );
+    expect(result.text).toContain(`他张了张口。${replacement}\n\n“没什么`);
+    expect(result.text).not.toContain("不是比较他记得");
+  });
+  it("rejects the garden doubled head gesture with the exact preserved neighbour in its error", () => {
+    const garden = `${"远处灯火亮着。".repeat(80)}带起一阵很淡的旧年忍冬味。他没有抬头，只看见地上那片被捏坏的叶子。`;
+    expect(() =>
+      applyEditorialEdits(
+        garden,
+        [
+          {
+            ...edit,
+            original: "旧年忍冬味。",
+            replacement: "风。他没有抬头，只看见",
+          },
+        ],
+        policy,
+      ),
+    ).toThrow(
+      'edits[0].replacement ends with preserved right-neighbour text "他没有抬头，只看见"',
+    );
+  });
+  it("rejects copied left neighbours and repetitions within a replacement or across operations", () => {
+    const garden = `${"河面灯光摇动。".repeat(100)}他没有抬头，只看见旧词。`;
+    expect(() =>
+      applyEditorialEdits(
+        garden,
+        [{ ...edit, original: "旧词", replacement: "他没有抬头，只看见新词" }],
+        policy,
+      ),
+    ).toThrow("preserved left-neighbour");
+    expect(() =>
+      applyEditorialEdits(
+        source,
+        [{ ...edit, replacement: "他没有抬头，只看见他没有抬头，只看见" }],
+        policy,
+      ),
+    ).toThrow("adjacent repeated fragment");
+    expect(() =>
+      applyEditorialEdits(
+        `${source}一二`,
+        [
+          { ...edit, original: "一", replacement: "六字以上片段" },
+          { ...edit, original: "二", replacement: "六字以上片段" },
+        ],
+        policy,
+      ),
+    ).toThrow("adjacent repeated fragment");
+    expect(
+      applyEditorialEdits(`${source}他没有抬头他没有抬头`, [edit], policy).text,
+    ).toContain("他没有抬头他没有抬头");
   });
 });
 it("section replacements preserve headings, other sections, fenced code and CRLF bytes", () => {

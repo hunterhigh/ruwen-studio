@@ -44,6 +44,18 @@ DeepSeek 离线预算使用 `pnpm p3:smoke --plan --profile deepseek --max-usd 1
 
 情感读者的原文锚点先精确匹配；失败时按NFKC、去空白后的码点计算 `1 - Levenshtein距离 / 两者较长长度`。仅在相似度≥0.85、长度差≤原锚点20%、且只对应正文一处时自动对齐，`anchor_adjusted`保存原锚点和分数；同一位置的重叠搜索窗口合并，重复位置不自动选择。
 
-无法对齐时，一次纠正消息逐条列出错误锚点和正文原句，要求原样复制。重试后仍无匹配的条目移入`dropped_reactions`；有效反应须至少3条且不少于最终提交总数的一半。剔除条目不传给文学编辑。编辑替换锚点与文学问题定位仍精确校验，不对齐、不剔除，编辑改动比例和批准门不变。
+无法对齐时，一次纠正消息逐条列出错误锚点和正文原句，要求原样复制。重试后仍无匹配的条目移入`dropped_reactions`；有效反应须至少3条且不少于最终提交总数的一半。剔除条目不传给文学编辑。编辑original整段原文与文学问题定位仍精确校验，不对齐、不剔除，编辑改动比例和批准门不变。
 
 冒烟报告每岗的`failures`包含`role`、从1开始的`attempt`和`error`原文（沿用凭据/安全处理）；恢复成功也保留先前错误。每岗还汇总`dropped_reactions`和`anchor_adjusted`。网页现有“项目资料”页可打开`authoring-ruwen-v5/reports/runs/<runId>/qinggan-duzhe.json`查看完整剔除/调整记录；本并行线程不修改`apps/web`，章节批注侧栏仍只呈现有效反应。
+
+## 核验退回与冒烟专用继续（2026-11-13）
+
+章节 `RETURNED` 记为 `status=stopped`、`failure=null`，终端与摘要明确显示“流程按设计停止”，退出码0；这表示成功执行了退回门，不表示冒烟跑完。`workflowCompleted=false`，原始核验意见和退回原因保留。模型/程序错误、格式失败、截断和预算拦截仍为 `failed`、退出码1。
+
+仅冒烟命令可显式增加 `--continue-on-verdict`。独立工具项目以 `smoke-test-user` 身份模拟“人类驳回核验意见”，对每个驳回分别记录原始 verdict、候选sha256与审计事件；不把 `pass:false` 改成 true。继续后仍须通过既有候选稿批准门，最终只生成记忆预览。编辑RESTAGE、格式/安全失败、截断、费用上限都不能由此绕过。普通网页/worker请求没有这个参数；只有工具专用队列和绑定的临时项目可注册测试回调。
+
+JSON、终端与 `summary-record.md` / `summary-replay.md` 显著标注测试模拟决定。完成但使用了该开关的报告为 `completed_with_verdict_override`，`p3GatePassed=false`；启用但未实际驳回则仍为 `completed`，保留开关标记。重放必须使用录制时相同的开关。修改格式和路由后请使用新输出目录：
+
+```powershell
+corepack.cmd pnpm p3:smoke --live --profile deepseek --max-usd 1.2 --brief-file .local/p3-deepseek/garden-brief.txt --continue-on-verdict --output .local/p3-deepseek/garden-02
+```

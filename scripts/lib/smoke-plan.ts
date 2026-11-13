@@ -27,7 +27,7 @@ export function smokePlan(report: Awaited<ReturnType<typeof runP3Smoke>>) {
     scenario: report.scenario,
     maxUsd: report.maxUsd,
     totalBoundUsd: cumulativeUsd,
-    canFinish: report.status === "completed" && blockedAt === null,
+    canFinish: report.workflowCompleted && blockedAt === null,
     blockedAt,
     providerCalls: report.providerCalls,
     failure: report.failure,

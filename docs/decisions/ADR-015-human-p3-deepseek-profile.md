@@ -11,3 +11,7 @@
 选择 profile 而不替换默认值，便于 A 线程网页预览和 CLI 共用、随时切回默认路由。模型 key 仅从人类进程环境取得，共享凭据限制先于 SDK 凭据发现。离线计划和 replay 不解析 key。真实连通性与工具质量由人类 ping/record 冒烟验证，Codex 不执行 live。
 
 主要依据：本机 `@earendil-works/pi-ai/dist/providers/data/deepseek.json`、`dist/api/openai-completions.js`；[DeepSeek 思考与多轮工具回传协议](https://api-docs.deepseek.com/guides/thinking_mode/)、[官方模型 ID](https://api-docs.deepseek.com/quick_start/)（2026-11-11 核对）。协议序列化测试只调用纯转换函数，不调用 provider。
+
+## 核验员使用 standard（2026-11-13 人类决定）
+
+garden-01 的现实核验将可能属于人物误会的推断判为知识来源冲突，导致整条流程停止。人类认为这种误拒的代价高于核验岗位的少量费用，故仅在 DeepSeek profile 中将情节/现实核验员显式覆盖为 standard 同款 `deepseek-flash/high`，不再使用 cheap 的 off。保留情感读者 cheap、Anthropic 默认路由及两岗8192输出上限；思考与最终输出仍共享额度，不额外提高预算或宣称误判已消除。配置测试要求两个覆盖项与 standard 完全一致，防止后续路由漂移；不改上游提示词原文。

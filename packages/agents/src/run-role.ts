@@ -178,7 +178,7 @@ async function validateOutput(
   if (id === "wenxue-bianji") {
     if (!Array.isArray(output.edits) || !Array.isArray(output.problems))
       throw new RoleOutputError(
-        "Editor requires anchored edits and problem records",
+        "Editor requires original → replacement edits and problem records",
       );
     const issues = editorAnchorIssues(output, String(input.prose));
     if (issues.length)
@@ -363,6 +363,7 @@ export async function runRole(
   let timedOut = false;
   let lastValidationError: string | undefined;
   let anchorError: ProseAnchorError | undefined;
+  let editorError: string | undefined;
   let attemptNumber = 0;
   let finalOutputAttempt = false;
   let droppedReactions: Data[] | undefined;
@@ -399,6 +400,7 @@ export async function runRole(
         } catch (error) {
           lastValidationError = (error as Error).message;
           anchorError = error instanceof ProseAnchorError ? error : undefined;
+          if (id === "wenxue-bianji") editorError = lastValidationError;
           if (error instanceof ReaderCoverageError && finalOutputAttempt) {
             droppedReactions = error.dropped_reactions;
             adjustedReactions = error.anchor_adjusted;
@@ -653,6 +655,7 @@ export async function runRole(
       finalOutputAttempt = attempt === ROLE_OUTPUT_ATTEMPTS - 1;
       lastValidationError = undefined;
       anchorError = undefined;
+      editorError = undefined;
       const attemptStart = runtime.state.messages.length;
       if (ctx.signal?.aborted) throw new RoleAbortError("Role cancelled");
       if (prompted) {
@@ -772,7 +775,9 @@ export async function runRole(
         );
       correction = anchorError
         ? `${formatCorrection}\n${anchorCorrection(anchorError)}`
-        : formatCorrection;
+        : editorError
+          ? `${formatCorrection}\n编辑修改被拒绝，以下是校验数据：${editorError}\n逐条修正 original → replacement，不要复制操作范围之外会被保留的原文。`
+          : formatCorrection;
       resetReason = "format_correction";
     }
     throw new RoleOutputError(

@@ -148,14 +148,14 @@ it("accepts exactly half when three valid reactions survive", async () => {
   expect((result.output as Data).reactions).toHaveLength(3);
 });
 it("keeps editor replacement anchors strict and gives literal corrections without changing or dropping edits", async () => {
+  const editorProse = `${prose}${"河水向远处流去。".repeat(40)}`;
   const edit = (anchor: string) =>
     fauxAssistantMessage(
       fauxToolCall("submit_edit", {
         decision: "LOCAL_EDIT",
         edits: [
           {
-            anchor_before: anchor,
-            anchor_after: "粮车已经离开驿站。",
+            original: anchor,
             replacement: "\n",
             kind: "literary",
             reason: "保留段落间距。",
@@ -169,7 +169,7 @@ it("keeps editor replacement anchors strict and gives literal corrections withou
   const runtime = createFauxRuntime([edit(changed), edit(changed)]);
   const failure = await runRole(
     "wenxue-bianji",
-    { prose, reading: { reactions: valid } },
+    { prose: editorProse, reading: { reactions: valid } },
     { ...ctx(runtime), onRequest: (r) => requests.push(r) },
   ).catch((e) => e);
   expect(failure).toBeInstanceOf(RoleOutputError);
@@ -182,12 +182,65 @@ it("keeps editor replacement anchors strict and gives literal corrections withou
   ).toEqual([1, 2]);
   const corrected = await runRole(
     "wenxue-bianji",
-    { prose, reading: { reactions: valid } },
+    { prose: editorProse, reading: { reactions: valid } },
     ctx(createFauxRuntime([edit(changed), edit(original)])),
   );
   expect((corrected.output as Data).edits).toHaveLength(1);
   expect(corrected.failures?.[0]).toMatchObject({
     role: "wenxue-bianji",
     attempt: 1,
+  });
+});
+
+it("explains a copied garden neighbour literally and accepts one corrected original replacement", async () => {
+  const editorProse = `${"河水向远处流去。".repeat(80)}带起一阵很淡的旧年忍冬味。他没有抬头，只看见地上那片叶子。`;
+  const response = (replacement: string) =>
+    fauxAssistantMessage(
+      fauxToolCall("submit_edit", {
+        decision: "LOCAL_EDIT",
+        problems: [],
+        edits: [
+          {
+            original: "旧年忍冬味。",
+            replacement,
+            kind: "literary",
+            reason: "避免替叙述者解释气味。",
+          },
+        ],
+      }),
+      { stopReason: "toolUse" },
+    );
+  const requests: TranscriptContext[] = [];
+  const result = await runRole(
+    "wenxue-bianji",
+    { prose: editorProse, reading: { reactions: [] } },
+    {
+      ...ctx(
+        createFauxRuntime([
+          response("风。他没有抬头，只看见"),
+          response("风。"),
+        ]),
+      ),
+      onRequest: (r) => requests.push(r),
+    },
+  );
+  const correction = JSON.stringify(
+    requests[1]?.messages.filter((m) => m.role === "user"),
+  );
+  expect(correction).toContain("edits[0].replacement");
+  expect(correction).toContain("他没有抬头，只看见");
+  expect(correction).toContain("original 后的正文会保留");
+  expect((result.output as Data).edits).toEqual([
+    {
+      original: "旧年忍冬味。",
+      replacement: "风。",
+      kind: "literary",
+      reason: "避免替叙述者解释气味。",
+    },
+  ]);
+  expect(result.failures?.[0]).toMatchObject({
+    attempt: 1,
+    role: "wenxue-bianji",
+    error: expect.stringContaining("preserved right-neighbour"),
   });
 });

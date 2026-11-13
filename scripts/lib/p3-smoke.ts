@@ -45,6 +45,11 @@ import {
   requestInputBound,
   SmokeBudget,
 } from "./smoke-budget.ts";
+import {
+  SmokeFlowStop,
+  type SmokeVerdictReview,
+  smokeVerdictReviewer,
+} from "./smoke-verdict-review.ts";
 
 const value = <T>(result: IdeationResult<T>): T => {
   if (!result.ok) throw new Error(`Ideation: ${result.error.code}`);
@@ -88,6 +93,8 @@ export interface SmokeOptions {
   upstream?: ModelRuntime;
   /** Internal offline mode: local fixed replies only, no provider dispatch or recording. */
   planOnly?: boolean;
+  /** Disposable smoke account only. Does not change production verdict handling. */
+  continueOnVerdict?: boolean;
 }
 export async function runP3Smoke(options: SmokeOptions) {
   const custom = options.brief !== undefined;
@@ -109,16 +116,24 @@ export async function runP3Smoke(options: SmokeOptions) {
     upstream: string;
     briefSha256?: string;
     bootstrapSha256?: string;
+    continueOnVerdict?: boolean;
   } =
     options.mode === "replay"
       ? JSON.parse(await readFile(planFile, "utf8"))
       : {
           version: 1,
           upstream: options.live ? "real" : "faux",
+          ...(options.continueOnVerdict ? { continueOnVerdict: true } : {}),
           ...(custom ? { briefSha256 } : {}),
         };
   if (plan.briefSha256 !== briefSha256)
     throw new Error("Replay requires the SAME --brief-file as its recording");
+  if (
+    (plan.continueOnVerdict ?? false) !== (options.continueOnVerdict ?? false)
+  )
+    throw new Error(
+      "Replay requires the SAME --continue-on-verdict setting as its recording",
+    );
   if (plan.version !== 1 || !["real", "faux"].includes(plan.upstream))
     throw new Error("Unsupported smoke recording plan");
   if (options.mode === "record" && !options.planOnly)
@@ -214,6 +229,9 @@ export async function runP3Smoke(options: SmokeOptions) {
     candidate = "",
     memoryPreview: unknown = null;
   let results: { role: RoleId; result: RoleResult }[] = [];
+  let stop: { label: string; reason: string; returnedTo?: string } | null =
+    null;
+  const verdictReviews: SmokeVerdictReview[] = [];
   const project = await isolatedProject(
     options.url,
     runtime,
@@ -240,6 +258,9 @@ export async function runP3Smoke(options: SmokeOptions) {
             }
           }
         }
+      : undefined,
+    options.continueOnVerdict
+      ? smokeVerdictReviewer(verdictReviews)
       : undefined,
   );
   const { service: worker, fs } = project;
@@ -391,6 +412,11 @@ export async function runP3Smoke(options: SmokeOptions) {
     steps.push({ phase: "chapter", status: run.status });
     if (run.paths.candidate && (await fs.exists(run.paths.candidate)))
       candidate = await fs.readText(run.paths.candidate);
+    if (run.status === "RETURNED")
+      throw new SmokeFlowStop(
+        run.returnReason ?? "Chapter returned for upstream revision",
+        run.returnedTo,
+      );
     if (run.status !== "AWAITING_CANDIDATE_APPROVAL" || !run.candidateSha256)
       throw new Error(run.error ?? `Chapter stopped: ${run.status}`);
     budget.phase = "memory_preview";
@@ -423,7 +449,13 @@ export async function runP3Smoke(options: SmokeOptions) {
       throw new Error(run.error ?? `Memory stopped: ${run.status}`);
     // Intentionally no memory approval: the final product of this smoke is a preview.
   } catch (error) {
-    failure = error instanceof Error ? error.message : String(error);
+    if (error instanceof SmokeFlowStop)
+      stop = {
+        label: error.message,
+        reason: error.reason,
+        ...(error.returnedTo ? { returnedTo: error.returnedTo } : {}),
+      };
+    else failure = error instanceof Error ? error.message : String(error);
   } finally {
     results = (
       await worker.db.pool.query<{ role: RoleId; result: RoleResult }>(
@@ -501,7 +533,28 @@ export async function runP3Smoke(options: SmokeOptions) {
     p3GatePassed: false,
     planned,
     providerCalls: planningState?.callCount ?? null,
-    status: failure ? "failed" : "completed",
+    status: failure
+      ? "failed"
+      : stop
+        ? "stopped"
+        : verdictReviews.length
+          ? "completed_with_verdict_override"
+          : "completed",
+    workflowCompleted: !failure && !stop,
+    stop,
+    continueOnVerdict: options.continueOnVerdict ?? false,
+    warning: verdictReviews.length
+      ? "冒烟专用：已以测试身份记录“人类驳回核验意见”并继续；这是测试模拟决定，不表示核验通过或 P3 验收通过。"
+      : options.continueOnVerdict
+        ? "冒烟专用：已启用 --continue-on-verdict；本轮尚未模拟驳回核验意见。"
+        : null,
+    verdictReviews,
+    verdicts: results
+      .filter((r) =>
+        ["qingjie-heyanyuan", "xianshi-heyanyuan"].includes(r.role),
+      )
+      .sort((a, b) => a.role.localeCompare(b.role))
+      .map((r) => ({ role: r.role, output: r.result.output })),
     failure,
     maxUsd: budget.capUsd,
     costUsd: budget.spentUsd,
@@ -523,6 +576,21 @@ export async function runP3Smoke(options: SmokeOptions) {
     memoryPreview,
   };
   if (!options.planOnly) {
+    await writeFile(
+      path.join(directory, `summary-${options.mode}.md`),
+      [
+        ...(report.warning ? [`# ⚠ ${report.warning}`, ""] : []),
+        `状态：${stop ? "流程按设计停止" : report.status}`,
+        ...(stop ? [`退回原因：${stop.reason}`] : []),
+        ...(failure ? [`程序或执行失败：${failure}`] : []),
+        ...verdictReviews.map(
+          (review) =>
+            `- ${review.role}：人类驳回核验意见（测试身份 ${review.actor}；候选 SHA256 ${review.candidateSha256}）`,
+        ),
+        "P3 验收闸门：未通过。完整用量、原始核验意见与测试决定见 JSON 报告。",
+        "",
+      ].join("\n"),
+    );
     await writeFile(
       path.join(directory, `report-${options.mode}.json`),
       `${JSON.stringify(report, null, 2)}\n`,

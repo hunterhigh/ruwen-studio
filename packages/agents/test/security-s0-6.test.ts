@@ -141,8 +141,7 @@ it.each([
         decision: "LOCAL_EDIT",
         edits: [
           {
-            anchor_before: "",
-            anchor_after: "。岸边只有一盏灯，",
+            original: "风从门外吹进来",
             replacement: "风停了",
             kind: "literary",
             reason,

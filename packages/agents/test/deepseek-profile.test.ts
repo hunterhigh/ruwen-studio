@@ -27,7 +27,10 @@ it("switches all roles without credentials or altering default Anthropic routing
     expect(model.id).toBe(
       spec.modelTier === "strong" ? "deepseek-v4-pro" : "deepseek-flash",
     );
-    expect(thinkingLevel).toBe(spec.modelTier === "cheap" ? "off" : "high");
+    const verifier = ["qingjie-heyanyuan", "xianshi-heyanyuan"].includes(id);
+    expect(thinkingLevel).toBe(
+      spec.modelTier === "cheap" && !verifier ? "off" : "high",
+    );
     expect(getSupportedThinkingLevels(model)).toContain(thinkingLevel);
     expect(roleGenerationPolicy(id).maxTokens).toBeLessThanOrEqual(
       model.maxTokens,
@@ -35,6 +38,25 @@ it("switches all roles without credentials or altering default Anthropic routing
   }
   vi.stubEnv("MODEL_PROFILE", "unknown");
   expect(() => resolveRoute(ROLES["xiaoshuo-zuozhe"])).toThrow("MODEL_PROFILE");
+});
+it("promotes DeepSeek verifiers to the standard route while default routing and the emotional reader stay cheap", () => {
+  const config = JSON.parse(
+    readFileSync(
+      new URL("../../../config/models.deepseek.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  for (const id of ["qingjie-heyanyuan", "xianshi-heyanyuan"] as const) {
+    vi.stubEnv("MODEL_PROFILE", "default");
+    expect(resolveRoute(ROLES[id])).toMatchObject({
+      provider: "anthropic",
+      thinkingLevel: "off",
+    });
+    vi.stubEnv("MODEL_PROFILE", "deepseek");
+    expect(resolveRoute(ROLES[id])).toEqual(config.tiers.standard);
+    expect(config.roleOverrides[id]).toEqual(config.tiers.standard);
+  }
+  expect(resolveRoute(ROLES["qinggan-duzhe"])).toEqual(config.tiers.cheap);
 });
 it("matches the installed DeepSeek snapshot, including prices, limits, thinking and tools", () => {
   const snapshot = JSON.parse(

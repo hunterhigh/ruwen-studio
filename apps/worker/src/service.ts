@@ -93,6 +93,11 @@ export interface WorkerOptions {
   runtime: () => ModelRuntime;
   runtimeForRequest?: (request: Data) => ModelRuntime;
   queue?: string;
+  /** Not exposed through requests; restricted to disposable tool queues. */
+  smokeVerdictReview?: (
+    fs: PostgresFS,
+    ...args: Parameters<NonNullable<PipelineContext["smokeVerdictReview"]>>
+  ) => Promise<boolean>;
   heartbeatSeconds?: number;
   concurrency?: number;
   roleTimeoutMs?: number;
@@ -155,6 +160,13 @@ export class WorkerService {
   private options: WorkerOptions;
   private active = new Map<string, AbortController>();
   constructor(connectionString: string, options: WorkerOptions) {
+    if (
+      options.smokeVerdictReview &&
+      !/^ruwen-tool-[0-9a-f-]{36}$/.test(options.queue ?? "")
+    )
+      throw new Error(
+        "Smoke verdict review requires a disposable tool queue; production workers cannot enable it",
+      );
     this.modelMode = options.runtime().mode;
     const concurrency =
       options.concurrency ?? runtimeSettings().execution.concurrency;
@@ -748,6 +760,7 @@ export class WorkerService {
           });
       };
       timer = setInterval(poll, 200);
+      const smokeReview = this.options.smokeVerdictReview;
       const ctx: PipelineContext = {
         projectId: fs.projectId,
         projectKey: stored.project_key,
@@ -760,6 +773,12 @@ export class WorkerService {
         // Never feed provider events, thinking or raw transcripts into the sink.
         onDelta: (delta, role) => stream?.push(delta, role),
         onAttemptReset: (role, reason) => stream?.reset(role, reason),
+        ...(smokeReview
+          ? {
+              smokeVerdictReview: (role, verdict, run) =>
+                smokeReview(fs, role, verdict, run),
+            }
+          : {}),
         ...(this.options.roleTimeoutMs === undefined
           ? {}
           : { timeoutMs: this.scheduling.roleTimeoutMs }),

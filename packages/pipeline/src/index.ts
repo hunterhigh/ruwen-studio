@@ -106,6 +106,12 @@ export interface PipelineContext extends Omit<RoleContext, "fs"> {
   onProgress?: (run: ChapterRun) => void;
   runId?: string;
   deferMemory?: boolean;
+  /** Trusted harness only: record an explicit test-user adjudication without changing the model verdict. */
+  smokeVerdictReview?: (
+    role: "qingjie-heyanyuan" | "xianshi-heyanyuan",
+    verdict: Data,
+    run: ChapterRun,
+  ) => Promise<boolean>;
   executeRole?: (
     id: RoleId,
     input: Data,
@@ -539,7 +545,7 @@ export async function startChapter(
         ctx,
       );
     if (!Array.isArray(edited.edits) || Object.hasOwn(edited, "edited_text"))
-      throw new Error("Editor output requires anchored edits");
+      throw new Error("Editor output requires original → replacement edits");
     const applied = applyEditorialEdits(
       author.output,
       edited.edits as unknown as EditorialEdit[],
@@ -575,7 +581,10 @@ export async function startChapter(
       ).output,
     );
     await checkpoint(fs, run, "PLOT_CHECKED", ctx);
-    if (!plot.pass)
+    if (
+      !plot.pass &&
+      !(await ctx.smokeVerdictReview?.("qingjie-heyanyuan", plot, run))
+    )
       return await returnRun(
         fs,
         run,
@@ -600,7 +609,10 @@ export async function startChapter(
       ).output,
     );
     await checkpoint(fs, run, "REALITY_CHECKED", ctx);
-    if (!reality.pass)
+    if (
+      !reality.pass &&
+      !(await ctx.smokeVerdictReview?.("xianshi-heyanyuan", reality, run))
+    )
       return await returnRun(
         fs,
         run,

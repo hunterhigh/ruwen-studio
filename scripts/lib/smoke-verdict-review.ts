@@ -84,10 +84,11 @@ export function smokeVerdictReviewer(
 }
 
 export class SmokeFlowStop extends Error {
-  constructor(
-    readonly reason: string,
-    readonly returnedTo: string | undefined,
-  ) {
+  readonly reason: string;
+  readonly returnedTo: string | undefined;
+  constructor(reason: string, returnedTo: string | undefined) {
     super("流程按设计停止");
+    this.reason = reason;
+    this.returnedTo = returnedTo;
   }
 }

@@ -1,6 +1,8 @@
+import { execFile } from "node:child_process";
 import { lstat, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 import {
   createFauxRuntime,
   ROLES,
@@ -855,3 +857,37 @@ it("the smoke-only continue switch cannot bypass an editor restage", async () =>
   expect(report.memoryPreview).toBeNull();
   expect(report.verdictReviews).toEqual([]);
 });
+
+it("the native Node CLI runs an offline plan including the verdict flag without a TypeScript transpiler", async () => {
+  const directory = await folder();
+  const { stdout } = await promisify(execFile)(
+    process.execPath,
+    [
+      "scripts/p3-smoke.ts",
+      "--plan",
+      "--profile",
+      "deepseek",
+      "--max-usd",
+      "1.2",
+      "--continue-on-verdict",
+      "--output",
+      directory,
+    ],
+    {
+      windowsHide: true,
+      timeout: 50000,
+      env: {
+        ...process.env,
+        REAL_MODEL: "0",
+        MODEL_MODE: "faux",
+        RUWEN_CANARY: "RUWEN_NATIVE_CLI_FAUX_ONLY",
+      },
+    },
+  );
+  expect(stdout).toContain("provider calls=0");
+  expect(stdout).toContain("Demo can finish: YES");
+  expect(stdout).toContain("profile=deepseek");
+  expect(
+    await import("node:fs/promises").then((fs) => fs.readdir(directory)),
+  ).toEqual([]);
+}, 60000);

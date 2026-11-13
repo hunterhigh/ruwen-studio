@@ -1,11 +1,15 @@
+import {
+  assertNoEditorialBoundaryCopy,
+  assertNoNewEditorialRepetition,
+} from "./editorial-repetitions.ts";
+
 export interface EditPolicy {
   maxChangedRatio: number;
   maxReplacementChars: number;
   maxSectionChars: number;
 }
 export interface EditorialEdit {
-  anchor_before: string;
-  anchor_after: string;
+  original: string;
   replacement: string;
   kind: "fact" | "literary";
   reason: string;
@@ -45,7 +49,7 @@ function applyRanges(
       source,
     );
 }
-/** Anchors are preserved boundary contexts; empty anchors mean BOF/EOF. */
+/** Replace a unique, nonempty original passage in full. All ranges refer to the same author draft. */
 export function applyEditorialEdits(
   source: string,
   edits: readonly EditorialEdit[],
@@ -58,33 +62,35 @@ export function applyEditorialEdits(
   )
     throw new Error("Invalid edit policy");
   let changed = 0;
-  const changes = edits.map((edit) => {
+  const changes = edits.map((edit, index) => {
     if (
-      ![
-        edit.anchor_before,
-        edit.anchor_after,
-        edit.replacement,
-        edit.reason,
-      ].every((v) => typeof v === "string") ||
+      Object.hasOwn(edit, "anchor_before") ||
+      Object.hasOwn(edit, "anchor_after")
+    )
+      throw new Error(
+        "Legacy boundary edit format requires a new reviewed run; submit original and replacement",
+      );
+    if (
+      ![edit.original, edit.replacement, edit.reason].every(
+        (v) => typeof v === "string",
+      ) ||
       !["fact", "literary"].includes(edit.kind) ||
-      !edit.reason.trim()
+      !edit.reason.trim() ||
+      !edit.original
     )
       throw new Error("Invalid editorial edit");
-    const start = edit.anchor_before
-      ? unique(source, edit.anchor_before) + edit.anchor_before.length
-      : 0;
-    const end = edit.anchor_after
-      ? unique(source, edit.anchor_after)
-      : source.length;
-    if (end < start) throw new Error("Edit anchors are reversed");
+    const start = unique(source, edit.original);
+    const end = start + edit.original.length;
     const before = source.slice(start, end);
     const volume = Math.max(size(before), size(edit.replacement));
     if (volume > policy.maxReplacementChars)
       throw new Error("Replacement exceeds single-edit limit");
+    assertNoEditorialBoundaryCopy(source, start, end, edit.replacement, index);
     changed += volume;
     return {
       start,
       end,
+      index,
       replacement: edit.replacement,
       kind: edit.kind,
       before,
@@ -97,6 +103,7 @@ export function applyEditorialEdits(
       "Replacements exceed configured proportion of original prose",
     );
   const text = applyRanges(source, changes);
+  assertNoNewEditorialRepetition(source, text, changes);
   return {
     text,
     changes: changes.map(({ kind, before, after, reason }) => ({

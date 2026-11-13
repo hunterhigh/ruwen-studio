@@ -118,15 +118,16 @@ export function createScenarioRuntime(
           scenario.startsWith("anchor_") || scenario === "edit_ratio"
             ? [
                 {
-                  anchor_before:
+                  original:
                     scenario === "anchor_ambiguous"
                       ? "林川"
                       : scenario === "anchor_missing"
                         ? "他走进不存在的房间"
-                        : "林川把信封",
-                  anchor_after: "内袋里。",
+                        : "林川把信封塞进内袋里。",
                   replacement:
-                    scenario === "edit_ratio" ? "风".repeat(1000) : "放进",
+                    scenario === "edit_ratio"
+                      ? "风".repeat(1000)
+                      : "林川把信封放进内袋里。",
                   kind: "literary",
                   reason: "模拟局部调整的锚点与比例校验",
                 },

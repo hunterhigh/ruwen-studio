@@ -181,9 +181,8 @@ const outputs: Record<
       decision: oneOf(["LOCAL_EDIT", "RESTAGE", "RETURN_CONSTRUCTION"]),
       edits: arr(
         obj({
-          anchor_before: bounded(200),
-          anchor_after: bounded(200),
-          replacement: bounded(1600),
+          original: str({ minLength: 1, maxLength: 3200 }),
+          replacement: bounded(3200),
           kind: oneOf(["fact", "literary"]),
           reason: bounded(1200),
         }),

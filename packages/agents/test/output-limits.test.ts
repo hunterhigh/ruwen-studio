@@ -80,16 +80,15 @@ it.each([
   expect(failure.partial?.output).toBe("");
 });
 it.each([
-  ["not unique", { anchor_before: "甲" }],
-  ["not found", { anchor_after: "不存在" }],
+  ["not unique", { original: "甲" }],
+  ["not found", { original: "不存在" }],
   ["proportion", { replacement: "字".repeat(80) }],
 ] as const)("faux editor rejects %s", async (message, override) => {
   const payload = {
     decision: "LOCAL_EDIT",
     edits: [
       {
-        anchor_before: "左",
-        anchor_after: "右",
+        original: "旧",
         replacement: "新",
         kind: "literary",
         reason: "节奏",

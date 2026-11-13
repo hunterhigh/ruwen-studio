@@ -95,12 +95,12 @@ export async function assemblePrompt(
       : `最终结果必须调用 ${spec.output.toolName} 提交；不得仅用普通消息代替。`;
   const editing =
     spec.id === "wenxue-bianji"
-      ? "\n平台提交格式：LOCAL_EDIT仅提交edits锚点替换，不返回整章。anchor_before与anchor_after是保留的原稿边界文本，分别必须唯一；空字符串分别表示篇首、篇尾；只替换两者之间的内容。锚点最多200字，单项删除/插入最多1600字，总替换量（各项删除/插入较大者之和）最多原稿15%，具体配置可能更低。RESTAGE/RETURN_CONSTRUCTION的edits必须为空并给return_reason。每个文学问题以location、category、condition、handling、result记录在problems，location须引用原稿中的短原文，其余字段不得为空；无问题时为空。平台在候选稿批准后入账，复发候选不能自动生成作者禁令。"
+      ? "\n平台提交格式：LOCAL_EDIT仅提交edits的原文original与完整替换文本replacement，不返回整章。original必须非空、逐字复制且在作者原稿中唯一出现；代码整段替换original，范围外的正文和标点原样保留。要删除或保留的引号、标点都须在这对文本中明确处理，不再使用边界锚点。original与replacement各最多1600字，总修改量（各项原文/替换较大者之和）最多原稿15%，具体配置可能更低。禁止复制左右邻接的保留正文到replacement，也禁止引入6字以上的相邻重复片段。所有修改针对同一原稿、不得重叠。RESTAGE/RETURN_CONSTRUCTION的edits必须为空并给return_reason。每个文学问题以location、category、condition、handling、result记录在problems，location须引用原稿中的短原文，其余字段不得为空；无问题时为空。平台在候选稿批准后入账，复发候选不能自动生成作者禁令。"
       : spec.id === "jiyi-weihuyuan"
         ? "\n平台提交格式：先按需读取资源；patches只引用本次实际读取的path与base_sha256。每项sections按完整Markdown标题heading替换其正文replacement，保留标题及其他小节；标题必须存在且唯一，不得引入同级或更高标题。每资源最多8小节，每小节最多4000字；不返回整份new_content。"
         : "";
   const anchors = ["qinggan-duzhe", "wenxue-bianji"].includes(spec.id)
-    ? "\n平台锚点格式：每个非空锚点须为当前正文中连续6–30字的原文，原样复制，不得改写人名或代词；编辑表示篇首/篇尾的空锚点仍允许。情感读者至少提交3条有效阅读反应。"
+    ? "\n平台定位格式：读者anchor与编辑问题location须为当前正文中连续6–30字的原文，原样复制，不得改写人名或代词；编辑edits.original为上文定义的完整替换范围，不受30字定位限制。情感读者至少提交3条有效阅读反应。"
     : "";
   const content = `${fragments.join("\n\n")}\n\n${PLATFORM_NOTE}\n\nCURRENT_ROLE:${spec.id}${editing}\n${format}${spec.platformFormat ? `\n${spec.platformFormat}` : ""}${anchors}\n\n${securityNote(spec.id)}`;
   return {

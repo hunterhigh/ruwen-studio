@@ -228,8 +228,7 @@ export function editorAnchorIssues(output: Data, prose: string): AnchorIssue[] {
     issues.push({ path, anchor, closest: proseMatches(prose, anchor).closest });
   };
   for (const [i, edit] of (output.edits as Data[]).entries())
-    for (const key of ["anchor_before", "anchor_after"])
-      if (edit[key]) check(String(edit[key]), `edits[${i}].${key}`, true);
+    check(String(edit.original), `edits[${i}].original`, true);
   for (const [i, problem] of (output.problems as Data[]).entries())
     check(String(problem.location), `problems[${i}].location`, false);
   return issues;

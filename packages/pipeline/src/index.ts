@@ -539,7 +539,7 @@ export async function startChapter(
         ctx,
       );
     if (!Array.isArray(edited.edits) || Object.hasOwn(edited, "edited_text"))
-      throw new Error("Editor output requires anchored edits");
+      throw new Error("Editor output requires original → replacement edits");
     const applied = applyEditorialEdits(
       author.output,
       edited.edits as unknown as EditorialEdit[],

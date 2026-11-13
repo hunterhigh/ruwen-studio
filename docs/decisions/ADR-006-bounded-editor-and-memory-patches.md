@@ -14,7 +14,7 @@ config/models.json为12岗分别设置maxTokens和basis：作者65536、编辑/�
 
 stopReason=length立即抛RoleTruncatedError，不纠正、不自动重试，也不执行截断消息内的提交/读取工具。错误携带partial，保留usage/cache计数/费用/转录；worker沿用失败用量落库机制，候选/正典不接受截断输出。
 
-文学编辑LOCAL_EDIT提交edits与problems，不再提供edited_text或自报before/after。每项edits为{anchor_before,anchor_after,replacement,kind,reason}：两个边界原文分别必须在原稿中唯一匹配，边界保留，仅替换其间内容。空before/after分别明确代表篇首/篇尾。所有范围基于同一原稿计算，重叠拒绝，逆序应用；删除与插入码点数较大者是该项修改量。单项最多1600码点，总量最多floor(原稿码点数×maxChangedRatio)，配置默认15%、可下调且不可上调越过15%。重复/找不到/逆序锚点、超单项或总量均拒绝。代码从真实原稿生成before/after日志；原稿在编辑运行之前保存，事实和文学修改分别记录，批准门不变。问题字段为location/category/condition/handling/result，为B1账本接入预留，A2不自动写账。
+文学编辑LOCAL_EDIT提交edits与problems，不提供edited_text或自报before/after。2026-11-13根据人类决定（ADR-005）改为{original,replacement,kind,reason}：original非空且逐字唯一，整段替换；旧双边界格式不再接受。所有范围基于同一原稿计算，重叠拒绝，逆序应用；原/新码点数较大者是该项修改量。单项最多1600码点，总量最多floor(原稿码点数×maxChangedRatio)，配置默认15%、可下调且不可越过15%。新增重复和邻文复制拒绝与一次具体纠正见ADR-005。代码从真实原稿生成before/after日志；原稿在编辑运行之前保存，事实和文学修改分别记录，批准门不变。问题字段为location/category/condition/handling/result。
 
 记忆维护员只提交{path,base_sha256,sections:[{heading,replacement}]}，每资源最多8小节，每小节原/新正文最多4000码点。heading为现有完整ATX Markdown标题且必须唯一；replacement仅为该标题之后、下一同级/上级标题之前的正文，可含下级标题，不得引入同级/上级标题。代码围栏内的标题不当作小节边界。缺失/重复/重叠标题拒绝，不静默创建新小节。保留标题、其他小节和原始CRLF字节；replacement换行匹配目标小节。
 
@@ -22,7 +22,7 @@ stopReason=length立即抛RoleTruncatedError，不纠正、不自动重试，也
 
 ## 替代与验证
 
-保留整章/整文件输出会继续浪费额度且难以保证改动边界，因此不采用。按行号补丁会受换行和行漂移影响，因此使用唯一原文边界与明确标题。新增text-edits及output-limits测试覆盖确定性应用、Unicode预算、单项/总量/重叠、CRLF保留、截断不执行工具且只调用一次、faux锚点错误与缺失小节；既有pipeline、隔离、批准、强杀恢复测试继续运行。
+保留整章/整文件输出会继续浪费额度且难以保证改动边界，因此不采用。按行号补丁会受换行和行漂移影响，因此使用唯一完整原文与明确标题。新增text-edits及output-limits测试覆盖确定性应用、Unicode预算、单项/总量/重叠、CRLF保留、截断不执行工具且只调用一次、faux锚点错误与缺失小节；既有pipeline、隔离、批准、强杀恢复测试继续运行。
 
 ## A4路由复核（2026-11-09）
 

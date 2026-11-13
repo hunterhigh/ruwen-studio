@@ -282,15 +282,13 @@ describe("chapter pipeline", { timeout: 20000 }, () => {
             edits: [
               {
                 kind: "fact",
-                anchor_before: "驿吏",
-                anchor_after: "木牌，",
+                original: "翻过",
                 replacement: "翻开",
                 reason: "事实",
               },
               {
                 kind: "literary",
-                anchor_before: "信封",
-                anchor_after: "胸口。",
+                original: "抵在",
                 replacement: "贴着",
                 reason: "文学",
               },

@@ -18,3 +18,5 @@
 12. **交付边界：** 一个块一个分支一个 PR，PR 描述贴截图列表。不要把多个块合并做。提交和合并继续遵守根目录 `AGENTS.md`；不直接推送 main，不 force push，最新 main 上 fast/full CI 全绿后按既有授权合并。
 
 块 0 仅交付规则与 `docs/reports/frontend-redesign/00-inventory.md`，不写功能代码。旧界面的文案、确认框与视觉替换按后续各块实施，不在块 0 提前整改。
+
+执行任何块之前，先读 FRONTEND-REDESIGN.md 末尾的勘误；勘误与块正文冲突时，以勘误为准。

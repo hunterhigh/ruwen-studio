@@ -1,6 +1,6 @@
 # 如文工作室 · 前端改版指令包（交给 Codex）
 
-> 版本：v1（2026-11-17）
+> 版本：v1.1（2026-11-17，含块 0 清单勘误）
 > 适用仓库：hunterhigh/ruwen-studio（基线 6d129b6），只改 `apps/web` 的前端。
 > 视觉依据：`docs/design/ruwen-studio-redesign.html`（单文件原型，浏览器直接打开；侧栏底部"设计规范"页是颜色、字体、组件和用词的权威来源）。
 > 用法：先把原型和本文件放进仓库（见下方"准备"），然后**按顺序**每次把一个指令块完整粘贴给 Codex。一个块对应一个分支、一个 PR。
@@ -462,3 +462,9 @@ E. 错误：页面顶部的 IdeationErrorNotice 改为收件箱或对话区内�
    - 1440×900 全页截图：书架、概览、构思、审稿桌（等你批准 / 修订稿 / 盖章后）、资料提交、项目资料、账户、登录、404，与 docs/design/ruwen-studio-redesign.html 并排对比，差异写进 docs/reports/frontend-redesign/11.md。
    - 更新 docs/p5-trial-guide.md 中与界面有关的描述（按钮名、页面名）。
 ```
+
+## v1.1 勘误（依据 docs/reports/frontend-redesign/00-inventory.md）
+
+通用
+- G1 原型预览：不要用 file: 打开。运行 `python -m http.server 8765 --directory docs/design`，访问 http://127.0.0.1:8765/ruwen-studio-redesign.html。每个块的报告附上原型对应页面的截图做对比。
+- G2 任何时间（批准时间、完成时间）只能从真实字段推导（run.events、receipt.createdAt 等），推导不出就不显示，不得写死。

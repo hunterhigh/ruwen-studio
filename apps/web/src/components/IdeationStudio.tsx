@@ -12,6 +12,8 @@ import type {
 } from "@ruwen/pipeline";
 import { useRouter } from "next/navigation.js";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { confirmation } from "../copy/zh-CN.ts";
+import { useConfirm } from "../ui/ConfirmDialog.tsx";
 import {
   allIdeationPages,
   createIdeationClient,
@@ -80,6 +82,7 @@ export function IdeationStudio({
   chatLimit: number;
   verbatimTargets: readonly VerbatimTargetOption[];
 }) {
+  const confirm = useConfirm();
   const router = useRouter();
   const [adapter] = useState(() => createIdeationClient(projectId));
   const [selected, setSelected] = useState<IdeationSessionId>(
@@ -366,12 +369,8 @@ export function IdeationStudio({
                 type="button"
                 className="text-button"
                 disabled={busy || closed}
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      "关闭此会话的新对话？已有任务继续，预览仍可阅读和决定。",
-                    )
-                  )
+                onClick={async () => {
+                  if (await confirm(confirmation.closeSession))
                     void operation(async () => {
                       unwrap(
                         await adapter.api.closeIdeationSession({
@@ -737,12 +736,8 @@ export function IdeationStudio({
                     className="text-button danger"
                     type="button"
                     disabled={busy}
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          "取消此任务？已批准资料和已发生用量不会撤销。",
-                        )
-                      )
+                    onClick={async () => {
+                      if (await confirm(confirmation.cancelTask))
                         void operation(async () => {
                           unwrap(
                             await adapter.api.cancelIdeationTask({

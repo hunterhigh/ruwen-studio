@@ -4,7 +4,12 @@ import { expect, test } from "@playwright/test";
 import { exportProjectZip, LocalDirFS, type ProjectFS } from "@ruwen/core";
 import { previewConfiguration } from "../../../config/preview.ts";
 
-import { createDemo, signIn } from "./helpers.ts";
+import {
+  captureRedesign,
+  confirmAction,
+  createDemo,
+  signIn,
+} from "./helpers.ts";
 
 test("imported user Markdown cannot execute HTML, load images or create non-https links", async ({
   page,
@@ -51,18 +56,43 @@ test("imported user Markdown cannot execute HTML, load images or create non-http
     content.getByRole("link", { name: "允许的链接" }),
   ).toHaveAttribute("rel", "noopener noreferrer nofollow");
   expect(externalRequests).toEqual([]);
-  let externalWarning = "";
   let popups = 0;
   page.on("popup", () => {
     popups++;
   });
-  page.once("dialog", async (dialog) => {
-    externalWarning = dialog.message();
-    await dialog.dismiss();
-  });
   await content.getByRole("link", { name: "允许的链接" }).click();
-  expect(externalWarning).toContain("https://example.com");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText(
+    "即将打开外部网站 https://example.com，确定继续吗？",
+  );
+  await captureRedesign(page, "external-confirm");
+  await dialog.getByRole("button", { name: "取消", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
   expect(popups).toBe(0);
+  await content
+    .getByRole("link", { name: "允许的链接" })
+    .click({ button: "middle" });
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  expect(popups).toBe(0);
+  // Intercept the destination: exercise a confirmed popup without external traffic.
+  await page
+    .context()
+    .route("https://example.com/**", (route) =>
+      route.fulfill({ body: "External destination fixture" }),
+    );
+  await content.getByRole("link", { name: "允许的链接" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(dialog).toBeVisible();
+  const [popup] = await Promise.all([
+    page.waitForEvent("popup"),
+    dialog.getByRole("button", { name: "继续打开", exact: true }).click(),
+  ]);
+  await popup.waitForLoadState();
+  expect(popup.url()).toBe("https://example.com/read");
+  expect(await popup.evaluate(() => window.opener === null)).toBe(true);
+  await popup.close();
   expect(await page.evaluate(() => "XSS_SENTINEL" in globalThis)).toBe(false);
 });
 test("account can sign out every device using the CSRF-protected session endpoint", async ({
@@ -80,10 +110,12 @@ test("account can sign out every device using the CSRF-protected session endpoin
     await signIn(second, email);
     expect((await second.request.get("/api/session")).status()).toBe(200);
     await page.goto("/account");
-    page.once("dialog", (dialog) => dialog.accept());
-    await page
-      .getByRole("button", { name: "登出所有设备", exact: true })
-      .click();
+    await confirmAction(
+      page,
+      page.getByRole("button", { name: "登出所有设备", exact: true }),
+      "登出所有设备",
+      "account-sessions",
+    );
     await expect(page).toHaveURL(/\/sign-in$/);
     expect((await page.request.get("/api/session")).status()).toBe(401);
     expect((await second.request.get("/api/session")).status()).toBe(401);
@@ -234,7 +266,11 @@ test("faux failure and manual return remain stopped until the user chooses anoth
     "已退回，等待重新构思",
   );
   await page.getByRole("button", { name: "开始写作", exact: true }).click();
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "放弃本次运行", exact: true }).click();
+  await confirmAction(
+    page,
+    page.getByRole("button", { name: "放弃本次运行", exact: true }),
+    "放弃运行",
+    "chapter-cancel",
+  );
   await expect(page.getByTestId("run-status")).toHaveText("已放弃");
 });

@@ -1,6 +1,8 @@
 "use client";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { confirmation } from "../copy/zh-CN.ts";
 import type { runDetail } from "../server/api.ts";
+import { useConfirm } from "../ui/ConfirmDialog.tsx";
 import { ApiError, post } from "./client.ts";
 import { ProjectNav } from "./ProjectHome.tsx";
 import {
@@ -210,6 +212,7 @@ function RunReader({
   projectId: string;
   onChanged: () => void;
 }) {
+  const confirm = useConfirm();
   const { data, error: loadError, refresh } = useApi<Detail>(`/api/runs/${id}`),
     [streams, setStreams] = useState(emptyRoleStreams),
     [connected, setConnected] = useState(false),
@@ -599,13 +602,8 @@ function RunReader({
             type="button"
             className="text-button danger"
             disabled={busy}
-            onClick={() => {
-              if (
-                window.confirm(
-                  "放弃本次运行？已经提交的文学问题记录会保留；已批准正文不会撤销。",
-                )
-              )
-                void action("cancel");
+            onClick={async () => {
+              if (await confirm(confirmation.cancelRun)) void action("cancel");
             }}
           >
             放弃本次运行

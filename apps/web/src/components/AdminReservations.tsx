@@ -1,10 +1,13 @@
 "use client";
 import { type FormEvent, useState } from "react";
+import { confirmation } from "../copy/zh-CN.ts";
 import type { pendingReservations } from "../server/admin-review.ts";
+import { useConfirm } from "../ui/ConfirmDialog.tsx";
 import { post } from "./client.ts";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
 import { useApi } from "./useApi.ts";
 export function AdminReservations() {
+  const confirm = useConfirm();
   const {
     data,
     error: loadError,
@@ -22,8 +25,7 @@ export function AdminReservations() {
   ) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    if (!window.confirm("确认已核对服务商账单？此次处理及理由会永久留痕。"))
-      return;
+    if (!(await confirm(confirmation.resolveReservation))) return;
     setBusy(true);
     setError("");
     setNotice("");

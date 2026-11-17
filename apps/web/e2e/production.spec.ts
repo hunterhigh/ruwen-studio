@@ -90,4 +90,25 @@ test("production build enforces CSP without browser violations and disables prev
   ).toBe(404);
   expect(violations).toEqual([]);
   expect(errors).toEqual([]);
+  // Both self-hosted weights load under the unchanged font-src 'self' policy.
+  const fonts = await page.evaluate(async () => {
+    await Promise.all([
+      document.fonts.load('400 18px "Ruwen Serif"', "如文"),
+      document.fonts.load('600 30px "Ruwen Serif"', "如文"),
+    ]);
+    return Array.from(document.fonts)
+      .filter(
+        (font) =>
+          font.family.replaceAll('"', "") === "Ruwen Serif" &&
+          font.status === "loaded",
+      )
+      .map((font) => font.weight);
+  });
+  expect(fonts).toEqual(expect.arrayContaining(["400", "600"]));
+  expect(violations).toEqual([]);
+  const gallery = await page.request.get(
+    `${previewConfiguration().productionUrl}/dev/ui`,
+  );
+  expect(gallery.status()).toBe(404);
+  expect(await gallery.text()).not.toContain("设计组件预览");
 });

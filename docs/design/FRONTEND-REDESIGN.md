@@ -464,7 +464,63 @@ E. 错误：页面顶部的 IdeationErrorNotice 改为收件箱或对话区内�
 ```
 
 ## v1.1 勘误（依据 docs/reports/frontend-redesign/00-inventory.md）
+人类决定：页头'待你决定'采用方案 A（章节 pending + 前端汇总构思待决预览）。
 
 通用
 - G1 原型预览：不要用 file: 打开。运行 `python -m http.server 8765 --directory docs/design`，访问 http://127.0.0.1:8765/ruwen-studio-redesign.html。每个块的报告附上原型对应页面的截图做对比。
 - G2 任何时间（批准时间、完成时间）只能从真实字段推导（run.events、receipt.createdAt 等），推导不出就不显示，不得写死。
+
+块 1
+- 状态全集还包含 READINESS_OK（准备写作，run）、MEMORY_PREVIEW_READY（正在整理资料变更，run）、MEMORY_COMMITTED（正在写入资料，run），一并映射。
+
+块 2
+- "待你决定"数字 = 项目的 pending（等待批准的章节运行数）+ 本项目构思侧 status=pending 的预览数（前端用现有 ideation client 汇总：会话分页取全，每个会话的预览分页取全，只统计最近 10 个会话）。构思部分加载失败时只显示章节部分，不报错。把汇总逻辑写成一个 hook，块 6 复用。
+- 在 OPEN_QUESTIONS 记录："/api/projects 的 pending 不含构思预览，前端汇总有额外请求，后续可考虑由后端返回总数。"
+
+块 3
+- 修订稿数据源：reports["wenxue-bianji"].output.edits，格式 [{original, replacement, kind, reason}]。在 data.original 中定位 original（applyEditorialEdits 已保证可应用），渲染为删除线 original + 下划线 replacement。定位失败的操作只在批注卡中显示前后文字。
+- factChanges / literaryChanges 是 JSON 字符串（缺失为 ""），解析后格式 [{kind, before, after, reason}]；解析失败按空数组处理。
+- "涉及原稿 X%" = 所有 edits 的 original 长度之和 ÷ 原稿长度，保留一位小数。
+- 岗位点数：GET /api/account 的 usage 按 run_id + role_id 求和 charged_credits；charged_credits 为 null 时显示"待核对"，不得当作 0。账户 usage 只有最近 100 条，取不到的显示"用量见账户页"。
+- 作者浮层不显示资料包字符数（响应中没有）。文学编辑浮层：reports["wenxue-bianji"].readResources 中有诊断文件时列出诊断名，没有就不写。
+- 批准时间、完成时间从 run.events 推导。
+
+块 4
+- 摘要条四栏改为：新事实（new_facts）、状态变化（state_changes）、失效资料（invalidated）、作用域变化（scope_changes），数据来自 reports["jiyi-weihuyuan"].output，均为字符串数组。删除"仍然未知"栏。
+- "下一章状态"取 reports["jiyi-weihuyuan"].output.next_chapter_state（字符串），作为文件列表最后的虚拟条目，用 SafeMarkdown 渲染为文本块，不做表格，删除原文"结构化状态记录"的说明。
+- 差异来自 memoryFiles[{path, before, after}]。memoryPreview（JSON 字符串，只含 patches 等）不在界面解析展示，只在"技术信息"里显示其哈希。
+
+块 5
+- 通讯门一次只交给一个岗位：显示 handoff.recipient。字段映射：understanding.creativeValue →"你想要的"；understanding.fixedFacts →"不能改变的事实"；understanding.openChoices →"协调员没有替你决定"；understanding.exampleTreatment →"示例处理"（有才显示）；understanding.destination →"去向"；handoff.payload →"委托内容"（字符串用宋体块，对象用 KeyValueList）；handoff.resource_ids →"依据的资料"（能从 compileSources / verbatimTargets 解析出路径的显示路径，否则显示"N 份资料"）。
+- 章节情境（generation_field）：显示 chapter、lockedEvents（必须发生的事件）、lockedOrder（锁定顺序）、generationField 正文与 characterCount / 2200、approvedSources。不显示"保持开放"。
+- 学习计划：known 已知、unknown 待查、plan 调查计划、boundary 边界、potentialConflicts 可能的冲突、destination 去向、sourceMode 来源方式（翻译成中文）。
+- 任务胶囊不显示点数（Task 没有 chargedCredits），也不显示 usage 里的 token 与 costUsd。
+- 批准成功后的信息用 ApprovalReceipt：committedFiles（已写入的文件）、startedTaskId（已启动的任务）、projectionRegistered（章节情境已登记）、createdAt。回执只在当次页面显示，不给列表中的预览伪造批准时间。
+- "拒绝"新增 ConfirmDialog（带可选理由），这是新加的确认步骤。
+- 本块新增读取 URL 参数 ?preview=V（选中预览）与 ?compile=1（展开编译表单），只改前端。
+
+块 6
+- readiness 只有 ready 与 errors（字符串数组），没有逐项清单。通过时显示"写作前的资料已就绪"，不列出 9 项；不通过时按 errors 映射表逐条显示，匹配不上的放"其他检查信息"。
+- 第②步的判断依赖 errors 文本匹配章节情境相关内容；匹配不到时停在第①步。
+- "待你决定"列表复用块 2 的汇总 hook。
+
+块 7
+- 没有更新时间、字数、章数、演示标记。排序按 created_at 降序，右侧小字"按创建时间"。
+- "继续写"横卡改为"等你批准"横卡：只在存在 pending>0 的项目时显示第一个这样的项目，文字"有 N 份章节等你批准"，按钮"去处理"（进入项目概览）。不存在就不显示这张卡。
+- 筛选只保留"全部 / 有章节待批准"两项。
+- 封面角标 = pending。格子小字：pending>0 显示"N 份章节待批准"（--seal-deep）；否则显示"创建于 YYYY-MM-DD"。
+- 不显示"演示"标记。
+- 导入失败：服务端返回的中文 error 原样显示（它已是面向用户的文字）；没有文字时显示通用文案"导入没有完成，请确认这是如文导出的 ZIP"。
+
+块 8
+- 文件列表只有路径；状态、作用域、读取岗位来自 治理/资源注册表.json；"技术信息"只显示 sha256（没有大小和更新时间）。
+
+块 9
+- 不显示"本月已用"。余额卡显示：可用余额、运行中预留、今日已用 / 今日上限（来自 daily[bank]），并注明"按 UTC 日计算"。live 与 sandbox 两个余额分开显示，sandbox 标注"测试点数"。
+- 每日上限说明改为："运行中的预留也计入当天上限。降低上限后，新的模型调用可能被拒绝。"保留"恢复默认"（limitCredits:null）。
+- 用量明细按 run_id 分组，组标题为"《项目名》· 最早一条 started_at 的时间"，不显示章节号和运行状态（数据中没有）；组内按岗位列出 charged_credits，null 显示"待核对"。表格下方注明"显示最近 100 条记录"。账本中 reason=role_usage 的条目不再单列，避免重复计算。
+- 待核对预留没有时间字段，不显示时间。
+- 购买：plans 字段为 id、name、credits、priceMinor；创建结账不加点，模拟支付完成后才加沙箱点数。不出现任何真实收费承诺。
+
+块 10
+- preview、google 由服务端 props 提供；Google 未配置时隐藏按钮（不是禁用）。

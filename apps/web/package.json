@@ -15,7 +15,7 @@
     "@ruwen/core": "workspace:*",
     "@ruwen/db": "workspace:*",
     "@ruwen/pipeline": "workspace:*",
-    "better-auth": "1.7.18",
+    "better-auth": "1.7.25",
     "next": "16.4.5",
     "nodemailer": "10.4.0",
     "react": "19.3.1",

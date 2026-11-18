@@ -11,3 +11,8 @@ allowBuilds:
   '@google/genai': false
   esbuild: false
   protobufjs: false
+
+auditConfig:
+  ignoreGhsas:
+    # Human-approved; expires 2026-12-18. See ADR-017. Other high advisories still block.
+    - GHSA-fc5q-39xc-vjpf

@@ -12,7 +12,7 @@ import type {
 } from "@ruwen/pipeline";
 import { useRouter } from "next/navigation.js";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { confirmation } from "../copy/zh-CN.ts";
+import { confirmation, frameCopy } from "../copy/zh-CN.ts";
 import { useConfirm } from "../ui/ConfirmDialog.tsx";
 import {
   allIdeationPages,
@@ -32,7 +32,6 @@ import {
   VerbatimSelection,
   type VerbatimTargetOption,
 } from "./ideation/VerbatimSelection.tsx";
-import { ProjectNav } from "./ProjectHome.tsx";
 import {
   applyRoleFrame,
   emptyRoleStreams,
@@ -71,7 +70,6 @@ export function IdeationStudio({
   projectId,
   compileScope,
   compileSources,
-  modelMode,
   chatLimit,
   verbatimTargets,
 }: {
@@ -265,14 +263,9 @@ export function IdeationStudio({
     <main className="ideation-page">
       <header className="compact-heading">
         <div>
-          <span className="eyebrow">故事构思 / IDEATION</span>
-          <h1>把想法，交还给故事。</h1>
+          <h1>{frameCopy.ideation}</h1>
         </div>
-        <span className="mode-label">
-          <SafeMarkdown plain inline content={modelMode} /> · 待 P3 实测
-        </span>
       </header>
-      <ProjectNav id={projectId} current="/ideation" />
       <p className="notice">
         对话与任务会保存到当前项目。每份预览先阅读、再决定；批准后才提交资料或执行委托。点数按实际用量结算。
       </p>
@@ -678,10 +671,7 @@ export function IdeationStudio({
             </button>
           </form>
         </header>
-        <p className="fine-print">
-          费用与用量来自运行记录；价格与预留仍待 P3
-          实测。中断不会自动再次调用模型。
-        </p>
+        <p className="fine-print">{frameCopy.usageRecords}</p>
         <div className="ideation-task-list">
           {view?.tasks.map((task) => (
             <article key={task.id} className="ideation-task">
@@ -696,7 +686,6 @@ export function IdeationStudio({
                 {task.usage.costUsd === null
                   ? "费用未记录"
                   : `记录成本 $${task.usage.costUsd}`}{" "}
-                · 待 P3 实测
               </p>
               {task.error && <p>{errorCopy[task.error.code]}</p>}
               {task.stage !== "coordinator" && (

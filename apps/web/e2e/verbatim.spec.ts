@@ -120,7 +120,7 @@ test("v1.2 typed HTTP fixture: own-message codepoint selection, both destination
       .locator("..")
       .getByRole("button", { name: "逐字写入文件", exact: true }),
   ).toBeEnabled();
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 1180, height: 900 });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

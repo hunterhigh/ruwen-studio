@@ -1,10 +1,9 @@
 "use client";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
-import { confirmation } from "../copy/zh-CN.ts";
+import { confirmation, frameCopy } from "../copy/zh-CN.ts";
 import type { runDetail } from "../server/api.ts";
 import { useConfirm } from "../ui/ConfirmDialog.tsx";
 import { ApiError, post } from "./client.ts";
-import { ProjectNav } from "./ProjectHome.tsx";
 import {
   applyRoleFrame,
   emptyRoleStreams,
@@ -113,15 +112,9 @@ export function ChapterStudio({
     <main className="chapter-page">
       <header className="compact-heading">
         <div>
-          <span className="eyebrow">正文工作台 / CHAPTERS</span>
-          <h1>一章一章，写下去。</h1>
+          <h1>{frameCopy.chapters}</h1>
         </div>
-        <span className="mode-label">
-          <SafeMarkdown plain inline content={settings.data?.mode ?? "…"} /> ·
-          待 P3 实测
-        </span>
       </header>
-      <ProjectNav id={projectId} current="/chapters" />
       <div className="chapter-toolbar">
         <form onSubmit={create}>
           <label>
@@ -326,8 +319,8 @@ function RunReader({
           </span>
         </div>
         <span className="fine-print">
-          已记录成本小计 ${Number(data?.run.costTotal ?? 0).toFixed(4)} · 待 P3
-          实测
+          {frameCopy.recordedCost} $
+          {Number(data?.run.costTotal ?? 0).toFixed(4)}
         </span>
       </div>
       {(error || loadError || data?.run.error) && (

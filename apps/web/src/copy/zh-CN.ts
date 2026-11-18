@@ -6,6 +6,44 @@ import type {
   RunStatus,
 } from "@ruwen/pipeline";
 
+export const frameCopy = {
+  wordmark: "如文",
+  caption: "小说工作室",
+  navigation: "主导航",
+  projectNavigation: "项目导航",
+  shelf: "书架",
+  account: "账户与用量",
+  admin: "管理工作室",
+  project: "项目",
+  overview: "概览",
+  ideation: "故事构思",
+  chapters: "章节写作",
+  files: "项目资料",
+  decisions: "待你决定",
+  ideationDecisions: "查看构思待决预览",
+  exportZip: "导出 ZIP",
+  previewLabel: "开发预览",
+  previewFaux: "开发预览：当前使用模拟模型，点数与价格尚待实测。",
+  preview: "开发预览：点数与价格尚待实测。",
+  dismissPreview: "本次不再显示",
+  signOut: "退出登录",
+  signingOut: "正在退出…",
+  signOutError: "退出没有完成，请重试。",
+  signOutConfirmation: {
+    title: "退出登录？",
+    body: "未发送的消息不会保存。",
+    confirmLabel: "退出登录",
+  },
+  accountSandbox:
+    "沙箱点数只用于模拟或回放，不能支付真实模型运行；真实收费默认关闭。",
+  dailyLimit: "每日点数上限",
+  credits: "点。",
+  recordedCost: "已记录成本小计",
+  usageRecords: "费用与用量来自运行记录。中断不会自动再次调用模型。",
+  usageFootnote:
+    "模拟与回放只结算沙箱点数，不代表新增真实模型费用。历史运行不追溯扣点；真实收费保持关闭。",
+};
+
 /** Pending v1.1 codes are presentation-only until the service contract declares them. */
 export type IdeationUiErrorCode =
   | IdeationErrorCode

@@ -251,7 +251,7 @@ test("all five preview kinds: diffs, revision confirmation, rejection, learning 
   fixture.dispose();
 });
 
-test("pending billing/freeze errors give safe guidance and the mobile review has no horizontal overflow", async ({
+test("pending billing/freeze errors give safe guidance and the minimum desktop review has no horizontal overflow", async ({
   page,
 }, testInfo) => {
   await signIn(page);
@@ -281,7 +281,7 @@ test("pending billing/freeze errors give safe guidance and the mobile review has
           .getByRole("link", { name: "查看账户与点数 →", exact: true }),
       ).toHaveAttribute("href", "/account");
   }
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 1180, height: 900 });
   await page.getByLabel("预览类型", { exact: true }).selectOption("file_patch");
   expect(
     await page.evaluate(
@@ -289,7 +289,7 @@ test("pending billing/freeze errors give safe guidance and the mobile review has
     ),
   ).toBe(true);
   await page.screenshot({
-    path: testInfo.outputPath("ideation-mobile.png"),
+    path: testInfo.outputPath("ideation-desktop.png"),
     fullPage: true,
   });
   fixture.dispose();

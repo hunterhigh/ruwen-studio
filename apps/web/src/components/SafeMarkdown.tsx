@@ -3,6 +3,8 @@ import type { MouseEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import { confirmation, uiCopy } from "../copy/zh-CN.ts";
+import { useConfirm } from "../ui/ConfirmDialog.tsx";
 export function safeLink(href: string | undefined) {
   if (!href) return undefined;
   try {
@@ -11,14 +13,6 @@ export function safeLink(href: string | undefined) {
   } catch {
     return undefined;
   }
-}
-function confirmExternal(event: MouseEvent<HTMLAnchorElement>) {
-  const target = new URL(event.currentTarget.href);
-  if (
-    target.origin !== window.location.origin &&
-    !window.confirm(`即将打开外部网站：${target.origin}\n请确认是否继续。`)
-  )
-    event.preventDefault();
 }
 /** The sole renderer for user/model content. No HTML plugin, external image or caller-supplied renderer. */
 export function SafeMarkdown({
@@ -32,6 +26,20 @@ export function SafeMarkdown({
   plain?: boolean;
   selection?: { label: string; onSelect: (start: number, end: number) => void };
 }) {
+  const confirm = useConfirm();
+  async function confirmExternal(event: MouseEvent<HTMLAnchorElement>) {
+    const target = new URL(event.currentTarget.href);
+    if (target.origin === window.location.origin) return;
+    event.preventDefault();
+    if (
+      await confirm({
+        ...confirmation.external,
+        body: confirmation.external.body(target.origin),
+      })
+    ) {
+      window.open(target.href, "_blank", "noopener,noreferrer");
+    }
+  }
   if (plain && selection) {
     const report = (event: React.SyntheticEvent<HTMLTextAreaElement>) =>
       selection.onSelect(
@@ -119,9 +127,7 @@ export function SafeMarkdown({
           );
         },
         img: ({ alt }) => (
-          <span className="hidden-image">
-            [图片已隐藏{alt ? `：${alt}` : ""}]
-          </span>
+          <span className="hidden-image">{uiCopy.hiddenImage(alt)}</span>
         ),
       }}
       urlTransform={(url) => safeLink(url) ?? ""}

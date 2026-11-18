@@ -1,5 +1,6 @@
 import { createHmac, randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { expect, type Locator, type Page } from "@playwright/test";
 import { Database } from "@ruwen/db";
 export async function selectMessageRange(
@@ -71,4 +72,53 @@ export async function createDemo(page: Page, title: string) {
     page.getByRole("heading", { name: "项目资料已就绪" }),
   ).toBeVisible();
   return page.url().split("/").at(-1) ?? "";
+}
+
+/** Block 1 evidence is opt-in so CI never rewrites checked-in screenshots. */
+export async function captureRedesign(page: Page, name: string) {
+  if (process.env.FRONTEND_RED01_SCREENSHOTS !== "1") return;
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.evaluate(() => document.fonts.ready);
+  const directory = new URL(
+    "../../../docs/reports/frontend-redesign/01/",
+    import.meta.url,
+  );
+  await mkdir(directory, { recursive: true });
+  await page.screenshot({
+    path: fileURLToPath(new URL(`${name}.png`, directory)),
+    fullPage: false,
+  });
+}
+export async function confirmAction(
+  page: Page,
+  trigger: Locator,
+  label: string,
+  name: string,
+) {
+  await trigger.scrollIntoViewIfNeeded();
+  await captureRedesign(page, `${name}-page`);
+  await trigger.click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "取消", exact: true }),
+  ).toBeFocused();
+  const mutations: string[] = [];
+  const record = (request: import("@playwright/test").Request) => {
+    if (request.method() === "POST") mutations.push(request.url());
+  };
+  page.on("request", record);
+  try {
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    expect(mutations).toEqual([]);
+    await trigger.click();
+    await expect(dialog).toBeVisible();
+    await captureRedesign(page, `${name}-confirm`);
+    expect(mutations).toEqual([]);
+  } finally {
+    page.off("request", record);
+  }
+  await dialog.getByRole("button", { name: label, exact: true }).click();
 }

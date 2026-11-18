@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
+import { confirmation } from "../copy/zh-CN.ts";
 import type { billingAccount } from "../server/billing-account.ts";
+import { useConfirm } from "../ui/ConfirmDialog.tsx";
 import { post } from "./client.ts";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
 import { useApi } from "./useApi.ts";
@@ -9,6 +11,7 @@ type AccountData = Awaited<ReturnType<typeof billingAccount>> & {
   user: { id: string; email: string };
 };
 export function Account() {
+  const confirm = useConfirm();
   const [sessionError, setSessionError] = useState(""),
     [revoking, setRevoking] = useState(false),
     [busy, setBusy] = useState(false),
@@ -277,12 +280,8 @@ export function Account() {
                   type="button"
                   className="button primary"
                   disabled={busy || !data.sandboxEnabled}
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        "确认完成模拟支付？不会扣真实款项，点数只进入沙箱余额。",
-                      )
-                    )
+                  onClick={async () => {
+                    if (await confirm(confirmation.completePayment))
                       void pay(async () => {
                         await post(
                           `/api/billing/checkouts/${checkout.id}/complete`,
@@ -344,8 +343,8 @@ export function Account() {
           type="button"
           className="button secondary"
           disabled={revoking || !data}
-          onClick={() => {
-            if (!window.confirm("确认登出所有设备，包括当前浏览器？")) return;
+          onClick={async () => {
+            if (!(await confirm(confirmation.signOutAll))) return;
             setRevoking(true);
             void post("/api/auth/revoke-sessions")
               .then(() => window.location.assign("/sign-in"))

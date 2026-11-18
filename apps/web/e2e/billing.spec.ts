@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { Database } from "@ruwen/db";
 import { previewConfiguration } from "../../../config/preview.ts";
 import { runtimeSettings } from "../../../config/settings.ts";
-import { createDemo, signIn } from "./helpers.ts";
+import { confirmAction, createDemo, signIn } from "./helpers.ts";
 
 test("sandbox purchase records a real ledger entry once and refreshes segregated balances", async ({
   page,
@@ -20,8 +20,12 @@ test("sandbox purchase records a real ledger entry once and refreshes segregated
   await expect(
     page.getByRole("button", { name: "完成模拟支付", exact: true }),
   ).toBeVisible();
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "完成模拟支付", exact: true }).click();
+  await confirmAction(
+    page,
+    page.getByRole("button", { name: "完成模拟支付", exact: true }),
+    "完成模拟支付",
+    "account-payment",
+  );
   await expect(page.getByRole("status")).toContainText(
     "模拟支付已记入沙箱点数账本",
   );
@@ -92,10 +96,12 @@ test("frozen run refuses without a task, and an audited administrator can unfree
     await admin.goto("/admin");
     const account = admin.locator("tr").filter({ hasText: email });
     await expect(account).toContainText("已冻结");
-    admin.once("dialog", (dialog) => dialog.accept());
-    await account
-      .getByRole("button", { name: "人工复核并解冻", exact: true })
-      .click();
+    await confirmAction(
+      admin,
+      account.getByRole("button", { name: "人工复核并解冻", exact: true }),
+      "解除冻结",
+      "admin-unfreeze",
+    );
     await expect(account).toContainText("未冻结");
     await expect(
       account.getByRole("button", { name: "人工复核并解冻", exact: true }),
@@ -181,8 +187,12 @@ test("admin reviews uncertain cost with a reason and the account shows the audit
     await card
       .getByLabel("核对理由（必填，对用户可见）")
       .fill("已按服务商测试账单核对总实际费用。");
-    admin.once("dialog", (dialog) => dialog.accept());
-    await card.getByRole("button", { name: "确认核对并记入审计" }).click();
+    await confirmAction(
+      admin,
+      card.getByRole("button", { name: "确认核对并记入审计" }),
+      "确认核对",
+      "admin-reservation",
+    );
     await expect(
       admin.getByText("核对已完成，账本和处理理由已保存。"),
     ).toBeVisible();

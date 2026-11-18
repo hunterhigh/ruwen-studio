@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
+import { confirmation } from "../copy/zh-CN.ts";
 import type { AdminRiskReview } from "../server/admin-review.ts";
+import { useConfirm } from "../ui/ConfirmDialog.tsx";
 import { post } from "./client.ts";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
 export function AdminSecurity({
@@ -10,6 +12,7 @@ export function AdminSecurity({
   review: AdminRiskReview;
   onChanged?: () => Promise<unknown>;
 }) {
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const limits = review.designLimits;
@@ -105,12 +108,10 @@ export function AdminSecurity({
                       type="button"
                       className="text-button"
                       disabled={busy || !account.frozenAt}
-                      onClick={() => {
+                      onClick={async () => {
                         if (
                           !account.frozenAt ||
-                          !window.confirm(
-                            "确认已完成人工复核并解除冻结？历史风险事件与审计会保留。",
-                          )
+                          !(await confirm(confirmation.unfreeze))
                         )
                           return;
                         setBusy(true);

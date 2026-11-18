@@ -1,15 +1,26 @@
 import type { ReactNode } from "react";
+import { uiCopy } from "../copy/zh-CN.ts";
+import { ConfirmProvider } from "../ui/ConfirmDialog.tsx";
+import { ToastProvider } from "../ui/Toast.tsx";
 export const metadata = {
-  title: { default: "如文工作室", template: "%s · 如文" },
-  description: "从构思到候选稿，每一步由你确认。",
+  title: {
+    default: uiCopy.metadata.title,
+    template: uiCopy.metadata.titleTemplate,
+  },
+  description: uiCopy.metadata.description,
 };
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="zh-CN">
       <head>
+        <link rel="stylesheet" href="/fonts/ruwen-serif/font.css" />
         <link rel="stylesheet" href="/studio.css" />
       </head>
-      <body>{children}</body>
+      <body>
+        <ConfirmProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </ConfirmProvider>
+      </body>
     </html>
   );
 }

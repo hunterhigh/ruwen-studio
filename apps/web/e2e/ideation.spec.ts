@@ -1,7 +1,29 @@
 import { expect, test } from "@playwright/test";
 import { previewConfiguration } from "../../../config/preview.ts";
-import { createDemo, signIn } from "./helpers.ts";
+import { confirmAction, createDemo, signIn } from "./helpers.ts";
 import { ideationHttpFixture } from "./ideation-http-fixture.ts";
+
+test("task cancellation waits for the shared confirmation and preserves the original task endpoint", async ({
+  page,
+}) => {
+  await signIn(page);
+  const projectId = await createDemo(page, "任务取消确认");
+  const fixture = await ideationHttpFixture(page, projectId);
+  try {
+    await page.goto(`/projects/${projectId}/ideation`);
+    const card = page
+      .getByRole("region", { name: "下游任务", exact: true })
+      .locator("article")
+      .first();
+    const trigger = card.getByRole("button", { name: "取消任务", exact: true });
+    await expect(trigger).toBeVisible();
+    await confirmAction(page, trigger, "取消任务", "ideation-task");
+    await expect(card).toContainText("已取消");
+    await expect(trigger).toHaveCount(0);
+  } finally {
+    fixture.dispose();
+  }
+});
 
 test("persisted conversations: switching, clean handoff, safe user Markdown, close and tenant boundaries", async ({
   page,
@@ -78,10 +100,12 @@ test("persisted conversations: switching, clean handoff, safe user Markdown, clo
   await expect(conversation).toContainText("PRIVATE_IDEATION_WORDING_53ef");
   await create("另一条河流");
   await expect(conversation).toContainText("从一个放不下的念头开始");
-  page.once("dialog", (d) => d.accept());
-  await conversation
-    .getByRole("button", { name: "关闭会话", exact: true })
-    .click();
+  await confirmAction(
+    page,
+    conversation.getByRole("button", { name: "关闭会话", exact: true }),
+    "关闭会话",
+    "ideation-close",
+  );
   await expect(
     page.getByLabel("想和协调员说的话", { exact: true }),
   ).toBeDisabled();
@@ -290,10 +314,12 @@ test("v1.1 closed session blocks new messages/revisions but keeps existing previ
   await expect(
     page.getByText("交给下游的干净委托", { exact: true }),
   ).toBeVisible();
-  page.once("dialog", (dialog) => dialog.accept());
-  await conversation
-    .getByRole("button", { name: "关闭会话", exact: true })
-    .click();
+  await confirmAction(
+    page,
+    conversation.getByRole("button", { name: "关闭会话", exact: true }),
+    "关闭会话",
+    "ideation-close",
+  );
   await expect(
     page.getByLabel("想和协调员说的话", { exact: true }),
   ).toBeDisabled();

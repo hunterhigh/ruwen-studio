@@ -10,7 +10,8 @@ import {
   str,
   union,
 } from "@earendil-works/pi-schema";
-import { formatUserMessage } from "../messages.ts";
+import { authorInput, roleWithheld } from "../input-manifest.ts";
+import { buildStructuredInput } from "../messages.ts";
 import { rolePromptFiles } from "../prompts/manifest.ts";
 import {
   type Data,
@@ -320,17 +321,20 @@ export const ROLES = Object.fromEntries(
           ? "cheap"
           : "standard") as Tier,
       maxTurns: 8,
-      buildUserMessage(input) {
+      withheld: roleWithheld[id],
+      buildUserMessage(input, context = {}) {
         const selected: Data = {};
         for (const key of fields[id])
           if (Object.hasOwn(input, key)) selected[key] = input[key] ?? null;
+        let previousTailTruncated = context.previousTailTruncated;
         if (
           id === "qinggan-duzhe" &&
           typeof selected.previous_tail === "string"
-        )
-          selected.previous_tail = Array.from(selected.previous_tail)
-            .slice(-600)
-            .join("");
+        ) {
+          const characters = Array.from(selected.previous_tail);
+          previousTailTruncated ||= characters.length > 600;
+          selected.previous_tail = characters.slice(-600).join("");
+        }
         if (
           id !== "chuangyi-xietiaoyuan" &&
           (Object.hasOwn(input, "raw_user_text") ||
@@ -344,8 +348,15 @@ export const ROLES = Object.fromEntries(
             "Coordinator input cannot replay a translated handoff",
           );
         return id === "xiaoshuo-zuozhe"
-          ? String(selected.packet ?? "")
-          : formatUserMessage(selected);
+          ? authorInput(
+              String(selected.packet ?? ""),
+              spec.withheld,
+              context.packet,
+            )
+          : buildStructuredInput(selected, spec.withheld, {
+              ...context,
+              previousTailTruncated,
+            });
       },
     };
     return [id, Object.freeze(spec)];

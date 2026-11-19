@@ -12,6 +12,7 @@ import {
 import {
   checks,
   exportProjectZip,
+  type InputManifest,
   importProjectZip,
   initProject,
   LocalDirFS,
@@ -347,8 +348,18 @@ export async function runDetail(
   }
   const artifact = async (p: string | undefined) =>
     p && (await owned.fs.exists(p)) ? owned.fs.readText(p) : "";
-  const roleRows = await services.worker.db.pool.query(
-    "SELECT role_id,status,model,usage,cost_usd,usage_unknown,started_at,finished_at FROM role_runs WHERE run_id=$1 ORDER BY started_at",
+  const roleRows = await services.worker.db.pool.query<{
+    role_id: string;
+    status: string;
+    model: string | null;
+    usage: RoleResult["usage"] | null;
+    cost_usd: string | null;
+    usage_unknown: boolean;
+    started_at: Date;
+    finished_at: Date | null;
+    inputManifest: InputManifest | null;
+  }>(
+    'SELECT role_id,status,model,usage,cost_usd,usage_unknown,started_at,finished_at,input_manifest AS "inputManifest" FROM role_runs WHERE run_id=$1 ORDER BY started_at',
     [id],
   );
   const memoryPreview = await artifact(run.paths.memory_preview);

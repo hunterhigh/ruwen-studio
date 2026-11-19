@@ -3,6 +3,8 @@ import { readdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { InputManifest } from "@ruwen/core";
+import { inputChars } from "../input-manifest.ts";
 import { securityNote } from "../security/notes.ts";
 import type { RoleId, RoleSpec } from "../types.ts";
 
@@ -66,7 +68,7 @@ export const rolePromptFiles = (
 export async function assemblePrompt(
   spec: RoleSpec,
   upstreamRoot = defaultUpstreamRoot,
-): Promise<{ content: string; sha256: string }> {
+): Promise<{ content: string; sha256: string; rules: InputManifest["rules"] }> {
   const fragments: string[] = [];
   for (const file of spec.promptFiles) {
     const resolved = path.resolve(upstreamRoot, file.path),
@@ -106,5 +108,12 @@ export async function assemblePrompt(
   return {
     content,
     sha256: createHash("sha256").update(content, "utf8").digest("hex"),
+    rules: {
+      upstreamFileCount: fragments.length,
+      chars: fragments.reduce(
+        (total, fragment) => total + inputChars(fragment),
+        0,
+      ),
+    },
   };
 }

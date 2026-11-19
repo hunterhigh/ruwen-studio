@@ -1,8 +1,18 @@
+import { createHash } from "node:crypto";
 import path from "node:path";
 import bundle from "../../assets/upstream-bundle.json" with { type: "json" };
 import { projectionErrors } from "../checks/index.ts";
 import type { ProjectFS } from "../fs/project-fs.ts";
-import { scopeMatches, validateRegistry } from "../registry/index.ts";
+import {
+  type InputManifestItem,
+  type PacketInputManifest,
+  resourceInputLabel,
+} from "../input-manifest.ts";
+import {
+  type Resource,
+  scopeMatches,
+  validateRegistry,
+} from "../registry/index.ts";
 import {
   CoreError,
   chars,
@@ -101,7 +111,7 @@ async function requireAuthorSource(
   p: string,
   role: string,
   query: ObjectData,
-): Promise<void> {
+): Promise<Resource> {
   const relative = authorRelative(fs, state, p);
   if (role === "project_voice") {
     if (relative !== "表现/项目声音.md")
@@ -146,11 +156,17 @@ async function requireAuthorSource(
   if (resource.type !== expectedType)
     throw new CoreError(`${role}的资源类型错误：${resource.type}`);
   requireSnapshotSource(fs, state, p, role);
+  return resource;
 }
 export async function compilePacket(
   fs: ProjectFS,
   manifestValue: string,
-): Promise<{ output: string; warnings: string[] }> {
+): Promise<{
+  output: string;
+  warnings: string[];
+  message: string;
+  manifest: PacketInputManifest;
+}> {
   return fs.transaction(async (tx) => {
     const state = await loadState(tx);
     const status = await computeStatus(tx, state);
@@ -223,15 +239,27 @@ export async function compilePacket(
     const rolePaths: [string, string][] = [["projection", projection]];
     const voice = await requireFile(tx, manifest.project_voice);
     const pov = await requireFile(tx, manifest.pov_lens);
-    await requireAuthorSource(tx, state, voice, "project_voice", scope);
-    await requireAuthorSource(tx, state, pov, "pov_lens", scope);
+    const voiceResource = await requireAuthorSource(
+      tx,
+      state,
+      voice,
+      "project_voice",
+      scope,
+    );
+    const povResource = await requireAuthorSource(
+      tx,
+      state,
+      pov,
+      "pov_lens",
+      scope,
+    );
     rolePaths.push(["project_voice", voice], ["pov_lens", pov]);
-    const optional: [string, string][] = [];
+    const optional: [string, string, Resource][] = [];
     for (const role of ["relationship_lens", "expression_resource"])
       if (manifest[role] != null) {
         const p = await requireFile(tx, manifest[role]);
-        await requireAuthorSource(tx, state, p, role, scope);
-        optional.push([role, p]);
+        const resource = await requireAuthorSource(tx, state, p, role, scope);
+        optional.push([role, p, resource]);
         rolePaths.push([role, p]);
       }
     let exact: string | null = null;
@@ -259,7 +287,11 @@ export async function compilePacket(
       throw new CoreError(
         `generation field exceeds its 如文5.0 ceiling (${chars(projectionText)} > 2200)`,
       );
-    const sections: [string, string][] = [];
+    const sections: {
+      title: string;
+      content: string;
+      item: InputManifestItem;
+    }[] = [];
     const sources: ObjectData[] = [];
     const addSource = async (
       role: string,
@@ -267,6 +299,36 @@ export async function compilePacket(
       selection: ObjectData = { kind: "full" },
     ) => {
       sources.push({ role, ...(await ref(tx, p)), selection });
+    };
+    const addSection = async (
+      role: string,
+      p: string,
+      title: string,
+      content: string,
+      options: { resource?: Resource; tail?: number; truncated?: boolean } = {},
+    ) => {
+      const { resource, truncated = false } = options;
+      sections.push({
+        title,
+        content,
+        item: {
+          kind: options.tail ? "chapter_tail" : "packet_section",
+          label: resource
+            ? resourceInputLabel(resource.path, resource.title)
+            : title,
+          ...(resource ? { resourceId: resource.id } : {}),
+          path: p,
+          sha256: createHash("sha256").update(content).digest("hex"),
+          chars: chars(content),
+          truncated,
+          includedBecause: "packet",
+        },
+      });
+      await addSource(
+        role,
+        p,
+        options.tail ? { kind: "tail", chars: options.tail } : undefined,
+      );
     };
     await addSource("author_manifest", manifestPath);
     if (manifest.approved_prose_tail != null) {
@@ -293,11 +355,14 @@ export async function compilePacket(
         );
       if (approved.sha256 !== (await tx.sha256(prose)))
         throw new CoreError("approved_prose_tail hash no longer matches state");
-      sections.push(["最近批准正文", tail(await readText(tx, prose), length)]);
-      await addSource("approved_prose_tail", prose, {
-        kind: "tail",
-        chars: length,
-      });
+      const content = await readText(tx, prose);
+      await addSection(
+        "approved_prose_tail",
+        prose,
+        "最近批准正文",
+        tail(content, length),
+        { tail: length, truncated: chars(content) > length },
+      );
       rolePaths.push(["approved_prose_tail", prose]);
     }
     if (exact) rolePaths.push(["user_authored_text", exact]);
@@ -310,8 +375,7 @@ export async function compilePacket(
         );
       seen.set(p, role);
     }
-    sections.push(["当前章节情境", projectionText]);
-    await addSource("projection", projection);
+    await addSection("projection", projection, "当前章节情境", projectionText);
     if (exact) {
       const content = await readText(tx, exact);
       if (!content.trim())
@@ -322,15 +386,16 @@ export async function compilePacket(
         throw new CoreError(
           `user_authored_text exceeds its 如文5.0 ceiling (${chars(content)} > 600)`,
         );
-      sections.push([
+      await addSection(
+        "user_authored_text",
+        exact,
         "用户要求逐字保留的文本",
         content.replace(/[\r\n]+$/, ""),
-      ]);
-      await addSource("user_authored_text", exact);
+      );
     }
-    for (const [role, p, title, maximum] of [
-      ["project_voice", voice, "项目声音", 1200],
-      ["pov_lens", pov, "当前POV镜头", 900],
+    for (const [role, p, title, maximum, resource] of [
+      ["project_voice", voice, "项目声音", 1200, voiceResource],
+      ["pov_lens", pov, "当前POV镜头", 900, povResource],
     ] as const) {
       const content = (await readText(tx, p)).trim();
       if (!content) throw new CoreError(`Empty ${role}: ${tx.displayPath(p)}`);
@@ -338,21 +403,22 @@ export async function compilePacket(
         throw new CoreError(
           `${role} exceeds its 如文5.0 ceiling (${chars(content)} > ${maximum})`,
         );
-      sections.push([title, content]);
-      await addSource(role, p);
+      await addSection(role, p, title, content, { resource });
     }
-    for (const [role, p] of optional) {
+    for (const [role, p, resource] of optional) {
       const content = (await readText(tx, p)).trim();
       if (!content) throw new CoreError(`Empty ${role}: ${tx.displayPath(p)}`);
       if (chars(content) > 900)
         throw new CoreError(
           `${role} exceeds its 如文5.0 ceiling (${chars(content)} > 900)`,
         );
-      sections.push([
+      await addSection(
+        role,
+        p,
         role === "relationship_lens" ? "必要关系镜头" : "当前表现能力",
         content,
-      ]);
-      await addSource(role, p);
+        { resource },
+      );
     }
     const body = [
       "# 如文·小说作者资料包",
@@ -364,12 +430,13 @@ export async function compilePacket(
       "只在这个有限处境中写一个被人物实际经历的章节。保留明确事件与锁定顺序，但不要把情境句当作逐项覆盖清单；不要浏览项目记忆。",
       "",
     ];
-    for (const [title, content] of sections)
+    for (const { title, content } of sections)
       body.push(`# ${title}`, "", content, "");
     const rendered = `${body.join("\n").trimEnd()}\n`;
-    if (chars(rendered) > maximum)
+    const packetChars = chars(rendered);
+    if (packetChars > maximum)
       throw new CoreError(
-        `packet exceeds maximum context (${chars(rendered)} > ${maximum}); remove inactive or duplicated input`,
+        `packet exceeds maximum context (${packetChars} > ${maximum}); remove inactive or duplicated input`,
       );
     if (!text(manifest.output)) throw new CoreError("output must be text");
     const output = tx.path(manifest.output);
@@ -393,7 +460,17 @@ export async function compilePacket(
     state.active_packet = { ...(await ref(tx, output)), meta: metaPath };
     state.stale = { projection: false, packet: false };
     await saveState(tx, state);
-    return { output, warnings };
+    return {
+      output,
+      warnings,
+      message: rendered,
+      manifest: {
+        sha256: createHash("sha256").update(rendered).digest("hex"),
+        seen: sections.map(({ item }) => item),
+        packetChars,
+        packetBudget: maximum,
+      },
+    };
   });
 }
 export async function checkPacket(

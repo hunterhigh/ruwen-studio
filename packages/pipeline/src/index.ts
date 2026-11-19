@@ -33,6 +33,7 @@ import {
   commitMemoryPreview,
   createMemoryPreview,
   type EditorialEdit,
+  type PacketInputManifest,
   type ProjectFS,
   packet,
   publicRoleResult,
@@ -118,7 +119,11 @@ export interface PipelineContext extends Omit<RoleContext, "fs"> {
     ctx: RoleContext,
     run: ChapterRun,
   ) => Promise<RoleResult>;
-  onCheckpoint?: (fs: ProjectFS, run: ChapterRun) => Promise<void>;
+  onCheckpoint?: (
+    fs: ProjectFS,
+    run: ChapterRun,
+    authorPacketManifest?: PacketInputManifest,
+  ) => Promise<void>;
 }
 export interface UserApproval {
   confirmed: true;
@@ -214,6 +219,7 @@ async function checkpoint(
   run: ChapterRun,
   status: RunStatus,
   ctx: PipelineContext,
+  authorPacketManifest?: PacketInputManifest,
 ): Promise<void> {
   ensureLive(ctx.signal);
   if (run.status === status) return;
@@ -238,7 +244,7 @@ async function checkpoint(
     await fs.transaction(async (tx) => {
       await syncProblemStatus(tx, run, ctx);
       await write(tx, runPath(run.id), run);
-      await ctx.onCheckpoint?.(tx, run);
+      await ctx.onCheckpoint?.(tx, run, authorPacketManifest);
     });
   else await write(fs, runPath(run.id), run);
   ctx.onProgress?.(structuredClone(run));
@@ -440,6 +446,7 @@ export async function startChapter(
     if (run.status === "REQUESTED" && (await fs.exists(run.target)))
       run.targetBeforeSha256 = await fs.sha256(run.target);
     await checkpoint(fs, run, "READINESS_OK", ctx);
+    let authorPacketManifest: PacketInputManifest | undefined;
     if (!run.packetSha256) {
       await ensureExactTextChapter(fs, manifest, run.chapter);
       const compiled = await packet.compilePacket(fs, manifest);
@@ -447,6 +454,7 @@ export async function startChapter(
       run.paths.packet = `${runDirectory(id)}/packet.md`;
       await fs.write(run.paths.packet, await fs.read(compiled.output));
       run.packetSha256 = await fs.sha256(run.paths.packet);
+      authorPacketManifest = compiled.manifest;
     } else if (
       !run.paths.packet ||
       !run.paths.source_packet ||
@@ -479,26 +487,25 @@ export async function startChapter(
       locked_order: lockedOrder,
     });
     run.paths.promises = promisesPath;
-    await checkpoint(fs, run, "PACKET_COMPILED", ctx);
+    await checkpoint(fs, run, "PACKET_COMPILED", ctx, authorPacketManifest);
     const author = await call(
       fs,
       run,
       CHAPTER_ROLES.author,
       { packet: await text(fs, String(run.paths.packet)) },
-      ctx,
+      { ...ctx, authorPacketManifest },
     );
     if (typeof author.output !== "string")
       throw new Error("Author did not return prose");
     run.paths.author = `authoring-ruwen-v5/candidates/${id}-author.md`;
     await fs.write(run.paths.author, author.output);
     await checkpoint(fs, run, "AUTHOR_DONE", ctx);
-    const previousTail =
+    const previousProse =
       object(current.last_approved_prose) &&
       typeof current.last_approved_prose.path === "string"
-        ? Array.from(await text(fs, current.last_approved_prose.path))
-            .slice(-600)
-            .join("")
+        ? await text(fs, current.last_approved_prose.path)
         : "";
+    const previousCharacters = Array.from(previousProse);
     const reading = await call(
       fs,
       run,
@@ -506,9 +513,9 @@ export async function startChapter(
       {
         prose: author.output,
         chapter: run.chapter,
-        previous_tail: previousTail,
+        previous_tail: previousCharacters.slice(-600).join(""),
       },
-      ctx,
+      { ...ctx, previousTailTruncated: previousCharacters.length > 600 },
     );
     await checkpoint(fs, run, "READER_DONE", ctx);
     run.paths.original = `authoring-ruwen-v5/candidates/${id}-original.md`;

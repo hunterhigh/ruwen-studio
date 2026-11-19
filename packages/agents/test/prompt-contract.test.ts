@@ -99,7 +99,7 @@ it.each([
   "qinggan-duzhe",
 ] as RoleId[])("%s excludes SKILL, references and shared contract source from system and input", async (id) => {
   const prompt = (await assemblePrompt(ROLES[id])).content;
-  const input = ROLES[id].buildUserMessage({
+  const { message: input } = ROLES[id].buildUserMessage({
     packet: "当前作者资料包",
     prose: "当前正文",
     chapter: "001",
@@ -199,7 +199,7 @@ it.each(
   const fields = Object.fromEntries(
     [...allowed, ...denied].map((field) => [field, `SENTINEL_${field}`]),
   );
-  const message = ROLES[id].buildUserMessage(fields);
+  const { message } = ROLES[id].buildUserMessage(fields);
   for (const field of allowed) expect(message).toContain(`SENTINEL_${field}`);
   for (const field of denied)
     expect(message).not.toContain(`SENTINEL_${field}`);

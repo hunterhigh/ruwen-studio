@@ -153,6 +153,7 @@ export const roleRuns = pgTable(
     roleId: text("role_id").notNull(),
     status: text("status").notNull(),
     inputSha256: text("input_sha256").notNull(),
+    inputManifest: jsonb("input_manifest"),
     model: text("model"),
     promptSha256: text("prompt_sha256").references(() => prompts.sha256),
     result: jsonb("result"),

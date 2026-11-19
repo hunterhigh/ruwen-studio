@@ -30,6 +30,7 @@ import {
   candidateProblems,
   checks,
   handoff,
+  type PacketInputManifest,
   type ProjectFS,
   publicRoleResult,
   publicTranscript,
@@ -64,6 +65,7 @@ import { runtimeSettings } from "../../../config/settings.ts";
 import type { IdeationSessionOptions } from "../../../packages/pipeline/src/ideation/sessions.ts";
 import { IdeationRunner } from "./ideation-runner.ts";
 import { createIdeationService } from "./ideation-service.ts";
+import { persistInputManifest } from "./input-manifest.ts";
 import { persistPrivatePrompt } from "./private-prompts.ts";
 import { recordRoleSecurityEvents } from "./security-events.ts";
 import { streamSink } from "./stream-events.ts";
@@ -448,7 +450,11 @@ export class WorkerService {
       onCheckpoint: (tx, next) => this.checkpoint(tx, next),
     });
   }
-  private async checkpoint(fs: ProjectFS, run: ChapterRun) {
+  private async checkpoint(
+    fs: ProjectFS,
+    run: ChapterRun,
+    authorPacketManifest?: PacketInputManifest,
+  ) {
     if (!(fs instanceof PostgresFS))
       throw new Error("Durable checkpoint requires PostgresFS");
     const row = await fs.sql<{ cancel_requested: boolean }>(
@@ -473,7 +479,13 @@ export class WorkerService {
         [
           run.id,
           event.status,
-          JSON.stringify({ path: runPath(run.id), roles: run.roles }),
+          JSON.stringify({
+            path: runPath(run.id),
+            roles: run.roles,
+            ...(event.status === "PACKET_COMPILED" && authorPacketManifest
+              ? { authorPacketManifest }
+              : {}),
+          }),
           event.time,
         ],
       );
@@ -495,6 +507,7 @@ export class WorkerService {
   ): Promise<RoleResult> {
     assertInputLimits(input);
     const hash = inputDigest(input);
+    let authorPacketManifest = ctx.authorPacketManifest;
     const cached = await fs.transaction(async (tx) => {
       const row = await tx.sql<{
         status: string;
@@ -526,6 +539,13 @@ export class WorkerService {
         );
       }
       await assertRunEnabled(projectSql(tx), fs.ownerId, run.id);
+      if (id === CHAPTER_ROLES.author && !authorPacketManifest) {
+        const packet = await tx.sql<{ manifest: PacketInputManifest | null }>(
+          "SELECT s.output_ref->'authorPacketManifest' AS manifest FROM pipeline_steps s JOIN pipeline_runs p ON p.id=s.run_id WHERE s.run_id=$1 AND p.project_id=$2 AND s.step='PACKET_COMPILED'",
+          [run.id, fs.projectId],
+        );
+        authorPacketManifest = packet.rows[0]?.manifest ?? undefined;
+      }
       const prompt = await assemblePrompt(ROLES[id], ctx.upstreamRoot);
       await tx.sql(
         "INSERT INTO prompts(sha256,content) VALUES($1,$2) ON CONFLICT DO NOTHING",
@@ -554,6 +574,9 @@ export class WorkerService {
     try {
       result = await runRole(id, input, {
         ...ctx,
+        authorPacketManifest,
+        onInputManifest: (manifest) =>
+          persistInputManifest(fs, run.id, id, manifest),
         onRequest: (request, role) => {
           requested = true;
           ctx.onRequest?.(request, role);
@@ -784,7 +807,7 @@ export class WorkerService {
           : { timeoutMs: this.scheduling.roleTimeoutMs }),
         executeRole: (id, input, ctx, run) =>
           this.cachedRole(fs, run, id, input, ctx),
-        onCheckpoint: (tx, run) => this.checkpoint(tx, run),
+        onCheckpoint: (tx, run, manifest) => this.checkpoint(tx, run, manifest),
       };
       if (task.kind === "dispatch") {
         await this.dispatch(fs, task.runId, stored.request, ctx, stored.status);

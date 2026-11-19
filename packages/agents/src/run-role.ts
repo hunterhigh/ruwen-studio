@@ -9,9 +9,12 @@ import {
   checks,
   type EditorialEdit,
   handoff,
+  type InputManifest,
+  registry,
   type SectionEdit,
   state,
 } from "@ruwen/core";
+import { toolInput } from "./input-manifest.ts";
 import {
   editingPolicy,
   ROLE_OUTPUT_ATTEMPTS,
@@ -321,12 +324,32 @@ export async function runRole(
   const submitName =
     spec.output.kind === "tool" ? spec.output.toolName : undefined;
   const input = await prepareInput(id, rawInput, ctx);
-  const user = spec.buildUserMessage(input);
+  const registryData = await registry
+    .readRegistry(ctx.fs)
+    .catch(() => undefined);
+  const resourceTitles = new Map<string, string>();
+  for (const resource of registryData?.resources ?? []) {
+    if (typeof resource?.id === "string" && typeof resource.title === "string")
+      resourceTitles.set(resource.id, resource.title);
+  }
+  const manifestContext = {
+    packet: ctx.authorPacketManifest,
+    previousTailTruncated: ctx.previousTailTruncated,
+    resourceTitles,
+  };
+  const initial = spec.buildUserMessage(input, manifestContext);
+  let prepared = initial;
+  let inputManifest: InputManifest | undefined;
+  let recordedManifest = "";
+  const seenToolCalls = new Map<
+    string,
+    NonNullable<ReturnType<typeof toolInput>>
+  >();
   const prompt = await assemblePrompt(spec, ctx.upstreamRoot);
   await ctx.onPrompt?.(prompt);
   const security = new RoleSecurity(
     prompt.content,
-    user,
+    initial.message,
     spec.output.kind === "tool" && id !== "chuangyi-xietiaoyuan",
     await publicTemplateMaterials(ctx.upstreamRoot),
     (text) => ctx.onDelta?.(text, id),
@@ -447,38 +470,63 @@ export async function runRole(
       });
     },
     getApiKey: (provider) => ctx.runtime.apiKey?.(provider),
-    ...(ctx.loadCoordinatorInput || ctx.beforeProviderRequest
-      ? {
-          prepareRequest: async ({ context }) => {
-            await ctx.beforeProviderRequest?.();
-            if (!ctx.loadCoordinatorInput) return undefined;
-            if (id !== "chuangyi-xietiaoyuan")
-              throw new RoleOutputError(
-                "Conversation reload is coordinator-only",
-              );
-            const fresh = await ctx.loadCoordinatorInput?.();
-            if (!fresh)
-              throw new RoleOutputError("Coordinator context is unavailable");
-            assertInputLimits(fresh);
-            const current = await prepareInput(id, fresh, ctx);
-            Object.assign(input, current);
-            security.detector.addMaterial(current);
-            const first = context.messages.findIndex(
-              (message) => message.role === "user",
-            );
-            return {
-              context: {
-                ...context,
-                messages: context.messages.map((message, index) =>
-                  index === first && message.role === "user"
-                    ? { ...message, content: spec.buildUserMessage(current) }
-                    : message,
-                ),
-              },
-            };
-          },
+    prepareRequest: async ({ context }) => {
+      await ctx.beforeProviderRequest?.();
+      let request = context;
+      if (ctx.loadCoordinatorInput) {
+        if (id !== "chuangyi-xietiaoyuan")
+          throw new RoleOutputError("Conversation reload is coordinator-only");
+        const fresh = await ctx.loadCoordinatorInput();
+        if (!fresh)
+          throw new RoleOutputError("Coordinator context is unavailable");
+        assertInputLimits(fresh);
+        const current = await prepareInput(id, fresh, ctx);
+        Object.assign(input, current);
+        security.detector.addMaterial(current);
+        prepared = spec.buildUserMessage(current, manifestContext);
+        const first = context.messages.findIndex(
+          (message) => message.role === "user",
+        );
+        request = {
+          ...context,
+          messages: context.messages.map((message, index) =>
+            index === first && message.role === "user"
+              ? { ...message, content: prepared.message }
+              : message,
+          ),
+        };
+      }
+      for (const message of request.messages) {
+        if (
+          message.role !== "toolResult" ||
+          seenToolCalls.has(message.toolCallId)
+        )
+          continue;
+        const material = toolInput(message, resourceTitles);
+        if (material) seenToolCalls.set(message.toolCallId, material);
+      }
+      const tools = [...seenToolCalls.values()];
+      const next: InputManifest = {
+        ...prepared.manifest,
+        seen: [...prepared.manifest.seen, ...tools.map(({ seen }) => seen)],
+        rules: prompt.rules,
+        totals: {
+          ...prepared.manifest.totals,
+          inputChars:
+            prepared.manifest.totals.inputChars +
+            tools.reduce((sum, entry) => sum + entry.chars, 0),
+        },
+      };
+      if (ctx.onInputManifest) {
+        const serialized = JSON.stringify(next);
+        if (serialized !== recordedManifest) {
+          await ctx.onInputManifest(next);
+          recordedManifest = serialized;
         }
-      : {}),
+      }
+      inputManifest = next;
+      return request === context ? undefined : { context: request };
+    },
     beforeToolCall: async ({ toolCall, assistantMessage }, signal) => {
       security.observe(assistantMessage);
       if (security.failure || security.streamFailure)
@@ -607,6 +655,7 @@ export async function runRole(
   const snapshot = (): RoleResult => {
     security.finalizeFailure();
     return {
+      ...(inputManifest ? { inputManifest } : {}),
       usageUnknown: inFlight && generated,
       runtimeMode: ctx.runtime.mode,
       output: output ?? "",
@@ -664,7 +713,7 @@ export async function runRole(
         // Already published text remains scanner context so reset cannot bypass security.
         security.retry(resetReason === "prompt_overlap_correction");
       }
-      const nextPrompt = prompted ? correction : user;
+      const nextPrompt = prompted ? correction : initial.message;
       prompted = true;
       await Promise.race([runtime.prompt(nextPrompt), aborted]);
       const message = [...runtime.state.messages]

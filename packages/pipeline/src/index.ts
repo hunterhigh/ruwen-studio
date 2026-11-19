@@ -1,5 +1,28 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
+  type CandidateVersion,
+  candidateText,
+  describeCandidateVersions,
+  pendingReverification,
+  type Reverification,
+  type ReverificationStatus,
+  requireCandidateVersion,
+} from "./candidate-revisions.ts";
+
+export type {
+  Reverification,
+  ReverificationStatus,
+} from "./candidate-revisions.ts";
+export {
+  CandidateRevisionError,
+  describeCandidateVersions,
+  pendingReverification,
+  readCandidateRevision,
+  requireCandidateVersion,
+  saveCandidateRevision,
+} from "./candidate-revisions.ts";
+
+import {
   clearChapterExactText,
   ensureExactTextChapter,
 } from "./ideation/exact-text.ts";
@@ -28,6 +51,7 @@ import {
   applyEditorialEdits,
   applySectionEdits,
   approval,
+  assertMaterialText,
   candidateProblems,
   checks,
   commitMemoryPreview,
@@ -85,6 +109,12 @@ export interface ChapterRun {
   costTotal: number;
   events: { status: RunStatus; time: string }[];
   candidateSha256?: string;
+  candidateVersion?: number | undefined;
+  candidateVersions?: CandidateVersion[];
+  verificationBasisSha256?: string | undefined;
+  reverification?: Reverification;
+  verificationRunId?: string;
+  verificationReportPaths?: Record<string, string>;
   packetSha256?: string;
   memoryPreviewSha256?: string;
   targetBeforeSha256?: string;
@@ -240,6 +270,8 @@ async function checkpoint(
   )
     return;
   move(run, status);
+  if (status === "AWAITING_CANDIDATE_APPROVAL")
+    Object.assign(run, await describeCandidateVersions(fs, run));
   if (ctx.onCheckpoint || run.literaryProblemsRecorded)
     await fs.transaction(async (tx) => {
       await syncProblemStatus(tx, run, ctx);
@@ -497,6 +529,7 @@ export async function startChapter(
     );
     if (typeof author.output !== "string")
       throw new Error("Author did not return prose");
+    assertMaterialText(author.output);
     run.paths.author = `authoring-ruwen-v5/candidates/${id}-author.md`;
     await fs.write(run.paths.author, author.output);
     await checkpoint(fs, run, "AUTHOR_DONE", ctx);
@@ -559,10 +592,7 @@ export async function startChapter(
       editingPolicy(),
     );
     const prose = applied.text;
-    if (checks.candidateProseErrors(prose).length)
-      throw new Error(
-        "Edited prose contains governance or compliance language",
-      );
+    candidateText(prose);
     run.paths.candidate = `authoring-ruwen-v5/candidates/${id}-candidate.md`;
     await fs.write(run.paths.candidate, prose);
     const changes = applied.changes;
@@ -669,6 +699,8 @@ export async function approveCandidate(
       run = await ownedRun(tx, id, ctx);
       if (run.status !== "AWAITING_CANDIDATE_APPROVAL")
         throw new Error("Candidate was already processed");
+      if (pendingReverification(run))
+        throw new Error("Candidate verification is still pending");
       ensureLive(signal);
       const current = await state.loadState(tx);
       const currentPacket = current.active_packet;
@@ -732,6 +764,105 @@ export async function approveCandidate(
   } finally {
     if (active.get(key)?.control === control) active.delete(key);
   }
+}
+
+type VerificationRole =
+  | typeof CHAPTER_ROLES.plot
+  | typeof CHAPTER_ROLES.reality;
+export type VerificationResult = { role: VerificationRole; result: RoleResult };
+
+export function matchesReverification(
+  run: ChapterRun,
+  request: Reverification,
+) {
+  return (
+    run.status === "AWAITING_CANDIDATE_APPROVAL" &&
+    pendingReverification(run) &&
+    run.reverification?.id === request.id &&
+    run.reverification.sha256 === request.sha256 &&
+    run.reverification.version === request.version
+  );
+}
+
+export async function verifyCandidateVersion(
+  fs: ProjectFS,
+  runId: string,
+  request: Reverification,
+  context: PipelineContext,
+): Promise<VerificationResult[]> {
+  const { run, prose, promises } = await fs.transaction(async (tx) => {
+    const run = await ownedRun(tx, runId, context);
+    const { current } = await requireCandidateVersion(tx, run, request.sha256);
+    return {
+      run,
+      prose: await text(tx, current.path),
+      promises: await parse(tx, String(run.paths.promises)),
+    };
+  });
+  const ctx = { ...context, fs };
+  const results: VerificationResult[] = [];
+  const verify = async (role: VerificationRole, input: Data) => {
+    ensureLive(ctx.signal);
+    const result = ctx.executeRole
+      ? await ctx.executeRole(role, input, ctx, run)
+      : await runRole(role, input, ctx);
+    results.push({ role, result });
+  };
+  await verify(CHAPTER_ROLES.plot, {
+    prose,
+    locked_events: promises.locked_events ?? [],
+    locked_order: promises.locked_order ?? [],
+  });
+  try {
+    const hardRules = await readAuthorizedResource(
+      ctx,
+      CHAPTER_ROLES.reality,
+      "xiaoyan-yingsheding",
+    );
+    await verify(CHAPTER_ROLES.reality, { prose, hard_rules: [hardRules] });
+  } catch (error) {
+    // A definite plot failure remains actionable if the second request is interrupted.
+    if (!verificationFailure(results)) throw error;
+  }
+  return results;
+}
+
+export const verificationFailure = (results: VerificationResult[]) =>
+  results
+    .map(({ result }) => asData(result.output))
+    .find(({ pass }) => pass === false);
+
+/** Called in the same project transaction that finishes the billed child run. */
+export async function completeCandidateVerification(
+  tx: ProjectFS,
+  run: ChapterRun,
+  request: Reverification,
+  status: Exclude<ReverificationStatus, "pending">,
+  results: VerificationResult[],
+  context: PipelineContext,
+) {
+  if (run.reverification?.id !== request.id) return;
+  run.reverification = { ...request, status };
+  if (status === "passed" || status === "returned") {
+    run.verificationBasisSha256 = request.sha256;
+    run.verificationRunId = request.id;
+    run.verificationReportPaths = {};
+    for (const { role, result } of results) {
+      const path = `${runDirectory(run.id)}/reverify-${request.id}-${role}.json`;
+      await write(tx, path, publicRoleResult(result));
+      run.verificationReportPaths[role] = path;
+    }
+  }
+  if (status === "returned") {
+    run.returnedTo = "zhangjie-qingjing-bianyiyuan";
+    run.returnReason = JSON.stringify(
+      verificationFailure(results)?.issues ?? [],
+    );
+    move(run, "RETURNED");
+    await syncProblemStatus(tx, run, context);
+  }
+  await write(tx, runPath(run.id), run);
+  await context.onCheckpoint?.(tx, run);
 }
 export async function generateMemoryPreview(
   fs: ProjectFS,

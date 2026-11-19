@@ -145,7 +145,9 @@ export async function quoteRun(
   tx: Sql,
   userId: string,
   bank: Bank,
-  kind: "chapter" | "ideation" | "memory",
+  kind: keyof ReturnType<
+    typeof runtimeSettings
+  >["billing"]["defaultReservations"],
 ): Promise<RunQuote> {
   const account = await lockAccount(tx, userId);
   if (account.frozen_at)

@@ -17,13 +17,20 @@ import {
   initProject,
   LocalDirFS,
   registry,
+  securityLimits,
   state,
 } from "@ruwen/core";
 import type {
   IdeationErrorCode,
   IdeationServiceV1_2 as IdeationService,
 } from "@ruwen/pipeline";
-import { type ChapterRun, loadRun, runPath } from "@ruwen/pipeline";
+import {
+  CandidateRevisionError,
+  type ChapterRun,
+  describeCandidateVersions,
+  loadRun,
+  runPath,
+} from "@ruwen/pipeline";
 import { releasePolicy, runtimeSettings } from "../../../../config/settings.ts";
 import {
   type AdminAction,
@@ -51,6 +58,7 @@ import {
   loginLimit,
   MAILBOX_COOKIE,
   readCookie,
+  requestLimit,
   requireCsrf,
 } from "./security.ts";
 import type { WebServices } from "./services.ts";
@@ -128,6 +136,25 @@ export const API_ROUTES: readonly RouteDefinition[] = [
     pattern: "/api/runs/:runId/events",
     resource: "runId",
     foreignCase: "foreign SSE subscription",
+  },
+  {
+    method: "POST",
+    pattern: "/api/runs/:runId/candidate/revisions",
+    resource: "runId",
+    foreignCase: "foreign candidate revision save",
+  },
+  {
+    method: "GET",
+    pattern: "/api/runs/:runId/candidate/revisions/:version",
+    resource: "runId",
+    resourceParams: ["runId", "version"],
+    foreignCase: "foreign candidate revision read",
+  },
+  {
+    method: "POST",
+    pattern: "/api/runs/:runId/reverify",
+    resource: "runId",
+    foreignCase: "foreign candidate reverification",
   },
   {
     method: "POST",
@@ -249,11 +276,14 @@ async function limitedBody(request: Request, limit: number) {
   }
   return value;
 }
-async function body(request: Request): Promise<Record<string, unknown>> {
+async function body(
+  request: Request,
+  limit = 65536,
+): Promise<Record<string, unknown>> {
   try {
     const value: unknown = JSON.parse(
       new TextDecoder("utf-8", { fatal: true }).decode(
-        await limitedBody(request, 65536),
+        await limitedBody(request, limit),
       ),
     );
     if (!value || typeof value !== "object" || Array.isArray(value))
@@ -329,11 +359,13 @@ export async function runDetail(
     Record<string, Omit<RoleResult, "systemPrompt" | "transcript">>
   > = {};
   for (const role of ROLE_IDS) {
-    const ref = run.roles[role];
-    if (ref?.path && (await owned.fs.exists(ref.path))) {
-      const result = JSON.parse(
-        await owned.fs.readText(ref.path),
-      ) as RoleResult;
+    const path =
+      run.verificationReportPaths &&
+      (role === "qingjie-heyanyuan" || role === "xianshi-heyanyuan")
+        ? run.verificationReportPaths[role]
+        : run.roles[role]?.path;
+    if (path && (await owned.fs.exists(path))) {
+      const result = JSON.parse(await owned.fs.readText(path)) as RoleResult;
       reports[role] = {
         output: result.output,
         usage: result.usage,
@@ -359,8 +391,16 @@ export async function runDetail(
     finished_at: Date | null;
     inputManifest: InputManifest | null;
   }>(
-    'SELECT role_id,status,model,usage,cost_usd,usage_unknown,started_at,finished_at,input_manifest AS "inputManifest" FROM role_runs WHERE run_id=$1 ORDER BY started_at',
-    [id],
+    `SELECT * FROM (
+      SELECT DISTINCT ON (r.role_id) r.role_id,r.status,r.model,r.usage,r.cost_usd,
+        r.usage_unknown,r.started_at,r.finished_at,r.input_manifest AS "inputManifest"
+      FROM role_runs r JOIN pipeline_runs p ON p.id=r.run_id
+      WHERE (r.run_id=$1 AND ($2::uuid IS NULL OR r.role_id NOT IN ('qingjie-heyanyuan','xianshi-heyanyuan')))
+        OR (r.run_id=$2 AND p.project_id=$3 AND p.kind='chapter_reverify'
+        AND p.request->>'parentId'=$1::text AND r.status='completed')
+      ORDER BY r.role_id,(r.run_id=$1)
+    ) selected ORDER BY started_at`,
+    [id, run.verificationRunId ?? null, owned.project.id],
   );
   const memoryPreview = await artifact(run.paths.memory_preview);
   const memoryFiles: { path: string; before: string; after: string }[] = [];
@@ -395,9 +435,21 @@ export async function runDetail(
       });
     }
   }
+  const versions =
+    stored.kind === "chapter_run" && run.paths.candidate
+      ? await describeCandidateVersions(owned.fs, run)
+      : undefined;
   return {
     project: owned.project,
-    run,
+    run: versions
+      ? {
+          ...run,
+          ...versions,
+          candidateVersions: versions.candidateVersions.map(
+            ({ path: _path, ...version }) => version,
+          ),
+        }
+      : run,
     reports,
     roles: roleRows.rows,
     prose: await artifact(run.paths.candidate ?? run.paths.author),
@@ -679,7 +731,10 @@ export async function handleApi(
         { reservationId: params.reservationId ?? "" },
         services.adminEmails,
       );
-    if (request.method !== "GET")
+    if (
+      request.method !== "GET" ||
+      route.pattern.endsWith("/revisions/:version")
+    )
       requireCsrf(request, services.environment.baseURL);
     if (adminAction && !isAdmin(services, user.email)) {
       throw new HttpError(404, "资源不存在。");
@@ -837,7 +892,7 @@ export async function handleApi(
         return json(
           (
             await db.pool.query(
-              "SELECT id,chapter,kind,status,created_at FROM pipeline_runs WHERE project_id=$1 ORDER BY created_at DESC",
+              "SELECT id,chapter,kind,status,created_at FROM pipeline_runs WHERE project_id=$1 AND kind<>'chapter_reverify' ORDER BY created_at DESC",
               [owned.project.id],
             )
           ).rows,
@@ -870,6 +925,85 @@ export async function handleApi(
       const id = params.runId ?? "";
       if (route.pattern.endsWith("/events"))
         return events(request, services, user.id, id);
+      if (route.pattern.endsWith("/revisions/:version")) {
+        await requestLimit(
+          db,
+          `candidate-read:${user.id}`,
+          services.environment.secret,
+          120,
+          60,
+          "版本读取过于频繁，请稍后再试。",
+        );
+        if (!/^[1-9]\d{0,8}$/.test(params.version ?? ""))
+          throw new HttpError(404, "候选版本不存在。");
+        return json({
+          text: await services.worker.candidateRevision(
+            owned.fs,
+            id,
+            Number(params.version),
+          ),
+        });
+      }
+      if (route.pattern.endsWith("/candidate/revisions")) {
+        await requestLimit(
+          db,
+          `candidate-save:${user.id}`,
+          services.environment.secret,
+          60,
+          60,
+          "保存过于频繁，请稍后再试。",
+        );
+        const data = await body(
+          request,
+          Math.min(
+            16 * 1024 * 1024,
+            securityLimits().materialChars * 12 + 1024,
+          ),
+        );
+        if (
+          Object.keys(data).length !== 2 ||
+          typeof data.baseSha256 !== "string" ||
+          !/^[a-f0-9]{64}$/.test(data.baseSha256) ||
+          typeof data.text !== "string"
+        )
+          throw new HttpError(400, "请提供候选稿哈希和正文。");
+        return json(
+          await services.worker.reviseCandidate(
+            owned.fs,
+            id,
+            data.baseSha256,
+            data.text,
+          ),
+          201,
+        );
+      }
+      if (route.pattern.endsWith("/reverify")) {
+        await requestLimit(
+          db,
+          `candidate-reverify:${user.id}`,
+          services.environment.secret,
+          10,
+          60,
+          "核验请求过于频繁，请稍后再试。",
+        );
+        const data = await body(request);
+        if (
+          Object.keys(data).length !== 1 ||
+          typeof data.expectedSha256 !== "string" ||
+          !/^[a-f0-9]{64}$/.test(data.expectedSha256)
+        )
+          throw new HttpError(400, "请提供待核验的候选稿哈希。");
+        return json(
+          {
+            id: await services.worker.enqueueReverification(
+              owned.fs,
+              id,
+              data.expectedSha256,
+            ),
+          },
+          202,
+        );
+      }
       if (request.method === "GET")
         return json(await runDetail(services, user.id, id));
       if (route.pattern.endsWith("/cancel")) {
@@ -1068,6 +1202,8 @@ export async function handleApi(
           : undefined;
       return ideationFailureResponse(code ?? "INTERNAL_ERROR");
     }
+    if (error instanceof CandidateRevisionError)
+      return json({ error: error.message }, error.status);
     if (error instanceof BillingError)
       return json(
         {

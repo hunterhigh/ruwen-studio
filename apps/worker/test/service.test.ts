@@ -360,7 +360,10 @@ it("queue producers reject a foreign owner and an unconfirmed or stale approval"
       confirmed: true,
       expectedSha256: "f".repeat(64),
     }),
-  ).rejects.toThrow("stale");
+  ).rejects.toMatchObject({
+    status: 409,
+    message: "内容已改变，请重新阅读后批准。",
+  });
 }, 30000);
 it("cancels a queued run without generating a chapter or model cost", async () => {
   const { service, fs } = await fixture();

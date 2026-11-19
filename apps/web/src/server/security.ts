@@ -36,8 +36,10 @@ export function csrfToken(request: Request) {
     : randomBytes(32).toString("hex");
 }
 export function requireCsrf(request: Request, origin: string) {
+  const source = request.headers.get("origin");
   if (
-    request.headers.get("origin") !== new URL(origin).origin ||
+    (source !== new URL(origin).origin &&
+      !(request.method === "GET" && source === null)) ||
     request.headers.get("sec-fetch-site") === "cross-site"
   )
     throw new HttpError(403, "请求来源不被允许，请从工作室页面重试。");
@@ -74,16 +76,32 @@ export async function loginLimit(
       settings.loginEmailLimit,
     ]);
   for (const [key, max] of buckets) {
-    const keyHash = createHmac("sha256", secret).update(key).digest("hex");
-    const row = await db.pool.query<{ attempts: string }>(
-      `INSERT INTO web_rate_limits(key_hash) VALUES($1) ON CONFLICT(key_hash) DO UPDATE SET
+    await requestLimit(
+      db,
+      key,
+      secret,
+      max,
+      settings.loginWindowSeconds,
+      "登录请求过多，请稍后再试。",
+    );
+  }
+}
+export async function requestLimit(
+  db: Database,
+  key: string,
+  secret: string,
+  max: number,
+  windowSeconds: number,
+  message: string,
+) {
+  const keyHash = createHmac("sha256", secret).update(key).digest("hex");
+  const row = await db.pool.query<{ attempts: string }>(
+    `INSERT INTO web_rate_limits(key_hash) VALUES($1) ON CONFLICT(key_hash) DO UPDATE SET
       attempts=CASE WHEN web_rate_limits.window_started_at < now()-($2*interval '1 second') THEN 1 ELSE web_rate_limits.attempts+1 END,
       window_started_at=CASE WHEN web_rate_limits.window_started_at < now()-($2*interval '1 second') THEN now() ELSE web_rate_limits.window_started_at END RETURNING attempts`,
-      [keyHash, settings.loginWindowSeconds],
-    );
-    if (Number(row.rows[0]?.attempts) > max)
-      throw new HttpError(429, "登录请求过多，请稍后再试。");
-  }
+    [keyHash, windowSeconds],
+  );
+  if (Number(row.rows[0]?.attempts) > max) throw new HttpError(429, message);
 }
 export function securityHeaders(
   nonce: string,

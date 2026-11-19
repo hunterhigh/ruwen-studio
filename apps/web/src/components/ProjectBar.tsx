@@ -1,12 +1,12 @@
 "use client";
 import { usePathname } from "next/navigation.js";
 import { frameCopy } from "../copy/zh-CN.ts";
-import { useProjectDecisions } from "./project/useProjectDecisions.ts";
+import { useProjectDecisionContext } from "./project/ProjectDecisions.tsx";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
 
 export function ProjectBar({ id }: { id: string }) {
   const pathname = usePathname();
-  const { project, count, loading } = useProjectDecisions(id);
+  const { project, count, loading } = useProjectDecisionContext();
   const root = `/projects/${encodeURIComponent(id)}`;
   const modes = [
     ["", frameCopy.overview],

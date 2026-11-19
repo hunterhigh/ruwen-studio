@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readCandidate, startChapter } from "./chapter-review.ts";
 import { createDemo, selectMessageRange, signIn } from "./helpers.ts";
 
 test("persisted faux project: conversation → handoff → downstream preview → compilation → chapter → two canonical approval gates", async ({
@@ -64,23 +65,21 @@ test("persisted faux project: conversation → handoff → downstream preview �
   await approve("批准逐字保留");
   await expect(card.getByText("已批准", { exact: true })).toBeVisible();
   await page.goto(`/projects/${projectId}/chapters`);
-  await page.getByLabel("章节号", { exact: true }).fill("1");
-  await page.getByRole("button", { name: "开始写作", exact: true }).click();
+  await startChapter(page);
   await expect(page).toHaveURL(/\?run=[a-f0-9-]+/);
   const runId = new URL(page.url()).searchParams.get("run");
-  await expect(page.getByTestId("run-status")).toHaveText("等待你阅读与批准", {
+  await expect(page.getByTestId("run-status")).toHaveText("等你阅读与批准", {
     timeout: 90000,
   });
-  await page.getByRole("checkbox", { name: /我已阅读/ }).check();
-  await page
-    .getByRole("button", { name: "批准正文，生成记忆预览", exact: true })
-    .click();
-  await expect(page.getByTestId("run-status")).toHaveText("等待批准资料变更");
+  await readCandidate(page);
+  await page.getByRole("button", { name: "批准正文", exact: true }).click();
+  await expect(page.getByTestId("run-status")).toHaveText("等你批准资料变更");
+  await page.getByRole("link", { name: "阅读资料变更", exact: true }).click();
   await page.getByLabel("我已逐项阅读资料变更预览，确认提交").check();
   await page
     .getByRole("button", { name: "批准并提交资料变更", exact: true })
     .click();
-  await expect(page.getByTestId("run-status")).toHaveText("正文与资料已提交");
+  await expect(page.getByTestId("run-status")).toHaveText("已完成");
   const detail = await (await page.request.get(`/api/runs/${runId}`)).json();
   const file = await (
     await page.request.get(

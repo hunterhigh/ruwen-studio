@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readCandidate } from "./chapter-review.ts";
 import { createDemo, signIn } from "./helpers.ts";
 
 test("候选稿保存后核验基准过期，只有新版哈希可批准", async ({ page }) => {
@@ -21,7 +22,8 @@ test("候选稿保存后核验基准过期，只有新版哈希可批准", async
   const before = await detail();
   const original = before.prose as string;
   const oldSha = before.run.candidateSha256 as string;
-  const text = `${original}\n\n他把封信重新塞回胸口。\n`;
+  const addition = "他把封信重新塞回胸口。";
+  const text = `${original}\n\n${addition}\n`;
   const save = await page.request.post(`${url}/candidate/revisions`, {
     headers,
     data: { baseSha256: oldSha, text },
@@ -32,19 +34,36 @@ test("候选稿保存后核验基准过期，只有新版哈希可批准", async
   const after = await detail();
   expect(after.run.verificationBasisSha256).toBe(oldSha);
   expect(after.run.candidateSha256).toBe(saved.sha256);
+  expect(after.prose).toBe(text);
   const read = await page.request.get(
     `${url}/candidate/revisions/${saved.version}`,
     { headers },
   );
   expect(read.status()).toBe(200);
   expect(await read.json()).toEqual({ text });
-  const approve = (expectedSha256: string) =>
-    page.request.post(`${url}/approve-candidate`, {
-      headers,
-      data: { confirmed: true, expectedSha256 },
-    });
-  expect((await approve(oldSha)).status()).toBe(409);
-  expect((await approve(saved.sha256)).status()).toBe(202);
+  const approvalPath = `${url}/approve-candidate`;
+  const stale = await page.request.post(approvalPath, {
+    headers,
+    data: { confirmed: true, expectedSha256: oldSha },
+  });
+  expect(stale.status()).toBe(409);
+
+  await page.goto(`/projects/${project}/chapters?run=${id}`);
+  await expect(page.locator(".chapter-paper")).toContainText(addition);
+  await readCandidate(page);
+  const [approval] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === approvalPath,
+    ),
+    page.getByRole("button", { name: "批准正文", exact: true }).click(),
+  ]);
+  expect(approval.request().postDataJSON()).toEqual({
+    confirmed: true,
+    expectedSha256: saved.sha256,
+  });
+  expect(approval.status()).toBe(202);
   await expect
     .poll(async () => (await detail()).run.status, { timeout: 45000 })
     .toBe("AWAITING_MEMORY_APPROVAL");

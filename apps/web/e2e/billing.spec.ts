@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import { Database } from "@ruwen/db";
 import { previewConfiguration } from "../../../config/preview.ts";
 import { runtimeSettings } from "../../../config/settings.ts";
+import { startChapter } from "./chapter-review.ts";
 import { confirmAction, createDemo, signIn } from "./helpers.ts";
 
 test("sandbox purchase records a real ledger entry once and refreshes segregated balances", async ({
@@ -79,7 +80,7 @@ test("frozen run refuses without a task, and an audited administrator can unfree
         [owner],
       );
     await page.goto(`/projects/${projectId}/chapters`);
-    await page.getByRole("button", { name: "开始写作", exact: true }).click();
+    await startChapter(page);
     await expect(page.getByRole("main").getByRole("alert")).toContainText(
       "等待人工复核",
     );

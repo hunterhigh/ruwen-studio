@@ -3,6 +3,12 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { exportProjectZip, LocalDirFS, type ProjectFS } from "@ruwen/core";
 import { previewConfiguration } from "../../../config/preview.ts";
+import {
+  captureChapter,
+  decisionRefreshAfter,
+  readCandidate,
+  startChapter,
+} from "./chapter-review.ts";
 
 import {
   captureRedesign,
@@ -162,33 +168,70 @@ test("real browser: register, project, paced SSE, two approvals, files/export, o
   await signIn(page);
   const projectId = await createDemo(page, "北岸冬信 · 浏览器试读");
   await page.getByRole("link", { name: "进入章节写作" }).click();
-  await page.getByRole("button", { name: "开始写作", exact: true }).click();
+  await expect(page.getByRole("navigation", { name: "项目导航" })).toHaveCount(
+    1,
+  );
+  await expect(
+    page.getByRole("link", { name: "章节写作", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  await startChapter(page);
   await expect(page).toHaveURL(/\?run=/);
   const runId = new URL(page.url()).searchParams.get("run");
   await expect(page.locator(".prose-paragraph").first()).toBeVisible();
   await expect(page.locator(".manuscript-meta")).toContainText("流式草稿");
-  await expect(page.getByTestId("run-status")).toHaveText("等待你阅读与批准", {
+  await captureChapter(page, "streaming");
+  await expect(page.getByTestId("run-status")).toHaveText("等你阅读与批准", {
     timeout: 60000,
   });
-  await expect(page.locator(".annotation").first()).toBeVisible();
+  await expect(page.locator(".chapter-note").first()).toBeVisible();
+  const decisions = page.locator(".decision-chip .badge-count");
+  await expect(decisions).toHaveText("1");
+  await expect(page.locator(".chapter-edit-decision")).toHaveText(
+    "编辑通读后没有修改正文",
+  );
+  await expect(page.getByRole("button", { name: "查看作者原稿" })).toHaveCount(
+    0,
+  );
   await expect(
-    page.getByRole("button", { name: "批准正文，生成记忆预览", exact: true }),
+    page.getByRole("button", { name: "批准正文", exact: true }),
   ).toBeDisabled();
   await page.screenshot({
     path: testInfo.outputPath("candidate-desktop.png"),
     fullPage: true,
   });
-  await page.getByRole("button", { name: "编辑记录", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "事实修正", exact: true }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "核验结论", exact: true }).click();
-  await expect(page.locator(".verdict")).toHaveCount(2);
-  await page.getByLabel("我已阅读候选稿和核验结果，确认批准正文").check();
-  await page
-    .getByRole("button", { name: "批准正文，生成记忆预览", exact: true })
-    .click();
-  await expect(page.getByTestId("run-status")).toHaveText("等待批准资料变更");
+  await captureChapter(page, "candidate-clean");
+  const approval = page.getByRole("button", { name: "批准正文", exact: true });
+  await page.locator(".chapter-end").evaluate((marker) => {
+    marker.scrollIntoView({ block: "end", behavior: "instant" });
+    window.scrollBy(0, 94);
+  });
+  await expect(page.getByText("读到本章结尾", { exact: true })).toHaveAttribute(
+    "data-read",
+    "true",
+  );
+  await expect(approval).toBeDisabled();
+  await readCandidate(page);
+  const expected = (await (await page.request.get(`/api/runs/${runId}`)).json())
+    .run;
+  const postedApproval = page.waitForRequest(
+    (r) => r.method() === "POST" && r.url().endsWith("/approve-candidate"),
+  );
+  const candidateRefresh = decisionRefreshAfter(page, "approve-candidate");
+  await page.getByRole("button", { name: "批准正文", exact: true }).click();
+  await candidateRefresh;
+  expect((await postedApproval).postDataJSON()).toEqual({
+    confirmed: true,
+    expectedSha256: expected.candidateSha256,
+    ...(expected.targetBeforeSha256
+      ? { expectedTargetSha256: expected.targetBeforeSha256 }
+      : {}),
+  });
+  await expect(page.getByTestId("run-status")).toHaveText("等你批准资料变更");
+  await expect(decisions).toHaveText("1");
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(page.locator(".chapter-stamp")).toBeVisible();
+  await captureChapter(page, "approved-memory-ready");
+  await page.getByRole("link", { name: "阅读资料变更", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "阅读资料变更，再决定是否提交。" }),
   ).toBeVisible();
@@ -196,10 +239,17 @@ test("real browser: register, project, paced SSE, two approvals, files/export, o
     page.getByRole("button", { name: "批准并提交资料变更", exact: true }),
   ).toBeDisabled();
   await page.getByLabel("我已逐项阅读资料变更预览，确认提交").check();
+  const memoryRefresh = decisionRefreshAfter(page, "approve-memory");
   await page
     .getByRole("button", { name: "批准并提交资料变更", exact: true })
     .click();
-  await expect(page.getByTestId("run-status")).toHaveText("正文与资料已提交");
+  await memoryRefresh;
+  await expect(page.getByTestId("run-status")).toHaveText("已完成");
+  await expect(decisions).toHaveCount(0);
+  await page.getByRole("link", { name: "回到正文", exact: true }).click();
+  await expect(page.locator(".chapter-stamp")).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await captureChapter(page, "completed");
   const noCsrf = await page.request.post(`/api/runs/${runId}/cancel`, {
     data: {},
   });
@@ -235,7 +285,7 @@ test("real browser: register, project, paced SSE, two approvals, files/export, o
     ),
   ).toBe(true);
   await page.screenshot({
-    path: testInfo.outputPath("candidate-desktop.png"),
+    path: testInfo.outputPath("candidate-minimum-desktop.png"),
     fullPage: true,
   });
   expect(pageErrors).toEqual([]);
@@ -247,30 +297,48 @@ test("faux failure and manual return remain stopped until the user chooses anoth
   await signIn(page);
   await createDemo(page, "退回与放弃试验");
   await page.getByRole("link", { name: "进入章节写作" }).click();
-  await page.getByLabel("预览场景").selectOption("plot_fail");
-  await page.getByRole("button", { name: "开始写作", exact: true }).click();
-  await expect(page.getByTestId("run-status")).toHaveText(
-    "已退回，等待重新构思",
-    { timeout: 60000 },
-  );
-  await expect(page.getByText("退回原因", { exact: true })).toBeVisible();
-  await page.getByLabel("预览场景").selectOption("normal");
-  await page.getByRole("button", { name: "开始写作", exact: true }).click();
-  await expect(page.getByTestId("run-status")).toHaveText("等待你阅读与批准", {
+  await startChapter(page, "plot_fail");
+  await expect(page.getByTestId("run-status")).toHaveText("已退回", {
     timeout: 60000,
   });
-  await page.getByRole("button", { name: "退回候选稿", exact: true }).click();
+  await expect(page.getByText("退回原因", { exact: true })).toBeVisible();
+  await startChapter(page, "normal");
+  await expect(page.getByTestId("run-status")).toHaveText("等你阅读与批准", {
+    timeout: 60000,
+  });
+  await expect(page.locator(".decision-chip .badge-count")).toHaveText("1");
+  await page.getByRole("button", { name: "退回", exact: true }).click();
   await page.getByLabel("退回原因").fill("想先调整人物选择，再重写这一章。");
-  await page.getByRole("button", { name: "确认退回", exact: true }).click();
-  await expect(page.getByTestId("run-status")).toHaveText(
-    "已退回，等待重新构思",
+  await captureChapter(page, "return-form");
+  const returned = page.waitForRequest(
+    (r) => r.method() === "POST" && r.url().endsWith("/return"),
   );
-  await page.getByRole("button", { name: "开始写作", exact: true }).click();
+  const returnRefresh = decisionRefreshAfter(page, "return");
+  await page.getByRole("button", { name: "确认退回", exact: true }).click();
+  await returnRefresh;
+  expect((await returned).postDataJSON()).toEqual({
+    reason: "想先调整人物选择，再重写这一章。",
+  });
+  await expect(page.getByTestId("run-status")).toHaveText("已退回");
+  await expect(page.locator(".decision-chip")).toHaveCount(0);
+  await startChapter(page);
+  await expect(page.getByTestId("run-status")).toHaveText("等你阅读与批准", {
+    timeout: 60000,
+  });
+  await expect(page.locator(".decision-chip .badge-count")).toHaveText("1");
+  const abandoned = page.waitForRequest(
+    (r) => r.method() === "POST" && r.url().endsWith("/cancel"),
+  );
+  const cancelRefresh = decisionRefreshAfter(page, "cancel");
   await confirmAction(
     page,
     page.getByRole("button", { name: "放弃本次运行", exact: true }),
     "放弃运行",
     "chapter-cancel",
   );
+  expect((await abandoned).postDataJSON()).toEqual({});
+  await cancelRefresh;
   await expect(page.getByTestId("run-status")).toHaveText("已放弃");
+  await expect(page.locator(".decision-chip")).toHaveCount(0);
+  await captureChapter(page, "cancelled");
 });

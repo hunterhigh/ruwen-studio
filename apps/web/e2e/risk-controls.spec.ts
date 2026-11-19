@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
+import { startChapter } from "./chapter-review.ts";
 import { createDemo, signIn } from "./helpers.ts";
 
 test("account daily limit persists, refuses a chapter without accepting a task, resets and fits minimum desktop", async ({
@@ -18,9 +19,9 @@ test("account daily limit persists, refuses a chapter without accepting a task, 
   await page.reload();
   await expect(input).toHaveValue("1000");
   await page.goto(`/projects/${projectId}/chapters`);
-  await page.getByRole("button", { name: "开始写作", exact: true }).click();
-  await expect(page.locator('.error[role="alert"]')).toContainText(
-    "今日点数额度不足",
+  await startChapter(page);
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
+    "点数不足或今日额度已用完",
   );
   await expect(page).not.toHaveURL(/\?run=/);
   const runs = await (

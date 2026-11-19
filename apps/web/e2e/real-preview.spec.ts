@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { Database } from "@ruwen/db";
 import { realPreviewCoordinates } from "../../../config/real-preview.ts";
+import { readCandidate, startChapter } from "./chapter-review.ts";
 
 test.use({ baseURL: realPreviewCoordinates().baseURL });
 let preview: ChildProcess;
@@ -114,20 +115,19 @@ test("human-started preview rehearsal uses a separate persistent sandbox and can
   await approve("批准章节情境");
   await expect(card.getByText("已批准", { exact: true })).toBeVisible();
   await page.goto(`/projects/${project}/chapters`);
-  await page.getByRole("button", { name: "开始写作", exact: true }).click();
+  await startChapter(page);
   await expect(
-    page.getByRole("button", { name: "批准正文，生成记忆预览", exact: true }),
+    page.getByRole("button", { name: "批准正文", exact: true }),
   ).toBeVisible({ timeout: 90000 });
-  await page.getByRole("checkbox", { name: /我已阅读/ }).check();
-  await page
-    .getByRole("button", { name: "批准正文，生成记忆预览", exact: true })
-    .click();
-  await expect(page.getByTestId("run-status")).toHaveText("等待批准资料变更");
+  await readCandidate(page);
+  await page.getByRole("button", { name: "批准正文", exact: true }).click();
+  await expect(page.getByTestId("run-status")).toHaveText("等你批准资料变更");
+  await page.getByRole("link", { name: "阅读资料变更", exact: true }).click();
   await page.getByLabel("我已逐项阅读资料变更预览，确认提交").check();
   await page
     .getByRole("button", { name: "批准并提交资料变更", exact: true })
     .click();
-  await expect(page.getByTestId("run-status")).toHaveText("正文与资料已提交");
+  await expect(page.getByTestId("run-status")).toHaveText("已完成");
   const db = new Database(realPreviewCoordinates().databaseURL);
   try {
     const banks = await db.pool.query(

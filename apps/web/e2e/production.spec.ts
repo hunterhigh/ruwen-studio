@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { previewConfiguration } from "../../../config/preview.ts";
+import { signIn } from "./helpers.ts";
+import { captureFrame } from "./redesign-02.ts";
 
 let server: ChildProcess;
 test.beforeAll(async () => {
@@ -22,6 +24,7 @@ test.beforeAll(async () => {
     REAL_MODEL: "0",
     REAL_CHARGING_ENABLED: "0",
     P3_GATE_PASSED: "0",
+    NEXT_PUBLIC_RUWEN_PREVIEW_BANNER: "0",
   };
   delete env.ANTHROPIC_API_KEY;
   server = spawn(process.execPath, ["apps/web/scripts/server.ts"], {
@@ -111,4 +114,20 @@ test("production build enforces CSP without browser violations and disables prev
   );
   expect(gallery.status()).toBe(404);
   expect(await gallery.text()).not.toContain("设计组件预览");
+});
+
+test("production frame keeps the preview banner disabled and emits no inline styles", async ({
+  page,
+}) => {
+  await signIn(page);
+  const response = await page.goto(
+    `${previewConfiguration().productionUrl}/projects`,
+  );
+  expect(response?.status()).toBe(200);
+  await expect(
+    page.getByRole("heading", { name: "书架", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".preview-banner")).toHaveCount(0);
+  expect(await response?.text()).not.toMatch(/<[^>]+\sstyle=/i);
+  await captureFrame(page, "shelf-production-banner-disabled");
 });

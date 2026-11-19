@@ -45,7 +45,7 @@ test("sandbox purchase records a real ledger entry once and refreshes segregated
     path: testInfo.outputPath("billing-account.png"),
     fullPage: true,
   });
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 1180, height: 900 });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

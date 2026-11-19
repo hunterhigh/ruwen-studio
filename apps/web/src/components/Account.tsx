@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { confirmation } from "../copy/zh-CN.ts";
+import { confirmation, frameCopy } from "../copy/zh-CN.ts";
 import type { billingAccount } from "../server/billing-account.ts";
 import { useConfirm } from "../ui/ConfirmDialog.tsx";
 import { post } from "./client.ts";
@@ -34,8 +34,7 @@ export function Account() {
     <main className="page-content">
       <header className="page-heading">
         <div>
-          <span className="eyebrow">账户 / USAGE</span>
-          <h1>每次写作，都有记录。</h1>
+          <h1>{frameCopy.account}</h1>
           <p>
             <SafeMarkdown
               plain
@@ -61,7 +60,7 @@ export function Account() {
         <p>
           {data?.localRealPreview
             ? "本机 DeepSeek 试用使用赠送的沙箱点数记录用量；API 实际费用由 DeepSeek 预付余额支付，此处不收款。"
-            : "点数、价格及预留均待 P3 实测。沙箱点数只用于模拟或回放，不能支付真实模型运行；真实收费默认关闭。"}
+            : frameCopy.accountSandbox}
         </p>
         <div className="billing-balances">
           {(["live", "sandbox"] as const).map((bank) => (
@@ -97,7 +96,7 @@ export function Account() {
         </div>
       </section>
       <section className="paper-panel" aria-label="每日点数上限">
-        <h2>每日点数上限 · 待 P3 实测</h2>
+        <h2>{frameCopy.dailyLimit}</h2>
         <p>
           按UTC日期重置，正式与沙箱分别计算同一上限。已用点数和未释放预留都计入额度；降低上限不会改写已发生的费用，会阻止后续新调用。
         </p>
@@ -186,7 +185,7 @@ export function Account() {
                   plain
                   content={data.daily[data.bank].defaultLimit}
                 />{" "}
-                点，待 P3 实测。
+                {frameCopy.credits}
               </p>
               <div className="decision-actions">
                 <button
@@ -233,7 +232,6 @@ export function Account() {
                 {plan.credits.toLocaleString("zh-CN")} 沙箱点 · 测试价格 $
                 {(plan.priceMinor / 100).toFixed(2)} USD
               </p>
-              <small>待 P3 实测</small>
               <button
                 type="button"
                 className="button secondary"
@@ -461,11 +459,7 @@ export function Account() {
           </tbody>
         </table>
       </div>
-      <p className="fine-print">
-        faux 与 replay
-        只结算沙箱点数，不代表新增真实模型费用。历史运行不追溯扣点；真实收费保持关闭。待
-        P3 实测。
-      </p>
+      <p className="fine-print">{frameCopy.usageFootnote}</p>
     </main>
   );
 }

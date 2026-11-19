@@ -12,6 +12,11 @@ export default async function StudioLayout({
     <Shell
       user={user}
       admin={services.adminEmails.includes(user.email.toLowerCase())}
+      previewBanner={
+        process.env.NEXT_PUBLIC_RUWEN_PREVIEW_BANNER === "1" ||
+        (process.env.NEXT_PUBLIC_RUWEN_PREVIEW_BANNER === undefined &&
+          process.env.NODE_ENV === "development")
+      }
     >
       {children}
     </Shell>

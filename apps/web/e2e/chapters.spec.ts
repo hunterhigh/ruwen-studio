@@ -153,7 +153,7 @@ test("admin risk UI reports enforced freezes and every dashboard access is audit
     fullPage: true,
   });
 });
-test("real browser: register, project, paced SSE, two approvals, files/export, ownership, CSRF, mobile", async ({
+test("real browser: register, project, paced SSE, two approvals, files/export, ownership, CSRF, minimum desktop", async ({
   page,
   browser,
 }, testInfo) => {
@@ -226,7 +226,7 @@ test("real browser: register, project, paced SSE, two approvals, files/export, o
     expect((await second.request.get(url)).status(), url).toBe(404);
   expect((await second.goto(`/projects/${projectId}`))?.status()).toBe(404);
   await other.close();
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 1180, height: 900 });
   await page.goto(`/projects/${projectId}/chapters?run=${runId}`);
   await expect(page.locator(".manuscript")).toBeVisible();
   expect(
@@ -235,7 +235,7 @@ test("real browser: register, project, paced SSE, two approvals, files/export, o
     ),
   ).toBe(true);
   await page.screenshot({
-    path: testInfo.outputPath("candidate-mobile.png"),
+    path: testInfo.outputPath("candidate-desktop.png"),
     fullPage: true,
   });
   expect(pageErrors).toEqual([]);

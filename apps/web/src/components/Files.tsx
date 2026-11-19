@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
+import { frameCopy } from "../copy/zh-CN.ts";
 import { request } from "./client.ts";
-import { ProjectNav } from "./ProjectHome.tsx";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
 import { useApi } from "./useApi.ts";
 export function Files({ id }: { id: string }) {
@@ -42,12 +42,10 @@ export function Files({ id }: { id: string }) {
     <main className="page-content">
       <header className="page-heading">
         <div>
-          <span className="eyebrow">项目资料 / FILES</span>
-          <h1>故事留下的每一页。</h1>
+          <h1>{frameCopy.files}</h1>
           <p>只读浏览。资料变更通过预览与批准提交。</p>
         </div>
       </header>
-      <ProjectNav id={id} current="/files" />
       {(error || loadError) && (
         <div role="alert" className="error">
           <SafeMarkdown plain content={error || loadError} />

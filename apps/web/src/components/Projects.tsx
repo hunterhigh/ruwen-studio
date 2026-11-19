@@ -1,5 +1,6 @@
 "use client";
 import { type FormEvent, useState } from "react";
+import { frameCopy } from "../copy/zh-CN.ts";
 import { post, request } from "./client.ts";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
 import { useApi } from "./useApi.ts";
@@ -54,8 +55,7 @@ export function Projects() {
     <main className="page-content">
       <header className="page-heading">
         <div>
-          <span className="eyebrow">书架 / PROJECTS</span>
-          <h1>让下一章，有处落笔。</h1>
+          <h1>{frameCopy.shelf}</h1>
           <p>从构思到正文，每份资料与每次确认都留在项目里。</p>
         </div>
         <button

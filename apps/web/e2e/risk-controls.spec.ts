@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { createDemo, signIn } from "./helpers.ts";
 
-test("account daily limit persists, refuses a chapter without accepting a task, resets and fits mobile", async ({
+test("account daily limit persists, refuses a chapter without accepting a task, resets and fits minimum desktop", async ({
   page,
 }) => {
   await signIn(page);
@@ -34,7 +34,7 @@ test("account daily limit persists, refuses a chapter without accepting a task, 
   await expect(page.getByRole("status")).toContainText("已恢复默认每日上限");
   const account = await (await page.request.get("/api/account")).json();
   await expect(input).toHaveValue(account.daily.sandbox.defaultLimit);
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 1180, height: 900 });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

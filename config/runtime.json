@@ -16,7 +16,8 @@
     "defaultReservations": {
       "chapter": 100000,
       "ideation": 25000,
-      "memory": 25000
+      "memory": 25000,
+      "reverify": 25000
     },
     "signupCredits": 250000,
     "plans": [

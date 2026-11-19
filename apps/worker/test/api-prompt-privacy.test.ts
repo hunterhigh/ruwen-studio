@@ -208,6 +208,7 @@ it("every registered HTTP response, file read, export entry and SSE batch exclud
     let url = route.pattern
       .replace(":projectId", fs.projectId)
       .replace(":runId", id)
+      .replace(":version", "1")
       .replace(":checkoutId", checkoutId)
       .replace(":accountId", fs.ownerId)
       .replace(":reservationId", reservationId);

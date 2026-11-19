@@ -186,7 +186,8 @@ it("every private route rejects anonymous requests; owner mutations also need CS
   for (const route of API_ROUTES.filter((r) => !publicRoutes.has(r.pattern))) {
     const url = route.pattern
       .replace(":projectId", ownedProjectId)
-      .replace(":runId", ownedRunId);
+      .replace(":runId", ownedRunId)
+      .replace(":version", "1");
     let ownUrl = url
       .replace(":checkoutId", ownedCheckoutId)
       .replace(":accountId", ownedAccountId)
@@ -208,11 +209,20 @@ it("every private route rejects anonymous requests; owner mutations also need CS
       ).status,
       url,
     ).toBe(401);
-    if (route.resource && route.method === "POST")
+    if (
+      route.resource &&
+      (route.method === "POST" || route.pattern.endsWith("/:version"))
+    )
       expect(
         (
           await handleApi(
-            request(ownUrl, "POST", true, { "x-csrf-token": "" }, {}),
+            request(
+              ownUrl,
+              route.method,
+              true,
+              { "x-csrf-token": "" },
+              route.method === "POST" ? {} : undefined,
+            ),
             services,
           )
         ).status,
@@ -310,6 +320,7 @@ for (const route of API_ROUTES.filter((item) => item.resource)) {
     let url = route.pattern
       .replace(":projectId", projectId)
       .replace(":runId", runId)
+      .replace(":version", "1")
       .replace(":checkoutId", foreignCheckoutId)
       .replace(":accountId", foreignAccountId)
       .replace(":reservationId", foreignReservationId);

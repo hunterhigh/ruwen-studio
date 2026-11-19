@@ -139,6 +139,22 @@ export const pipelineSteps = pgTable(
   },
   (t) => [primaryKey({ columns: [t.runId, t.step] })],
 );
+export const candidateRevisionAudit = pgTable(
+  "candidate_revision_audit",
+  {
+    runId: uuid("run_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    actorId: uuid("actor_id").notNull(),
+    version: integer("version").notNull(),
+    event: text("event").notNull().default("candidate_user_revision"),
+    beforeSha256: text("before_sha256").notNull(),
+    afterSha256: text("after_sha256").notNull(),
+    changedChars: integer("changed_chars").notNull(),
+    op: text("op").notNull(),
+    createdAt: time("created_at"),
+  },
+  (t) => [primaryKey({ columns: [t.runId, t.version] })],
+);
 export const prompts = pgTable("prompts", {
   sha256: text("sha256").primaryKey(),
   content: text("content").notNull(),

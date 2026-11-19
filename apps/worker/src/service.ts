@@ -40,20 +40,32 @@ import { Database, PostgresFS } from "@ruwen/db";
 import {
   approveCandidate,
   approveMemory,
+  CandidateRevisionError,
   CHAPTER_ROLES,
   type ChapterRequest,
   type ChapterRun,
   cancelRun,
+  completeCandidateVerification,
   generateMemoryPreview,
   InterruptedRoleError,
   inputDigest,
   loadRun,
+  matchesReverification,
   normalizeChapter,
   type PipelineContext,
+  pendingReverification,
+  type Reverification,
+  type ReverificationStatus,
+  readCandidateRevision,
+  requireCandidateVersion,
   returnCandidate as returnChapterCandidate,
   runPath,
+  saveCandidateRevision,
   startChapter,
   type UserApproval,
+  type VerificationResult,
+  verificationFailure,
+  verifyCandidateVersion,
 } from "@ruwen/pipeline";
 import { PgBoss } from "pg-boss";
 import {
@@ -78,6 +90,7 @@ type Kind =
   | "candidate"
   | "memory_preview"
   | "memory"
+  | "reverify"
   | "cancel"
   | "ideation"
   | "dispatch";
@@ -89,6 +102,14 @@ export interface Task {
   decision?: UserApproval;
   lockDeferrals?: number;
 }
+const reverificationKind = "chapter_reverify";
+const reverificationStates = {
+  passed: "DONE",
+  returned: "RETURNED",
+  failed: "FAILED",
+  cancelled: "CANCELLED",
+  stale: "STALE",
+} as const;
 export interface WorkerOptions {
   migrations?: "apply" | "verify";
   ideation?: Omit<IdeationSessionOptions, "modelMode" | "queue">;
@@ -312,6 +333,11 @@ export class WorkerService {
       throw new Error("Explicit user approval required");
     return fs.transaction(async (tx) => {
       const run = await loadRun(tx, id);
+      if (kind === "candidate" && pendingReverification(run))
+        throw new CandidateRevisionError(
+          409,
+          "当前版本正在核验，请稍后再批准。",
+        );
       const expected =
         kind === "candidate" ? run.candidateSha256 : run.memoryPreviewSha256;
       const target =
@@ -324,8 +350,14 @@ export class WorkerService {
         !target ||
         expected !== decision.expectedSha256 ||
         (await tx.sha256(target)) !== expected
-      )
+      ) {
+        if (kind === "candidate")
+          throw new CandidateRevisionError(
+            409,
+            "内容已改变，请重新阅读后批准。",
+          );
         throw new Error("Approval is stale or run is not awaiting approval");
+      }
       return this.send(tx, {
         kind,
         projectId: fs.projectId,
@@ -333,6 +365,133 @@ export class WorkerService {
         runId: id,
         decision,
       });
+    });
+  }
+  private async chapterForRevision(fs: PostgresFS, id: string) {
+    const row = await fs.sql<{
+      status: string;
+      cancel_requested: boolean;
+      request: Data;
+    }>(
+      "SELECT status,cancel_requested,request FROM pipeline_runs WHERE id=$1 AND project_id=$2 AND kind='chapter_run'",
+      [id, fs.projectId],
+    );
+    if (!row.rows[0]) throw new CandidateRevisionError(404, "运行不存在。");
+    return row.rows[0];
+  }
+  async reviseCandidate(
+    fs: PostgresFS,
+    id: string,
+    baseSha256: string,
+    text: string,
+  ) {
+    return fs.transaction(async (tx) => {
+      const row = await this.chapterForRevision(tx, id);
+      if (row.status !== "AWAITING_CANDIDATE_APPROVAL" || row.cancel_requested)
+        throw new CandidateRevisionError(
+          409,
+          "当前候选稿不在等待批准，请刷新核对状态。",
+        );
+      return saveCandidateRevision(
+        tx,
+        id,
+        baseSha256,
+        text,
+        "manual",
+        async (nested, revision, before, changedChars) => {
+          if (!(nested instanceof PostgresFS))
+            throw new Error("Durable candidate audit required");
+          await nested.sql(
+            "INSERT INTO candidate_revision_audit(run_id,project_id,actor_id,version,before_sha256,after_sha256,changed_chars,op,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+            [
+              id,
+              tx.projectId,
+              tx.ownerId,
+              revision.version,
+              before,
+              revision.sha256,
+              changedChars,
+              revision.op,
+              revision.createdAt,
+            ],
+          );
+        },
+      );
+    });
+  }
+  async candidateRevision(fs: PostgresFS, id: string, version: number) {
+    return fs.transaction(async (tx) => {
+      await this.chapterForRevision(tx, id);
+      if (!(await tx.exists(runPath(id))))
+        throw new CandidateRevisionError(404, "候选版本不存在。");
+      return readCandidateRevision(tx, await loadRun(tx, id), version);
+    });
+  }
+  async enqueueReverification(
+    fs: PostgresFS,
+    parentId: string,
+    expectedSha256: string,
+  ) {
+    return fs.transaction(async (tx) => {
+      const parent = await this.chapterForRevision(tx, parentId);
+      if (
+        parent.status !== "AWAITING_CANDIDATE_APPROVAL" ||
+        parent.cancel_requested
+      )
+        throw new CandidateRevisionError(
+          409,
+          "当前候选稿不在等待批准，请刷新核对状态。",
+        );
+      const run = await loadRun(tx, parentId);
+      const basis = await requireCandidateVersion(tx, run, expectedSha256);
+      if (pendingReverification(run))
+        throw new CandidateRevisionError(409, "当前版本正在核验，请稍后查看。");
+      const id = randomUUID();
+      const verification: Reverification = {
+        id,
+        version: basis.current.version,
+        sha256: basis.current.sha256,
+        status: "pending",
+      };
+      const quote = await quoteRun(
+        projectSql(tx),
+        tx.ownerId,
+        currentBank(),
+        "reverify",
+      );
+      await tx.sql(
+        "INSERT INTO pipeline_runs(id,project_id,kind,chapter,status,request) VALUES($1,$2,$3,$4,'REQUESTED',$5)",
+        [
+          id,
+          tx.projectId,
+          reverificationKind,
+          run.chapter,
+          JSON.stringify({
+            parentId,
+            version: verification.version,
+            expectedSha256: verification.sha256,
+            ...(typeof parent.request.simulation === "string"
+              ? { simulation: parent.request.simulation }
+              : {}),
+          }),
+        ],
+      );
+      Object.assign(run, {
+        candidateVersions: basis.candidateVersions,
+        candidateVersion: basis.candidateVersion,
+        verificationBasisSha256: basis.verificationBasisSha256,
+        reverification: verification,
+      });
+      await tx.write(runPath(parentId), `${JSON.stringify(run, null, 2)}\n`);
+      await reserveRun(projectSql(tx), id, quote);
+      const queued = await this.send(tx, {
+        kind: "reverify",
+        projectId: tx.projectId,
+        ownerId: tx.ownerId,
+        runId: id,
+      });
+      if (!queued) throw new Error("Reverification queue did not accept task");
+      return id;
     });
   }
   async enqueueDispatch(fs: PostgresFS, value: Data) {
@@ -369,11 +528,17 @@ export class WorkerService {
   }
   async cancel(fs: PostgresFS, id: string) {
     await fs.transaction(async (tx) => {
-      const result = await tx.sql(
-        "UPDATE pipeline_runs SET cancel_requested=true WHERE id=$1 AND project_id=$2 RETURNING id",
+      const result = await tx.sql<{ kind: string }>(
+        "UPDATE pipeline_runs SET cancel_requested=true WHERE id=$1 AND project_id=$2 RETURNING kind",
         [id, fs.projectId],
       );
       if (!result.rowCount) throw new Error("Run does not belong to project");
+      if (result.rows[0]?.kind === reverificationKind) return;
+      if (result.rows[0]?.kind === "chapter_run")
+        await tx.sql(
+          "UPDATE pipeline_runs SET cancel_requested=true WHERE project_id=$1 AND kind=$2 AND request->>'parentId'=$3 AND finished_at IS NULL",
+          [fs.projectId, reverificationKind, id],
+        );
       await this.send(tx, {
         kind: "cancel",
         projectId: fs.projectId,
@@ -500,7 +665,7 @@ export class WorkerService {
   }
   private async cachedRole(
     fs: PostgresFS,
-    run: ChapterRun,
+    runId: string,
     id: RoleId,
     input: Data,
     ctx: Parameters<typeof runRole>[2],
@@ -515,7 +680,7 @@ export class WorkerService {
         result: RoleResult | null;
       }>(
         "SELECT status,input_sha256,result FROM role_runs WHERE run_id=$1 AND role_id=$2",
-        [run.id, id],
+        [runId, id],
       );
       const existing = row.rows[0];
       if (existing) {
@@ -538,11 +703,11 @@ export class WorkerService {
           "Role was interrupted with an unknown provider outcome; automatic rerun blocked, manual review required",
         );
       }
-      await assertRunEnabled(projectSql(tx), fs.ownerId, run.id);
+      await assertRunEnabled(projectSql(tx), fs.ownerId, runId);
       if (id === CHAPTER_ROLES.author && !authorPacketManifest) {
         const packet = await tx.sql<{ manifest: PacketInputManifest | null }>(
           "SELECT s.output_ref->'authorPacketManifest' AS manifest FROM pipeline_steps s JOIN pipeline_runs p ON p.id=s.run_id WHERE s.run_id=$1 AND p.project_id=$2 AND s.step='PACKET_COMPILED'",
-          [run.id, fs.projectId],
+          [runId, fs.projectId],
         );
         authorPacketManifest = packet.rows[0]?.manifest ?? undefined;
       }
@@ -555,7 +720,7 @@ export class WorkerService {
       await tx.sql(
         "INSERT INTO role_runs(run_id,role_id,status,input_sha256,model,prompt_sha256) VALUES($1,$2,'running',$3,$4,$5)",
         [
-          run.id,
+          runId,
           id,
           hash,
           `${route.model.provider}/${route.model.id}`,
@@ -567,8 +732,8 @@ export class WorkerService {
     if (cached) return cached;
     const roleStarted = performance.now();
     if (process.env.NODE_ENV === "production")
-      logEvent("role_started", { run_id: run.id, role_id: id });
-    await this.options.onBoundary?.("role_intent", id, run.id);
+      logEvent("role_started", { run_id: runId, role_id: id });
+    await this.options.onBoundary?.("role_intent", id, runId);
     let result: RoleResult;
     let requested = false;
     try {
@@ -576,7 +741,7 @@ export class WorkerService {
         ...ctx,
         authorPacketManifest,
         onInputManifest: (manifest) =>
-          persistInputManifest(fs, run.id, id, manifest),
+          persistInputManifest(fs, runId, id, manifest),
         onRequest: (request, role) => {
           requested = true;
           ctx.onRequest?.(request, role);
@@ -585,13 +750,13 @@ export class WorkerService {
       });
     } catch (error) {
       if (process.env.NODE_ENV === "production")
-        reportError("worker_error", error, { run_id: run.id, role_id: id });
+        reportError("worker_error", error, { run_id: runId, role_id: id });
       const partial =
         error instanceof RoleExecutionError ? error.partial : undefined;
       if (partial)
         await this.saveRole(
           fs,
-          run.id,
+          runId,
           id,
           partial,
           "failed",
@@ -602,14 +767,14 @@ export class WorkerService {
           await fs.transaction((tx) =>
             tx.sql<{ model: string; prompt_sha256: string }>(
               "SELECT model,prompt_sha256 FROM role_runs WHERE run_id=$1 AND role_id=$2",
-              [run.id, id],
+              [runId, id],
             ),
           )
         ).rows[0];
         if (intent)
           await this.saveRole(
             fs,
-            run.id,
+            runId,
             id,
             {
               output: "",
@@ -627,12 +792,12 @@ export class WorkerService {
       }
       throw error;
     }
-    await this.options.onBoundary?.("role_response", id, run.id);
-    await this.saveRole(fs, run.id, id, result, "completed");
-    await this.options.onBoundary?.("role_completed", id, run.id);
+    await this.options.onBoundary?.("role_response", id, runId);
+    await this.saveRole(fs, runId, id, result, "completed");
+    await this.options.onBoundary?.("role_completed", id, runId);
     if (process.env.NODE_ENV === "production")
       logEvent("role_completed", {
-        run_id: run.id,
+        run_id: runId,
         role_id: id,
         duration_ms: performance.now() - roleStarted,
       });
@@ -754,7 +919,9 @@ export class WorkerService {
       if (!stored) throw new Error("Run does not belong to this project");
       if (
         (task.kind === "dispatch" && stored.kind !== "ideation_dispatch") ||
+        (task.kind === "reverify" && stored.kind !== reverificationKind) ||
         (task.kind !== "dispatch" &&
+          task.kind !== "reverify" &&
           task.kind !== "cancel" &&
           stored.kind !== "chapter_run")
       )
@@ -806,11 +973,16 @@ export class WorkerService {
           ? {}
           : { timeoutMs: this.scheduling.roleTimeoutMs }),
         executeRole: (id, input, ctx, run) =>
-          this.cachedRole(fs, run, id, input, ctx),
+          this.cachedRole(fs, run.id, id, input, ctx),
         onCheckpoint: (tx, run, manifest) => this.checkpoint(tx, run, manifest),
       };
       if (task.kind === "dispatch") {
         await this.dispatch(fs, task.runId, stored.request, ctx, stored.status);
+        return;
+      }
+      if (task.kind === "reverify") {
+        if (["REQUESTED", "RUNNING"].includes(stored.status))
+          await this.reverify(fs, task.runId, stored.request, ctx);
         return;
       }
       if (task.kind === "cancel" && stored.kind === "ideation_dispatch") {
@@ -908,6 +1080,87 @@ export class WorkerService {
       }
     }
   }
+  private async reverify(
+    fs: PostgresFS,
+    id: string,
+    value: Data,
+    ctx: PipelineContext,
+  ) {
+    const parentId = String(value.parentId);
+    const request: Reverification = {
+      id,
+      version: Number(value.version),
+      sha256: String(value.expectedSha256),
+      status: "pending",
+    };
+    const eligible = async (tx: PostgresFS, run: ChapterRun) =>
+      matchesReverification(run, request) &&
+      !!run.paths.candidate &&
+      (await tx.exists(run.paths.candidate)) &&
+      (await tx.sha256(run.paths.candidate)) === request.sha256;
+    const started = await fs.transaction(async (tx) => {
+      const run = await loadRun(tx, parentId);
+      if (ctx.signal?.aborted || !(await eligible(tx, run))) return false;
+      await tx.sql(
+        "UPDATE pipeline_runs SET status='RUNNING' WHERE id=$1 AND project_id=$2",
+        [id, tx.projectId],
+      );
+      return true;
+    });
+    let outcome: Exclude<ReverificationStatus, "pending"> = "stale";
+    let results: VerificationResult[] = [];
+    if (started) {
+      try {
+        results = await verifyCandidateVersion(fs, parentId, request, {
+          ...ctx,
+          executeRole: async (role, input, roleContext) => {
+            const stillCurrent = await fs.transaction(async (tx) =>
+              eligible(tx, await loadRun(tx, parentId)),
+            );
+            if (!stillCurrent)
+              throw new CandidateRevisionError(
+                409,
+                "候选稿已在别处更新，请刷新。",
+              );
+            return this.cachedRole(fs, id, role, input, roleContext);
+          },
+        });
+        outcome = verificationFailure(results) ? "returned" : "passed";
+      } catch (error) {
+        outcome = error instanceof CandidateRevisionError ? "stale" : "failed";
+      }
+    }
+    await fs.transaction(async (tx) => {
+      const parent = await this.chapterForRevision(tx, parentId);
+      const run = await loadRun(tx, parentId);
+      const child = await tx.sql<{ cancel_requested: boolean }>(
+        "SELECT cancel_requested FROM pipeline_runs WHERE id=$1 AND project_id=$2",
+        [id, tx.projectId],
+      );
+      if (parent.cancel_requested) outcome = "cancelled";
+      else if (!(await eligible(tx, run))) outcome = "stale";
+      else if (
+        outcome !== "returned" &&
+        (ctx.signal?.aborted || child.rows[0]?.cancel_requested)
+      )
+        outcome = "cancelled";
+      // A cancelled parent is completed by its own task.
+      if (!parent.cancel_requested)
+        await completeCandidateVerification(
+          tx,
+          run,
+          request,
+          outcome,
+          results,
+          ctx,
+        );
+      await tx.sql(
+        "UPDATE pipeline_runs SET status=$3,finished_at=now() WHERE id=$1 AND project_id=$2",
+        [id, tx.projectId, reverificationStates[outcome]],
+      );
+      await finishReservation(projectSql(tx), tx.ownerId, id);
+    });
+  }
   private async dispatch(
     fs: PostgresFS,
     id: string,
@@ -987,7 +1240,7 @@ export class WorkerService {
           locked_order: value.locked_order,
         });
       }
-      const result = await this.cachedRole(fs, run, role, input, {
+      const result = await this.cachedRole(fs, run.id, role, input, {
         ...ctx,
         fs,
       });

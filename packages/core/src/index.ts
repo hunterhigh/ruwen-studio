@@ -9,6 +9,12 @@ export { LocalDirFS } from "./fs/local-dir-fs.ts";
 export { AlreadyExists, type ProjectFS, UnsafePath } from "./fs/project-fs.ts";
 export * as handoff from "./handoff/index.ts";
 export { initProject } from "./init/index.ts";
+export {
+  type InputManifest,
+  type InputManifestItem,
+  type PacketInputManifest,
+  resourceInputLabel,
+} from "./input-manifest.ts";
 export * as candidateProblems from "./ledgers/candidate-problems.ts";
 export * as ledgers from "./ledgers/index.ts";
 export { previewV41Directory } from "./migration/local-preview.ts";

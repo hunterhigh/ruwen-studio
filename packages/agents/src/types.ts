@@ -11,7 +11,13 @@ import type {
   Usage,
 } from "@earendil-works/pi-ai";
 import type { Schema } from "@earendil-works/pi-schema";
-import type { ProjectFS, SecurityEvent } from "@ruwen/core";
+import type {
+  InputManifest,
+  PacketInputManifest,
+  ProjectFS,
+  SecurityEvent,
+} from "@ruwen/core";
+import type { InputManifestContext, InputMessage } from "./input-manifest.ts";
 import type { ToolValidationFailure } from "./tools/validation-feedback.ts";
 
 export type Json =
@@ -44,7 +50,8 @@ export interface RoleSpec {
     path: string;
     section?: "author_core" | "role_row";
   }[];
-  buildUserMessage(input: Data): string;
+  readonly withheld: readonly InputManifest["withheld"][number][];
+  buildUserMessage(input: Data, context?: InputManifestContext): InputMessage;
   output:
     | { kind: "text" }
     | { kind: "tool"; toolName: string; schema: Schema<Data> };
@@ -90,6 +97,9 @@ export interface RoleContext {
   onDelta?: (delta: string, role: RoleId) => void;
   onAttemptReset?: (role: RoleId, reason: AttemptResetReason) => void;
   onRequest?: (context: TranscriptContext, role: RoleId) => void;
+  onInputManifest?: (manifest: InputManifest) => Promise<void>;
+  authorPacketManifest?: PacketInputManifest | undefined;
+  previousTailTruncated?: boolean;
   /** Coordinator only: reloaded from the authorized server message store before EVERY provider request. */
   loadCoordinatorInput?: () => Promise<Data>;
   /** Internal isolated expression trial, never supplied by HTTP/model input. */
@@ -101,6 +111,7 @@ export interface RoleContext {
   searchApproved?: boolean;
 }
 export interface RoleResult {
+  inputManifest?: InputManifest;
   failures?: { role: RoleId; attempt: number; error: string }[];
   /** Rejected entries are retained here when coverage failure prevents a valid output. */
   dropped_reactions?: Data[];

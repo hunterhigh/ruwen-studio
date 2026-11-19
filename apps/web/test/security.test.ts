@@ -336,6 +336,20 @@ for (const route of API_ROUTES.filter((item) => item.resource)) {
     else expect(await result.json()).toEqual({ error: "资源不存在。" });
   });
 }
+
+it("run detail hides a populated role input manifest from a non-owner", async () => {
+  const manifest = {
+    version: 1,
+    seen: [{ kind: "resource", label: "FOREIGN_ROLE_MANIFEST" }],
+  };
+  await services.worker.db.pool.query(
+    "INSERT INTO role_runs(run_id,role_id,status,input_sha256,input_manifest) VALUES($1,'xiaoshuo-zuozhe','completed',$2,$3)",
+    [runId, "fixture", JSON.stringify(manifest)],
+  );
+  const response = await handleApi(request(`/api/runs/${runId}`), services);
+  expect(response.status).toBe(404);
+  expect(await response.json()).toEqual({ error: "资源不存在。" });
+});
 it("CI route coverage: every resource parameter declares and runs a foreign ownership case; no unregistered route files", async () => {
   for (const route of API_ROUTES) {
     const params = route.pattern.match(/:[A-Za-z]+/g) ?? [];

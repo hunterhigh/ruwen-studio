@@ -1,0 +1,588 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`biaoxian-shejishi manifest describes the actual faux request and excludes withheld sentinels 1`] = `
+{
+  "rules": {
+    "chars": 8133,
+    "upstreamFileCount": 9,
+  },
+  "seen": [
+    {
+      "chars": 32,
+      "includedBecause": "pipeline_input",
+      "kind": "delegation",
+      "label": "已批准的委托",
+      "truncated": false,
+    },
+    {
+      "chars": 116,
+      "includedBecause": "registry_reader",
+      "kind": "resource",
+      "label": "世界总表.md",
+      "path": "世界/世界总表.md",
+      "resourceId": "shijie-zongbiao",
+      "sha256": "235e8208f1e1d9428e1249804b024639932929ca7d62d9e43d6f10502fb7c71e",
+      "truncated": false,
+    },
+    {
+      "chars": 128,
+      "includedBecause": "pipeline_input",
+      "kind": "resource",
+      "label": "资料作用域",
+      "truncated": false,
+    },
+  ],
+  "totals": {
+    "inputChars": 639,
+  },
+  "version": 1,
+  "withheld": [
+    {
+      "category": "raw_user_wording",
+      "ruleRef": "I6",
+    },
+  ],
+}
+`;
+
+exports[`chuangyi-xietiaoyuan manifest describes the actual faux request and excludes withheld sentinels 1`] = `
+{
+  "rules": {
+    "chars": 8100,
+    "upstreamFileCount": 9,
+  },
+  "seen": [
+    {
+      "chars": 14,
+      "includedBecause": "pipeline_input",
+      "kind": "user_messages",
+      "label": "用户原话",
+      "truncated": false,
+    },
+    {
+      "chars": 31,
+      "includedBecause": "pipeline_input",
+      "kind": "resource",
+      "label": "项目标识",
+      "truncated": false,
+    },
+    {
+      "chars": 55,
+      "includedBecause": "pipeline_input",
+      "kind": "user_messages",
+      "label": "当前会话的消息",
+      "truncated": false,
+    },
+  ],
+  "totals": {
+    "inputChars": 297,
+  },
+  "version": 1,
+  "withheld": [
+    {
+      "category": "translated_delegation",
+      "ruleRef": "I6",
+    },
+  ],
+}
+`;
+
+exports[`gushi-gousishi manifest describes the actual faux request and excludes withheld sentinels 1`] = `
+{
+  "rules": {
+    "chars": 8099,
+    "upstreamFileCount": 9,
+  },
+  "seen": [
+    {
+      "chars": 32,
+      "includedBecause": "pipeline_input",
+      "kind": "delegation",
+      "label": "已批准的委托",
+      "truncated": false,
+    },
+    {
+      "chars": 25,
+      "includedBecause": "pipeline_input",
+      "kind": "resource",
+      "label": "委托所列的资料索引",
+      "truncated": false,
+    },
+    {
+      "chars": 128,
+      "includedBecause": "pipeline_input",
+      "kind": "resource",
+      "label": "资料作用域",
+      "truncated": false,
+    },
+  ],
+  "totals": {
+    "inputChars": 365,
+  },
+  "version": 1,
+  "withheld": [
+    {
+      "category": "raw_user_wording",
+      "ruleRef": "I6",
+    },
+  ],
+}
+`;
+
+exports[`jiyi-weihuyuan manifest describes the actual faux request and excludes withheld sentinels 1`] = `
+{
+  "rules": {
+    "chars": 4836,
+    "upstreamFileCount": 6,
+  },
+  "seen": [
+    {
+      "chars": 77,
+      "includedBecause": "pipeline_input",
+      "kind": "prose",
+      "label": "已批准正文",
+      "sha256": "d94da0906e772e5e0740d45dd4c0914ec6f855308939e0e55c2d0eddc393865c",
+      "truncated": false,
+    },
+    {
+      "chars": 311,
+      "includedBecause": "registry_reader",
+      "kind": "resource",
+      "label": "本章可读的当前态势（资料索引）",
+      "path": "世界/当前态势.md",
+      "resourceId": "shijie-dangqian-taishi",
+      "truncated": false,
+    },
+    {
+      "chars": 106,
+      "includedBecause": "tool_call",
+      "kind": "resource",
+      "label": "本章可读的当前态势",
+      "path": "世界/当前态势.md",
+      "resourceId": "shijie-dangqian-taishi",
+      "sha256": "f0b0d22a5ee857788ffadf0cf190ff92c5e6e808e169a4a95544836d659de59c",
+      "truncated": false,
+    },
+  ],
+  "totals": {
+    "inputChars": 806,
+  },
+  "version": 1,
+  "withheld": [
+    {
+      "category": "unapproved_prose",
+      "ruleRef": "I1",
+    },
+    {
+      "category": "unapproved_inferences",
+      "ruleRef": "I1",
+    },
+  ],
+}
+`;
+
+exports[`qinggan-duzhe manifest describes the actual faux request and excludes withheld sentinels 1`] = `
+{
+  "rules": {
+    "chars": 110,
+    "upstreamFileCount": 1,
+  },
+  "seen": [
+    {
+      "chars": 77,
+      "includedBecause": "pipeline_input",
+      "kind": "prose",
+      "label": "正文",
+      "sha256": "d94da0906e772e5e0740d45dd4c0914ec6f855308939e0e55c2d0eddc393865c",
+      "truncated": false,
+    },
+    {
+      "chars": 3,
+      "includedBecause": "pipeline_input",
+      "kind": "resource",
+      "label": "章节号",
+      "truncated": false,
+    },
+    {
+      "chars": 600,
+      "includedBecause": "pipeline_input",
+      "kind": "chapter_tail",
+      "label": "上一章正文尾部",
+      "sha256": "bd8e871f02e8dd9575fd8c5c2c0cd690b41ea79c5eb1ef3242803ab15a4d48b1",
+      "truncated": true,
+    },
+  ],
+  "totals": {
+    "inputChars": 860,
+  },
+  "version": 1,
+  "withheld": [
+    {
+      "category": "story_outline",
+      "ruleRef": "I5",
+    },
+    {
+      "category": "checklists",
+      "ruleRef": "I5",
+    },
+  ],
+}
+`;
+
+exports[`qingjie-heyanyuan manifest describes the actual faux request and excludes withheld sentinels 1`] = `
+{
+  "rules": {
+    "chars": 4819,
+    "upstreamFileCount": 6,
+  },
+  "seen": [
+    {
+      "chars": 77,
+      "includedBecause": "pipeline_input",
+      "kind": "prose",
+      "label": "正文",
+      "sha256": "d94da0906e772e5e0740d45dd4c0914ec6f855308939e0e55c2d0eddc393865c",
+      "truncated": false,
+    },
+    {
+      "chars": 13,
+      "includedBecause": "pipeline_input",
+      "kind": "locked_events",
+      "label": "必须发生的事件",
+      "truncated": false,
+    },
+    {
+      "chars": 15,
+      "includedBecause": "pipeline_input",
+      "kind": "locked_events",
+      "label": "锁定顺序",
+      "truncated": false,
+    },
+  ],
+  "totals": {
+    "inputChars": 286,
+  },
+  "version": 1,
+  "withheld": [
+    {
+      "category": "reader_reactions",
+      "ruleRef": "ruwen-zhangjie-xiezuo/SKILL.md#固定岗位链",
+    },
+    {
+      "category": "editor_edits",
+      "ruleRef": "ruwen-zhangjie-xiezuo/SKILL.md#固定岗位链",
+    },
+  ],
+}
+`;
+
+exports[`waibu-zhishi-guwen manifest describes the actual faux request and excludes withheld sentinels 1`] = `
+{
+  "rules": {
+    "chars": 8100,
+    "upstreamFileCount": 9,
+  },
+  "seen": [
+    {
+      "chars": 32,
+      "includedBecause": "pipeline_input",
+      "kind": "delegation",
+      "label": "已批准的委托",
+      "truncated": false,
+    },
+    {
+      "chars": 25,
+      "includedBecause": "pipeline_input",
+      "kind": "resource",
+      "label": "委托所列的资料索引",
+      "truncated": false,
+    },
+    {
+      "chars": 128,
+      "includedBecause": "pipeline_input",
+      "kind": "resource",
+      "label": "资料作用域",
+      "truncated": false,
+    },
+  ],
+  "totals": {
+    "inputChars": 365,
+  },
+  "version": 1,
+  "withheld": [
+    {
+      "category": "raw_user_wording",
+      "ruleRef": "I6",
+    },
+  ],
+}
+`;
+
+exports[`wenxue-bianji manifest describes the actual faux request and excludes withheld sentinels 1`] = `
+{
+  "rules": {
+    "chars": 4919,
+    "upstreamFileCount": 6,
+  },
+  "seen": [
+    {
+      "chars": 77,
+      "includedBecause": "pipeline_input",
+      "kind": "prose",
+      "label": "正文",
+      "sha256": "d94da0906e772e5e0740d45dd4c0914ec6f855308939e0e55c2d0eddc393865c",
+      "truncated": false,
+    },
+    {
+      "chars": 148,
+      "includedBecause": "pipeline_input",
+      "kind": "reader_reactions",
+      "label": "情感读者反应",
+      "truncated": false,
+    },
+    {
+      "chars": 157,
+      "includedBecause": "tool_call",
+      "kind": "diagnostic",
+      "label": "解释性文字诊断",
+      "sha256": "ba0826878bea5451ab419bc97fdae50c01ec97f09ad0e93e376031be35b2273e",
+      "truncated": false,
+    },
+  ],
+  "totals": {
+    "inputChars": 535,
+  },
+  "version": 1,
+  "withheld": [
+    {
+      "category": "full_literary_checklist",
+      "ruleRef": "ruwen-zhangjie-xiezuo/SKILL.md#阅读与编辑",
+    },
+  ],
+}
+`;
+
+exports[`xiangmu-zhiliyuan manifest describes the actual faux request and excludes withheld sentinels 1`] = `
+{
+  "rules": {
+    "chars": 8103,
+    "upstreamFileCount": 9,
+  },
+  "seen": [
+    {
+      "chars": 32,
+      "includedBecause": "pipeline_input",
+      "kind": "delegation",
+      "label": "已批准的委托",
+      "truncated": false,
+    },
+    {
+      "chars": 25,
+      "includedBecause": "pipeline_input",
+      "kind": "resource",
+      "label": "委托所列的资料索引",
+      "truncated": false,
+    },
+    {
+      "chars": 128,
+      "includedBecause": "pipeline_input",
+      "kind": "resource",
+      "label": "资料作用域",
+      "truncated": false,
+    },
+  ],
+  "totals": {
+    "inputChars": 365,
+  },
+  "version": 1,
+  "withheld": [
+    {
+      "category": "raw_user_wording",
+      "ruleRef": "I6",
+    },
+    {
+      "category": "literary_ledger_details",
+      "ruleRef": "I10",
+    },
+  ],
+}
+`;
+
+exports[`xianshi-heyanyuan manifest describes the actual faux request and excludes withheld sentinels 1`] = `
+{
+  "rules": {
+    "chars": 4843,
+    "upstreamFileCount": 6,
+  },
+  "seen": [
+    {
+      "chars": 77,
+      "includedBecause": "pipeline_input",
+      "kind": "prose",
+      "label": "正文",
+      "sha256": "d94da0906e772e5e0740d45dd4c0914ec6f855308939e0e55c2d0eddc393865c",
+      "truncated": false,
+    },
+    {
+      "chars": 39,
+      "includedBecause": "registry_reader",
+      "kind": "hard_rules",
+      "label": "硬设定规则.md",
+      "path": "校验/硬设定规则.md",
+      "resourceId": "xiaoyan-yingsheding",
+      "sha256": "bdd764dd0246ccb65ef94014da119739914f5070f5d9c2b651ee6417a5bcc48c",
+      "truncated": false,
+    },
+  ],
+  "totals": {
+    "inputChars": 404,
+  },
+  "version": 1,
+  "withheld": [
+    {
+      "category": "reader_reactions",
+      "ruleRef": "ruwen-zhangjie-xiezuo/SKILL.md#固定岗位链",
+    },
+    {
+      "category": "editor_edits",
+      "ruleRef": "ruwen-zhangjie-xiezuo/SKILL.md#固定岗位链",
+    },
+  ],
+}
+`;
+
+exports[`xiaoshuo-zuozhe manifest describes the actual faux request and excludes withheld sentinels 1`] = `
+{
+  "rules": {
+    "chars": 344,
+    "upstreamFileCount": 2,
+  },
+  "seen": [
+    {
+      "chars": 119,
+      "includedBecause": "packet",
+      "kind": "packet_section",
+      "label": "当前章节情境",
+      "path": "authoring-ruwen-v5/projections/current.md",
+      "sha256": "bb751d4fd515c79329431f9f6f48e32e755e047d2a330c0014d8288bebba07e7",
+      "truncated": false,
+    },
+    {
+      "chars": 77,
+      "includedBecause": "packet",
+      "kind": "packet_section",
+      "label": "项目声音.md",
+      "path": "表现/项目声音.md",
+      "resourceId": "biaoxian-xiangmu-shengyin",
+      "sha256": "0fca54264491937566abc35b454c8094a43503c5445804af3a5523fbeeea2163",
+      "truncated": false,
+    },
+    {
+      "chars": 90,
+      "includedBecause": "packet",
+      "kind": "packet_section",
+      "label": "主角.md",
+      "path": "人物/POV镜头/主角.md",
+      "resourceId": "zhujue-pov-jingtou",
+      "sha256": "b475fcb8070e83ff0bac1ca0679b8fc47d3a1a2e76f001f9a098543dc657e3cc",
+      "truncated": false,
+    },
+  ],
+  "totals": {
+    "inputChars": 569,
+    "packetBudget": 8000,
+    "packetChars": 569,
+  },
+  "version": 1,
+  "withheld": [
+    {
+      "category": "full_character_profiles",
+      "ruleRef": "I4",
+    },
+    {
+      "category": "world_materials",
+      "ruleRef": "I4",
+    },
+    {
+      "category": "story_outline",
+      "ruleRef": "I4",
+    },
+    {
+      "category": "research",
+      "ruleRef": "I4",
+    },
+    {
+      "category": "governance",
+      "ruleRef": "I4",
+    },
+    {
+      "category": "validation",
+      "ruleRef": "I4",
+    },
+    {
+      "category": "literary_ledger",
+      "ruleRef": "I4",
+    },
+    {
+      "category": "later_role_opinions",
+      "ruleRef": "I4",
+    },
+    {
+      "category": "source_list",
+      "ruleRef": "I4",
+    },
+  ],
+}
+`;
+
+exports[`zhangjie-qingjing-bianyiyuan manifest describes the actual faux request and excludes withheld sentinels 1`] = `
+{
+  "rules": {
+    "chars": 8124,
+    "upstreamFileCount": 9,
+  },
+  "seen": [
+    {
+      "chars": 72,
+      "includedBecause": "registry_reader",
+      "kind": "resource",
+      "label": "当前故事弧.md",
+      "path": "故事/当前故事弧.md",
+      "resourceId": "gushi-dangqian-hu",
+      "sha256": "ad84fca083be4d2833f0425907e850ff5fc061a3852c6572d387ff66f1d9ebe4",
+      "truncated": false,
+    },
+    {
+      "chars": 3,
+      "includedBecause": "pipeline_input",
+      "kind": "resource",
+      "label": "章节号",
+      "truncated": false,
+    },
+    {
+      "chars": 128,
+      "includedBecause": "pipeline_input",
+      "kind": "resource",
+      "label": "资料作用域",
+      "truncated": false,
+    },
+    {
+      "chars": 13,
+      "includedBecause": "pipeline_input",
+      "kind": "locked_events",
+      "label": "必须发生的事件",
+      "truncated": false,
+    },
+  ],
+  "totals": {
+    "inputChars": 633,
+  },
+  "version": 1,
+  "withheld": [
+    {
+      "category": "raw_user_wording",
+      "ruleRef": "I6",
+    },
+  ],
+}
+`;

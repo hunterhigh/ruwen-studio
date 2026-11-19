@@ -1,4 +1,9 @@
-import { assertInputLimits } from "@ruwen/core";
+import { assertInputLimits, type InputManifest } from "@ruwen/core";
+import {
+  builtInput,
+  fieldManifest,
+  type InputManifestContext,
+} from "./input-manifest.ts";
 import type { Data, Json } from "./types.ts";
 
 const labels: Record<string, string> = {
@@ -55,26 +60,44 @@ function readingText(value: Json): string {
       .join("\n\n");
   return JSON.stringify(value, null, 2);
 }
+function userSections(input: Data) {
+  assertInputLimits(input);
+  return Object.entries(input).map(([key, value]) => {
+    if (!/^[a-z_]+$/.test(key)) throw new Error("Invalid platform field name");
+    const label = labels[key] ?? "结构化资料";
+    const format =
+      typeof value === "string" || key === "reading" ? "text" : "json";
+    const raw =
+      key === "reading"
+        ? readingText(value)
+        : typeof value === "string"
+          ? value
+          : JSON.stringify(value, null, 2);
+    const body = escapeTaggedMaterial(raw);
+    const encoded = `<${label} field="${key}" format="${format}" chars="${Array.from(body).length}">\n${body}\n</${label}>`;
+    return { key, value, raw, encoded };
+  });
+}
 /** Escape reserved delimiters while retaining verbatim Unicode and physical line breaks. */
 export function formatUserMessage(input: Data): string {
-  assertInputLimits(input);
-  return Object.entries(input)
-    .map(([key, value]) => {
-      if (!/^[a-z_]+$/.test(key))
-        throw new Error("Invalid platform field name");
-      const label = labels[key] ?? "结构化资料";
-      const format =
-        typeof value === "string" || key === "reading" ? "text" : "json";
-      const raw =
-        key === "reading"
-          ? readingText(value)
-          : typeof value === "string"
-            ? value
-            : JSON.stringify(value, null, 2);
-      const body = escapeTaggedMaterial(raw);
-      return `<${label} field="${key}" format="${format}" chars="${Array.from(body).length}">\n${body}\n</${label}>`;
-    })
+  return userSections(input)
+    .map(({ encoded }) => encoded)
     .join("\n\n");
+}
+
+export function buildStructuredInput(
+  input: Data,
+  withheld: readonly InputManifest["withheld"][number][],
+  context: InputManifestContext,
+) {
+  const sections = userSections(input);
+  return builtInput(
+    sections.map(({ encoded }) => encoded).join("\n\n"),
+    sections.flatMap(({ key, value, raw }) =>
+      fieldManifest(key, value, raw, context),
+    ),
+    withheld,
+  );
 }
 /** Debug/faux decoding only; production model input is always the raw segmented text. */
 export function decodeUserMessage(message: string): Data | undefined {

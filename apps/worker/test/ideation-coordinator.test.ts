@@ -135,6 +135,26 @@ it("reloads coordinator messages from DB on every tool turn, offers only its thr
   expect(requests[0]).not.toContain("DB_RELOAD_MARKER");
   expect(requests[1]).toContain("DB_RELOAD_MARKER");
   expect(requests[2]).toContain("read_resource");
+  const { rows } = await p.db.pool.query(
+    "SELECT input_manifest FROM role_runs WHERE run_id=$1 AND role_id='chuangyi-xietiaoyuan'",
+    [first.turnId],
+  );
+  const manifest = rows[0]?.input_manifest;
+  expect(manifest.seen).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        kind: "user_messages",
+        label: "当前会话的消息",
+      }),
+      expect.objectContaining({
+        includedBecause: "tool_call",
+        resourceId: "xiangmu-zhangcheng",
+      }),
+    ]),
+  );
+  expect(JSON.stringify(manifest)).not.toMatch(
+    /FIRST_USER_MESSAGE|DB_RELOAD_MARKER/,
+  );
   expect(
     value(await p.service.listPreviews(p.actor, { sessionId: p.session.id }))
       .items,

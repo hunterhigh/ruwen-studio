@@ -282,3 +282,47 @@ it("an intercepted model response reaches neither real run-detail APIs nor persi
     await reader.cancel();
   }
 }, 30000);
+
+it("run detail returns the persisted request manifest and tolerates legacy role rows", async () => {
+  const { services, id, request, safe } = await setup();
+  const { rows } = await services.worker.db.pool.query(
+    "SELECT role_id,input_manifest,result FROM role_runs WHERE run_id=$1",
+    [id],
+  );
+  expect(rows).toHaveLength(5);
+  for (const row of rows) {
+    expect(row.input_manifest).toMatchObject({
+      version: 1,
+      seen: expect.any(Array),
+    });
+    expect(row.result).not.toHaveProperty("inputManifest");
+  }
+  const author = rows.find(({ role_id }) => role_id === "xiaoshuo-zuozhe");
+  expect(author?.input_manifest.totals.packetBudget).toBe(8000);
+  expect(author?.input_manifest.seen.length).toBeGreaterThan(1);
+  await services.worker.db.pool.query(
+    "UPDATE role_runs SET input_manifest=NULL WHERE run_id=$1 AND role_id='qinggan-duzhe'",
+    [id],
+  );
+  const response = await handleApi(request(`/api/runs/${id}`), services);
+  expect(response.status).toBe(200);
+  const detail = await response.json();
+  safe(detail);
+  expect(detail.roles).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        role_id: "xiaoshuo-zuozhe",
+        inputManifest: author?.input_manifest,
+        model: expect.any(String),
+        usage: expect.any(Array),
+      }),
+      expect.objectContaining({
+        role_id: "qinggan-duzhe",
+        inputManifest: null,
+      }),
+    ]),
+  );
+  const manifest = JSON.stringify(author?.input_manifest);
+  expect(manifest).not.toMatch(/ruwen-faux|"(model|usage|cost|token)[^"]*":/);
+  expect(detail.reports["xiaoshuo-zuozhe"]).not.toHaveProperty("inputManifest");
+}, 30000);

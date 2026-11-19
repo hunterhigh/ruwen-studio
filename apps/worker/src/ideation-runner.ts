@@ -38,6 +38,7 @@ import {
 import type { IdeationTransaction } from "../../../packages/pipeline/src/ideation/store.ts";
 import { ideationSql } from "./ideation-billing.ts";
 import { createIdeationService } from "./ideation-service.ts";
+import { persistInputManifest } from "./input-manifest.ts";
 import { persistPrivatePrompt } from "./private-prompts.ts";
 import { recordRoleSecurityEvents } from "./security-events.ts";
 import type { Task, WorkerOptions } from "./service.ts";
@@ -311,6 +312,8 @@ export class IdeationRunner {
       let result: RoleResult;
       try {
         result = await runRole(role, initial, {
+          onInputManifest: (manifest) =>
+            persistInputManifest(fs, task.id, role, manifest),
           onRequest: () => {
             providerStarted = true;
           },

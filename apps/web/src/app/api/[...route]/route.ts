@@ -17,3 +17,6 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   return handleApi(request, await getServices());
 }
+export async function PUT(request: Request) {
+  return handleApi(request, await getServices());
+}

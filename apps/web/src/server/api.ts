@@ -20,6 +20,14 @@ import {
   securityLimits,
   state,
 } from "@ruwen/core";
+import {
+  type AnnotationPatch,
+  annotationRatings,
+  annotationStats,
+  annotationStatuses,
+  isAnnotationId,
+  listRunAnnotations,
+} from "@ruwen/db";
 import type {
   IdeationErrorCode,
   IdeationServiceV1_2 as IdeationService,
@@ -31,6 +39,7 @@ import {
   loadRun,
   runPath,
 } from "@ruwen/pipeline";
+import { AnnotationEditConflict, type AnnotationEditRequest } from "worker";
 import { releasePolicy, runtimeSettings } from "../../../../config/settings.ts";
 import {
   type AdminAction,
@@ -144,6 +153,13 @@ export const API_ROUTES: readonly RouteDefinition[] = [
     foreignCase: "foreign candidate revision save",
   },
   {
+    method: "PUT",
+    pattern: "/api/runs/:runId/annotations/:annotationId",
+    resource: "runId",
+    resourceParams: ["runId", "annotationId"],
+    foreignCase: "foreign annotation disposition",
+  },
+  {
     method: "GET",
     pattern: "/api/runs/:runId/candidate/revisions/:version",
     resource: "runId",
@@ -205,6 +221,7 @@ export const API_ROUTES: readonly RouteDefinition[] = [
     authentication: "signature",
   },
   { method: "GET", pattern: "/api/admin" },
+  { method: "GET", pattern: "/api/admin/annotation-stats" },
   { method: "POST", pattern: "/api/admin/invitations" },
   { method: "GET", pattern: "/api/admin/reservations" },
   {
@@ -303,6 +320,53 @@ const string = (value: unknown, limit = 100) => {
     throw new HttpError(400, "请填写有效内容。");
   return value.trim();
 };
+function annotationPatch(data: Record<string, unknown>): AnnotationPatch {
+  const status = annotationStatuses.find((value) => data.status === value);
+  const usefulness =
+    data.usefulness === null
+      ? null
+      : annotationRatings.find((value) => data.usefulness === value);
+  if (
+    !Object.keys(data).length ||
+    Object.keys(data).some((key) => key !== "status" && key !== "usefulness") ||
+    ("status" in data && status === undefined) ||
+    ("usefulness" in data && usefulness === undefined)
+  )
+    throw new HttpError(400, "请提供有效的意见状态或评价。");
+  return {
+    ...(status ? { status } : {}),
+    ...(usefulness !== undefined ? { usefulness } : {}),
+  };
+}
+function revisionInput(
+  data: Record<string, unknown>,
+): string | AnnotationEditRequest {
+  const fields = Object.keys(data).length;
+  if (fields === 2 && typeof data.text === "string") return data.text;
+  const { op, editIds } = data;
+  if (
+    fields === 3 &&
+    (op === "revert_editor_edits" || op === "reapply_editor_edits") &&
+    Array.isArray(editIds) &&
+    editIds.length > 0 &&
+    editIds.length <= 100 &&
+    editIds.every(isAnnotationId) &&
+    new Set(editIds).size === editIds.length
+  )
+    return { op, editIds };
+  throw new HttpError(400, "请提供候选稿正文，或撤销、恢复的意见编号。");
+}
+function utcDate(value: string | null) {
+  if (!value || !/^[1-9]\d{3}-\d{2}-\d{2}$/.test(value))
+    throw new HttpError(400, "请提供有效的起止日期。");
+  const parsed = new Date(value);
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.toISOString().slice(0, 10) !== value
+  )
+    throw new HttpError(400, "请提供有效的起止日期。");
+  return value;
+}
 export async function authenticated(request: Request, services: WebServices) {
   const session = await services.auth.api.getSession({
     headers: request.headers,
@@ -452,6 +516,15 @@ export async function runDetail(
       : run,
     reports,
     roles: roleRows.rows,
+    annotations:
+      stored.kind === "chapter_run"
+        ? await listRunAnnotations(
+            services.worker.db,
+            owned.project.id,
+            id,
+            run.verificationRunId,
+          )
+        : [],
     prose: await artifact(run.paths.candidate ?? run.paths.author),
     original: await artifact(run.paths.original),
     memoryPreview,
@@ -923,6 +996,26 @@ export async function handleApi(
     }
     if (owned && route.resource === "runId") {
       const id = params.runId ?? "";
+      if (route.pattern.endsWith("/annotations/:annotationId")) {
+        await requestLimit(
+          db,
+          `annotation-update:${user.id}`,
+          services.environment.secret,
+          60,
+          60,
+          "更新意见过于频繁，请稍后再试。",
+        );
+        if (!isAnnotationId(params.annotationId))
+          throw new HttpError(404, "意见不存在。");
+        return json(
+          await services.worker.updateAnnotation(
+            owned.fs,
+            id,
+            params.annotationId,
+            annotationPatch(await body(request, 1024)),
+          ),
+        );
+      }
       if (route.pattern.endsWith("/events"))
         return events(request, services, user.id, id);
       if (route.pattern.endsWith("/revisions/:version")) {
@@ -961,10 +1054,8 @@ export async function handleApi(
           ),
         );
         if (
-          Object.keys(data).length !== 2 ||
           typeof data.baseSha256 !== "string" ||
-          !/^[a-f0-9]{64}$/.test(data.baseSha256) ||
-          typeof data.text !== "string"
+          !/^[a-f0-9]{64}$/.test(data.baseSha256)
         )
           throw new HttpError(400, "请提供候选稿哈希和正文。");
         return json(
@@ -972,7 +1063,7 @@ export async function handleApi(
             owned.fs,
             id,
             data.baseSha256,
-            data.text,
+            revisionInput(data),
           ),
           201,
         );
@@ -1127,6 +1218,15 @@ export async function handleApi(
         await auditAdmin(db.pool, user.id, "reservation_list", true);
         return json(await pendingReservations(db));
       }
+      if (route.pattern === "/api/admin/annotation-stats") {
+        const { searchParams } = new URL(request.url);
+        const from = utcDate(searchParams.get("from"));
+        const to = utcDate(searchParams.get("to"));
+        if (from > to) throw new HttpError(400, "开始日期不能晚于结束日期。");
+        const rows = await annotationStats(db, from, to);
+        await auditAdmin(db.pool, user.id, "dashboard_data", true);
+        return json(rows);
+      }
       if (request.method === "POST") {
         const code = randomBytes(18).toString("hex");
         await db.transaction(async (client) => {
@@ -1202,6 +1302,11 @@ export async function handleApi(
           : undefined;
       return ideationFailureResponse(code ?? "INTERNAL_ERROR");
     }
+    if (error instanceof AnnotationEditConflict)
+      return json(
+        { error: error.message, editIds: error.editIds },
+        error.status,
+      );
     if (error instanceof CandidateRevisionError)
       return json({ error: error.message }, error.status);
     if (error instanceof BillingError)

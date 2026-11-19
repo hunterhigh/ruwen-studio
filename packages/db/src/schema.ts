@@ -139,6 +139,23 @@ export const pipelineSteps = pgTable(
   },
   (t) => [primaryKey({ columns: [t.runId, t.step] })],
 );
+export const annotationDispositions = pgTable(
+  "annotation_dispositions",
+  {
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => pipelineRuns.id, { onDelete: "cascade" }),
+    annotationId: text("annotation_id").notNull(),
+    kind: text("kind").notNull(),
+    status: text("status").notNull().default("open"),
+    usefulness: text("usefulness"),
+    updatedBy: uuid("updated_by")
+      .notNull()
+      .references(() => users.id),
+    updatedAt: time("updated_at"),
+  },
+  (t) => [primaryKey({ columns: [t.runId, t.annotationId] })],
+);
 export const candidateRevisionAudit = pgTable(
   "candidate_revision_audit",
   {

@@ -49,6 +49,7 @@ export {
 export * as state from "./state/index.ts";
 export {
   applyEditorialEdits,
+  applyRanges,
   applySectionEdits,
   type EditorialEdit,
   type EditPolicy,

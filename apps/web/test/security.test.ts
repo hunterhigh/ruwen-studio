@@ -187,7 +187,8 @@ it("every private route rejects anonymous requests; owner mutations also need CS
     const url = route.pattern
       .replace(":projectId", ownedProjectId)
       .replace(":runId", ownedRunId)
-      .replace(":version", "1");
+      .replace(":version", "1")
+      .replace(":annotationId", `${ownedRunId}:0`);
     let ownUrl = url
       .replace(":checkoutId", ownedCheckoutId)
       .replace(":accountId", ownedAccountId)
@@ -202,7 +203,7 @@ it("every private route rejects anonymous requests; owner mutations also need CS
             route.method,
             false,
             {},
-            route.method === "POST" ? {} : undefined,
+            route.method !== "GET" ? {} : undefined,
           ),
           services,
         )
@@ -211,7 +212,7 @@ it("every private route rejects anonymous requests; owner mutations also need CS
     ).toBe(401);
     if (
       route.resource &&
-      (route.method === "POST" || route.pattern.endsWith("/:version"))
+      (route.method !== "GET" || route.pattern.endsWith("/:version"))
     )
       expect(
         (
@@ -221,7 +222,7 @@ it("every private route rejects anonymous requests; owner mutations also need CS
               route.method,
               true,
               { "x-csrf-token": "" },
-              route.method === "POST" ? {} : undefined,
+              route.method !== "GET" ? {} : undefined,
             ),
             services,
           )
@@ -235,6 +236,14 @@ it("every private route rejects anonymous requests; owner mutations also need CS
   expect(projects.map((p) => p.id)).toContain(ownedProjectId);
   expect(projects.map((p) => p.id)).not.toContain(projectId);
   expect((await handleApi(request("/api/admin"), services)).status).toBe(404);
+  expect(
+    (
+      await handleApi(
+        request("/api/admin/annotation-stats?from=2088-01-02&to=2088-01-02"),
+        services,
+      )
+    ).status,
+  ).toBe(404);
 });
 it("own SSE replays reset barriers and deltas in cursor order and never includes another tenant", async () => {
   const db = services.worker.db;
@@ -321,6 +330,7 @@ for (const route of API_ROUTES.filter((item) => item.resource)) {
       .replace(":projectId", projectId)
       .replace(":runId", runId)
       .replace(":version", "1")
+      .replace(":annotationId", `${runId}:0`)
       .replace(":checkoutId", foreignCheckoutId)
       .replace(":accountId", foreignAccountId)
       .replace(":reservationId", foreignReservationId);

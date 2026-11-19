@@ -26,7 +26,7 @@ function unique(source: string, anchor: string): number {
     throw new Error("Edit anchor is not unique");
   return index;
 }
-function applyRanges(
+export function applyRanges(
   source: string,
   ranges: { start: number; end: number; replacement: string }[],
 ) {

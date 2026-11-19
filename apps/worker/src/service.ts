@@ -36,7 +36,13 @@ import {
   publicTranscript,
   state,
 } from "@ruwen/core";
-import { Database, PostgresFS } from "@ruwen/db";
+import {
+  type AnnotationPatch,
+  Database,
+  findRunAnnotations,
+  PostgresFS,
+  writeAnnotationDisposition,
+} from "@ruwen/db";
 import {
   approveCandidate,
   approveMemory,
@@ -75,6 +81,10 @@ import {
 } from "../../../config/observability.ts";
 import { runtimeSettings } from "../../../config/settings.ts";
 import type { IdeationSessionOptions } from "../../../packages/pipeline/src/ideation/sessions.ts";
+import {
+  type AnnotationEditRequest,
+  applyAnnotationEdits,
+} from "./annotation-edits.ts";
 import { IdeationRunner } from "./ideation-runner.ts";
 import { createIdeationService } from "./ideation-service.ts";
 import { persistInputManifest } from "./input-manifest.ts";
@@ -82,6 +92,10 @@ import { persistPrivatePrompt } from "./private-prompts.ts";
 import { recordRoleSecurityEvents } from "./security-events.ts";
 import { streamSink } from "./stream-events.ts";
 
+export {
+  AnnotationEditConflict,
+  type AnnotationEditRequest,
+} from "./annotation-edits.ts";
 export { configuredIdeation } from "./ideation-config.ts";
 export { createIdeationService } from "./ideation-service.ts";
 
@@ -383,7 +397,7 @@ export class WorkerService {
     fs: PostgresFS,
     id: string,
     baseSha256: string,
-    text: string,
+    revisionRequest: string | AnnotationEditRequest,
   ) {
     return fs.transaction(async (tx) => {
       const row = await this.chapterForRevision(tx, id);
@@ -392,12 +406,30 @@ export class WorkerService {
           409,
           "当前候选稿不在等待批准，请刷新核对状态。",
         );
+      const editChange =
+        typeof revisionRequest === "string" ? null : revisionRequest;
+      const annotations: Awaited<ReturnType<typeof findRunAnnotations>> =
+        editChange
+          ? await findRunAnnotations(tx, id, editChange.editIds)
+          : new Map();
+      let text: string;
+      if (typeof revisionRequest === "string") {
+        text = revisionRequest;
+      } else {
+        const run = await loadRun(tx, id);
+        const { current } = await requireCandidateVersion(tx, run, baseSha256);
+        text = applyAnnotationEdits(
+          await tx.readText(current.path),
+          revisionRequest,
+          annotations,
+        );
+      }
       return saveCandidateRevision(
         tx,
         id,
         baseSha256,
         text,
-        "manual",
+        editChange?.op ?? "manual",
         async (nested, revision, before, changedChars) => {
           if (!(nested instanceof PostgresFS))
             throw new Error("Durable candidate audit required");
@@ -415,8 +447,42 @@ export class WorkerService {
               revision.createdAt,
             ],
           );
+          if (editChange) {
+            const status =
+              editChange.op === "revert_editor_edits"
+                ? "dismissed"
+                : "accepted";
+            for (const annotation of annotations.values())
+              await writeAnnotationDisposition(nested, id, annotation, {
+                status,
+              });
+          }
         },
       );
+    });
+  }
+  async updateAnnotation(
+    fs: PostgresFS,
+    id: string,
+    annotationId: string,
+    patch: AnnotationPatch,
+  ) {
+    return fs.transaction(async (tx) => {
+      await this.chapterForRevision(tx, id);
+      const annotation = (await findRunAnnotations(tx, id, [annotationId])).get(
+        annotationId,
+      );
+      if (!annotation) throw new CandidateRevisionError(404, "意见不存在。");
+      if (
+        annotation.kind === "editor" &&
+        patch.status !== undefined &&
+        (patch.status === "dismissed" || annotation.status === "dismissed")
+      )
+        throw new CandidateRevisionError(
+          409,
+          "请在候选稿中撤销或恢复这处修改。",
+        );
+      return writeAnnotationDisposition(tx, id, annotation, patch);
     });
   }
   async candidateRevision(fs: PostgresFS, id: string, version: number) {

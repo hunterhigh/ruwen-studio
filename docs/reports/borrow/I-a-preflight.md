@@ -27,3 +27,34 @@
 ## 需要人类决定的事
 
 - 请确认是否先由上游定义「既有稿件导入」专用状态入口、逐章独立批准及项目账本摘要／平台审计详情边界。若沿用现有上游流程，则需调整 D4 为分章后继续走正式批准。两种取舍均需明确后再开始实施。
+
+## 方案 B 核实
+
+### 做了什么
+
+1. **初始化前置与效果。** `init_state` / `initState` 要求项目尚无 `state.json`、项目就绪、注册表通过校验。活动大纲必须是已批准激活且哈希一致的 `story`，附带来源若有则以不重复的 `role=path` 传入，须为同样有效的 `character/world/story`。可选的重写截点与快照根须成对指定，在 `authoring-ruwen-v5/snapshots/` 内，跟踪来源和末章必须位于该快照。本方案无需开重写模式。 [上游 L115–154、L176–207、L220–254、L567–618](../../../vendor/ruwen/01-完整插件/ruwen-xiezuo-xitong/scripts/story_state.py#L567-L618) · [core L70–165、L316–379](../../../packages/core/src/state/index.ts#L316-L379)
+   **登记与下一章。** `lastApproved` 是指向项目内已有文件的路径。初始化只记该路径和当前哈希，无 `chapters/` 路径、章号连续性、前 N−1 章哈希或正文批准记录校验，也不写任何正文章节。状态为已初始化，历史和已消费 ID 为空，无待晋升或待记忆合并，投影和资料包均未生成。用户仍须批准真实第 N+1 章情境并登记，随后编译资料包、按正常流水线写作。投影记录末章路径/哈希，平台按现有规则使用相关已批准正文上下文。 [上游初始化及投影 L567–669](../../../vendor/ruwen/01-完整插件/ruwen-xiezuo-xitong/scripts/story_state.py#L567-L669) · [core L274–308、L381–447](../../../packages/core/src/state/index.ts#L381-L447) · [流水线 L457–489、L537–550](../../../packages/pipeline/src/index.ts#L457-L550)
+2. **上游检查的结论。** TS 与 Python 承认第 3 章作为历史接续引用，允许准备下一章。状态检查复核当前末章哈希，治理检查复核注册表和账本，闭合审计看资料文本与人工审查证据。三项检查均不证明前两章已获正文批准。 [上游状态检查 L378–484](../../../vendor/ruwen/01-完整插件/ruwen-xiezuo-xitong/scripts/story_state.py#L378-L484) · [上游治理检查 L32–76](../../../vendor/ruwen/01-完整插件/ruwen-xiezuo-xitong/scripts/governance_check.py#L32-L76) · [core 状态检查 L224–308](../../../packages/core/src/state/index.ts#L224-L308)
+3. **一次批准的最小契约。** 现有五种动作（`handoff_execute`、`candidate_approve`、`memory_commit`、`resource_activate`、`expression_activate`）都没有此语义。建议上游增加独立的历史接续批准动作，复用现有事件结构，将目标指向有版本的清单，绑定项目、批次和全部最终路径、衔接顺序、正文 SHA-256。确认时重算清单及每章哈希、检查 001..N 无缺口且目标为空，逐章排他写入、用末章初始化、记录接续事件并消费唯一批准，平台在同一项目事务内全成或全退。上游须认可这条进入 `chapters/` 的专用路径及可导出凭据，Python 入口与测试也要保证错误时不留下部分结果。单次清单事件满足 I2。设计 R2-8 的每章独立事件条文需明确改为等价批次批准。 [上游动作 L15–23、L62–146](../../../vendor/ruwen/01-完整插件/ruwen-xiezuo-xitong/scripts/approval_record.py#L15-L146) · [core L15–21、L41–185](../../../packages/core/src/approval/index.ts#L15-L185) · [正式章节模板](../../../vendor/ruwen/01-完整插件/ruwen-xiezuo-xitong/assets/project-template/chapters/README.md#L1-L3)
+4. **原稿隔离。** 建议将切分后的文本放 `研究/导入原稿/<批次>/chapter-001.md`，按章登记 `evidence` 资源，绑定项目作用域和文件哈希，`allow_author:false`，`readers` 只列未来资料提取岗位。首次保存用 proposed/candidate。现有工具只读 active 且 approved，故真正提取前用资料预览与现有 `resource_activate` 授予读取权限，仍属非正典。未来岗位经现有注册表读取函数校验角色、项目、状态及哈希，正文经不可信材料包裹。作者路径白名单和编译器另行阻断，原稿也不列作状态大纲、追踪来源或末章。只保存切分文本，原上传二进制不持久化。 [上游职责 L7–13、L31–40](../../../vendor/ruwen/03-设计与迁移/如文写作系统5.0-架构.md#L7-L40) · [上游注册表 L38–47、L120–129、L193–227](../../../vendor/ruwen/01-完整插件/ruwen-xiezuo-xitong/scripts/resource_registry.py#L193-L227) · [core 注册表 L37–44、L92–96、L229–291](../../../packages/core/src/registry/index.ts#L229-L291) · [岗位读取 L21–77](../../../packages/agents/src/tools/index.ts#L21-L77) · [作者包 L128–149](../../../packages/core/src/packet/index.ts#L128-L149)
+5. **R2-11 仍适用。** 平台追加式审计保存文件名、原文件 SHA-256、总章数及码点数，可分别记原稿保存与历史接续确认，以同一批次 ID 关联。项目账本记录白名单摘要，绑定正文的清单、批准事件和消费凭据作为独立的可导出文件。两者分工分别是平台追溯与上游可验证批准。 [上游审计白名单 L13–45](../../../vendor/ruwen/01-完整插件/ruwen-xiezuo-xitong/scripts/audit_ledger.py#L13-L45) · [core 审计 L15–58、L90–100](../../../packages/core/src/ledgers/index.ts#L15-L100) · [追加保护示例](../../../packages/db/migrations/0205_candidate_revision_audit.sql#L1-L19)
+
+### 测试结果
+
+临时项目使用差分测试的就绪资料夹具，先写入 3 章，再分别通过 TS CLI 与上游 Python 执行 `story_state init --last-approved chapters/chapter-003.md`。下列退出码按 TS/Python 排列，同一操作的 JSON 已对比，成功初始化生成的 `state.json` 逐字节相同。 [差分执行器 L96–157](../../../packages/core/test/differential/parity.test.ts#L96-L157) · [Python oracle](../../../packages/core/test/differential/python-oracle.py) · [上游 check L1001–1014](../../../vendor/ruwen/01-完整插件/ruwen-xiezuo-xitong/scripts/story_state.py#L1001-L1014) · [core CLI L309–334](../../../packages/core/bin/ruwen-core.ts#L309-L334)
+
+| 实测 | 输出摘要 |
+| --- | --- |
+| 就绪及治理检查 | `0/0`。`ready:true`、`valid:true`、零错误。资料不足、缺指定末章、重复初始化分别为 `2/2`。 |
+| 初始化并运行状态检查 | `0/0`。末章 `chapters/chapter-003.md`，SHA-256 为 `0118984f2618b223ea72334ef156aaf5ce17250691cad99b42551bfb49d24d32`，批准历史及消费 ID 都是 `[]`。初次 check 为 `source_reasons:[]`、`projection_stale:true`、`packet_stale:true`、`ready_to_compile:false`、`ready_to_draft:false`。 |
+| 闭合审计 | 逐章附匹配哈希的测试人工审查，三章均 `0/0`、`pass:true`、`decision:"candidate_allowed"`、`findings:[]`。移除第 3 章人工审查输入后变为 `1/1`、`remain_proposed`。此脚本判断资料能否成为候选，无法证明章节晋升或用户批准。 [上游 L26–68](../../../vendor/ruwen/01-完整插件/ruwen-xiezuo-xitong/scripts/closure_audit.py#L26-L68) · [core L107–167](../../../packages/core/src/checks/index.ts#L107-L167) |
+| 缺章和篡改对照 | 改第 1 章并移除第 2 章，末章不变，check 仍 `0/0`、`source_reasons:[]`，重新初始化也 `0/0`。再改第 3 章，check 仍退出 `0/0`，但 JSON 报 `changed last approved prose: chapters/chapter-003.md`。因此退出码或末章校验无法认证全部三章。 |
+| 接着写第 4 章 | 恢复正文字节，构思编译入口在无投影时接受第 4 章（项目身份查询用夹具，加载 4 份已批准资源）。随后登记第 4 章测试情境并编译。资料包 check 为 `0/0`、`valid:true`，状态 check 为 `ready_to_compile:true`、`ready_to_draft:true`。faux 正常章流程到 `AWAITING_CANDIDATE_APPROVAL`，第 4 章正式文件尚未生成，原三章哈希保持。 [构思编译前置 L88–132](../../../packages/pipeline/src/ideation/compilation.ts#L88-L132) |
+
+### 未完成与风险
+
+6. **有条件可行。** 实测支持把第 3 章用作合法的历史接续引用，完整 N 章的正式正典仍需上游认可的批次批准、逐章哈希校验和原子落盘。前提为未初始化且无既有正式章节、资料已逐份批准并就绪、原稿已隔离且提取岗位与读取权限已定案。已初始化项目另需获批的状态迁移。方案 A（直接导入专用入口）估计主仓 20–28 个文件、上游 3–6 个，主要是直接登记及逐章批准。方案 B 估计主仓 24–34 个、上游 3–5 个（批准动作、历史接续入口、说明、测试及可能的治理校验），额外涉及非正典原稿的存储、权限、等待与二次确认。两者均不计资料反推岗位及其实现。
+
+### 需要人类决定的事
+
+- 等待确认是否采纳方案 B 的上游历史接续契约、批次批准及适用项目范围。本轮为实验与文档，功能实现留待后续授权。

@@ -184,6 +184,22 @@ export const editorDecision = {
   RETURN_CONSTRUCTION: "退回构思",
 };
 export const changeKind = { fact: "事实修正", literary: "文学修改" };
+export const annotationStatsCopy = {
+  title: "意见反馈统计",
+  basis:
+    "按岗位完成日期筛选（UTC）。采纳率和忽略率按全部意见计算，有用率和没用率按已评价意见计算。",
+  from: "开始日期",
+  to: "结束日期",
+  filter: "更新统计",
+  role: "岗位",
+  total: "意见数",
+  accepted: "采纳率",
+  dismissed: "忽略率",
+  useful: "有用率",
+  notUseful: "没用率",
+  loading: "正在读取意见反馈…",
+  noRate: "—",
+};
 export const confirmation = {
   cancelRun: {
     title: "放弃本次运行？",

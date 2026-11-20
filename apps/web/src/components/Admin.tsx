@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import type { AdminRiskReview } from "../server/admin-review.ts";
+import { AdminAnnotationStats } from "./AdminAnnotationStats.tsx";
 import { AdminSecurity } from "./AdminSecurity.tsx";
 import { post } from "./client.ts";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
@@ -35,6 +36,7 @@ export function Admin() {
           <SafeMarkdown plain content={error || loadError} />
         </div>
       )}
+      <AdminAnnotationStats />
       <section className="paper-panel">
         <h2>费用复核</h2>
         <a href="/admin/reservations">处理待核对预留</a>

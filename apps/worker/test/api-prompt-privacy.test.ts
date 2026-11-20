@@ -209,6 +209,7 @@ it("every registered HTTP response, file read, export entry and SSE batch exclud
       .replace(":projectId", fs.projectId)
       .replace(":runId", id)
       .replace(":version", "1")
+      .replace(":annotationId", `${id}:0`)
       .replace(":checkoutId", checkoutId)
       .replace(":accountId", fs.ownerId)
       .replace(":reservationId", reservationId);
@@ -216,7 +217,7 @@ it("every registered HTTP response, file read, export entry and SSE batch exclud
       url = url.replace(`:${key}`, value);
     expect(url).not.toMatch(/:[A-Za-z]/); // New resource parameters need a concrete privacy fixture.
     const response = await handleApi(
-      request(url, route.method, route.method === "POST" ? {} : undefined),
+      request(url, route.method, route.method !== "GET" ? {} : undefined),
       services,
     );
     safe([...response.headers]);

@@ -10,6 +10,7 @@ import {
 } from "./candidate-revisions.ts";
 
 export type {
+  CandidateRevisionOperation,
   Reverification,
   ReverificationStatus,
 } from "./candidate-revisions.ts";

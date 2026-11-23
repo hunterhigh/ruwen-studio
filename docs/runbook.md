@@ -75,3 +75,20 @@ pnpm db:restore /secure-backup/ruwen.dump
 提交submodule指针、锁文件和上游提示词diff摘要，重跑快照、完整源文件子串/可见性、差分、不变量与全部CI；装配缓存/role_runs新哈希须能溯源。锁更新必须交人类审阅，不能因为CI绿自动合并；模型/提示词行为重新进入P3授权验收。不要在本轮P7准备中实际升级vendor。
 
 依据：[Fly配置](https://docs.fly.io/reference/configuration)、[Fly入口头](https://fly.io/docs/networking/request-headers/)、[Railway预部署](https://docs.railway.com/deployments/pre-deploy-command)、[Railway探针](https://docs.railway.com/deployments/healthchecks)、[Railway入口头](https://docs.railway.com/networking/public-networking/specs-and-limits)、[Compose只读限制](https://docs.docker.com/reference/compose-file/services/)、[Sentry数据收集选项](https://docs.sentry.io/platforms/javascript/guides/node/configuration/options/)。
+
+## GitHub Actions 用量
+
+提交推送只在 `main` 触发 CI。功能分支靠 PR 触发，合并后的 `main` 提交与手动 `workflow_dispatch` 都运行 `fast`、`full`、`containers`。同一引用有新运行时，取消仍在进行的旧运行。
+
+PR 总是跑 `fast`。`changes` 用实际测试的 PR 合并提交与第一父提交对比。只改 `docs/**`、根目录 Markdown、Dependabot 配置，或只调整 CI 触发、并发和作业调度且保持测试定义一致时，`full` 和 `containers` 在作业级跳过。代码、依赖、其他配置或测试作业定义改变时运行全套。路径判断失败时也运行全套，并保留判断错误。GitHub 将作业级 `Skipped` 视为可通过的必需检查结果。 [GitHub 作业条件说明](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-jobs-with-conditions)
+
+| 每次 PR 更新 | 修改前 | 修改后 |
+| --- | ---: | ---: |
+| 普通代码 PR | 约 62 runner 分钟 | 约 32 runner 分钟 |
+| 纯文档 PR | 约 57 runner 分钟 | 约 3 runner 分钟 |
+
+估算把作业实际时长按分钟向上取整后相加，旧流程包含 push 与 PR 两套作业，新流程计入约 1 分钟的路径判断。样本为块 F 和 I-a 首轮成功的双工作流。分钟数随缓存、队列外的准备时间和浏览器测试时长变化。每次合并触发的 `main` 全套 CI 和手动重跑另计。 [块 F 样本](https://github.com/hunterhigh/ruwen-studio/actions/runs/44507573653) · [I-a 样本](https://github.com/hunterhigh/ruwen-studio/actions/runs/44667808826)
+
+仓库为私有或内部时，标准 GitHub 托管 runner 的用量计入仓库所有者的月度套餐额度，超出额度后按账户的计费与预算设置办理。公开仓库的标准托管 runner 免费。以上为 Linux runner 用量估算，账单和剩余额度以 GitHub 的 Billing & plans 为准。 [GitHub Actions 计费](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
+
+Dependabot 每月检查版本更新。npm 和 GitHub Actions 各合成一组，Docker 沿用独立生态配置。三个生态都忽略 semver-major，每个生态最多保留两个开放的版本更新 PR。GitHub 对安全更新有独立的 PR 限额。 [Dependabot 配置参考](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference)

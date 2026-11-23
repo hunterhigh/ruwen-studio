@@ -9,6 +9,6 @@
     "@ruwen/agents": "workspace:*"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "1.5.0"
+    "@earendil-works/pi-ai": "1.5.2"
   }
 }

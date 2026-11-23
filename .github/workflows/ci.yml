@@ -2,6 +2,7 @@ name: Linux CI
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -13,6 +14,64 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: changes
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run_heavy: ${{ steps.paths.outputs.run_heavy }}
+    steps:
+      - name: Check out the PR merge commit and its parents
+        uses: actions/checkout@3d3c42e5aac5ba805da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+          submodules: false
+      - name: Classify changes against the tested merge commit's base
+        id: paths
+        run: |
+          ruby <<'RUBY'
+          require "open3"
+          require "yaml"
+
+          def git(*args)
+            output, status = Open3.capture2("git", *args)
+            abort("git #{args.join(' ')} failed") unless status.success?
+            output
+          end
+
+          def workloads(ref)
+            workflow = YAML.safe_load(git("show", "#{ref}:.github/workflows/ci.yml"))
+            # YAML 1.1 also parses the unquoted workflow trigger key as true.
+            workflow.delete(true)
+            workflow.delete("on")
+            workflow.delete("concurrency")
+            jobs = workflow.fetch("jobs")
+            jobs.delete("changes")
+            %w[full containers].each do |name|
+              job = jobs.fetch(name)
+              job.delete("needs")
+              job.delete("if")
+            end
+            workflow
+          end
+
+          git("rev-parse", "--verify", "HEAD^2")
+          paths = git("diff", "--no-ext-diff", "--name-only", "--no-renames", "-z",
+                      "HEAD^1", "HEAD", "--").split("\0")
+          fast_only = paths.all? do |path|
+            case path
+            when %r{\Adocs/}, %r{\A[^/]+\.md\z}, ".github/dependabot.yml"
+              true
+            when ".github/workflows/ci.yml"
+              workloads("HEAD^1") == workloads("HEAD")
+            else
+              false
+            end
+          end
+          File.open(ENV.fetch("GITHUB_OUTPUT"), "a") { |out| out.puts("run_heavy=#{!fast_only}") }
+          RUBY
   fast:
     name: fast
     runs-on: ubuntu-24.04
@@ -47,7 +106,8 @@ jobs:
         run: pnpm lint && pnpm typecheck && pnpm test:fast
   full:
     name: full
-    needs: fast
+    needs: [fast, changes]
+    if: ${{ !cancelled() && needs.fast.result == 'success' && (needs.changes.result != 'success' || needs.changes.outputs.run_heavy != 'false') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     services:
@@ -124,7 +184,8 @@ jobs:
           if-no-files-found: ignore
   containers:
     name: containers
-    needs: fast
+    needs: [fast, changes]
+    if: ${{ !cancelled() && needs.fast.result == 'success' && (needs.changes.result != 'success' || needs.changes.outputs.run_heavy != 'false') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:

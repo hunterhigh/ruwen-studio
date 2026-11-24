@@ -13,7 +13,8 @@
 
 - `pnpm lint`、`pnpm typecheck` 通过。数据库和 Worker 定向回归 14 项通过，覆盖空闲连接被终止后继续查询、原始事务错误、回滚失败、脱敏日志、LISTEN 重新订阅和套接字关闭顺序。
 - 本地 P3 复跑有通过轮次，每轮 21 项。Windows 后续轮次间歇出现原生 CLI 50 秒超时，或编辑退回用例 10 秒超时。连续十轮尚待确认。计时探针确认成功轮次中，应用连接池清理先于 PostgreSQL 停止，CLI 完成且模型服务商调用数为 0。
-- 本地 `pnpm test` 重试出现 P3、章节流水线和 Python 差分用例超时，已保留日志。`pnpm test:e2e` 已完成生产构建并启动 36 项浏览器测试。最终本地结果与 Linux CI 链接见 PR 验证记录。
+- 本地 `pnpm test` 重试出现 P3、章节流水线和 Python 差分用例超时。`pnpm test:e2e` 建置成功，浏览器用例出现等待候选稿和页面元素的超时。已保存失败证据，完整结果见 PR 验证记录。
+- PR 首轮 Linux CI 中 P3 通过，集成测试共 763 项通过、1 项失败。CI 的临时密码 `postgres` 正好出现在固定事件名 `postgres_connection_error` 中，产生脱敏断言误报。改用独立测试标记，日志字段形状仍逐条校验，同时覆盖 TCP 先于 PostgreSQL 错误消息关闭的情况。修正后用同一测试密码在本地复查，5 项断线回归全部通过。 [PR #55](https://github.com/hunterhigh/ruwen-studio/pull/55)
 
 ## 未完成与风险
 

@@ -288,7 +288,7 @@ export class WorkerService {
         );
       }
     } catch (error) {
-      await this.ideationRunner.stop();
+      await this.ideationRunner.stop().catch(() => {});
       await this.boss.stop({ graceful: false }).catch(() => {});
       await this.db.close().catch(() => {});
       throw error;
@@ -296,9 +296,15 @@ export class WorkerService {
   }
   async stop() {
     for (const control of this.active.values()) control.abort();
-    await this.ideationRunner.stop();
-    await this.boss.stop({ graceful: true, timeout: 10000 });
-    await this.db.close();
+    try {
+      await this.ideationRunner.stop();
+    } finally {
+      try {
+        await this.boss.stop({ graceful: true, timeout: 10000 });
+      } finally {
+        await this.db.close();
+      }
+    }
   }
   private adapter(fs: PostgresFS) {
     return {
@@ -938,8 +944,9 @@ export class WorkerService {
     if (task.kind === "ideation")
       return this.ideationRunner.handle(task, jobSignal);
     const fs = new PostgresFS(this.db, task.projectId, task.ownerId);
-    const connection = await this.db.pool.connect();
     const control = new AbortController();
+    const session = await this.db.checkout((error) => control.abort(error));
+    const { client: connection } = session;
     const signal = jobSignal
       ? AbortSignal.any([jobSignal, control.signal])
       : control.signal;
@@ -956,7 +963,7 @@ export class WorkerService {
       );
       locked = lock.rows[0]?.locked === true;
       if (!locked) {
-        connection.release();
+        session.release();
         released = true;
         const deferrals = (task.lockDeferrals ?? 0) + 1;
         const delayMs = Math.min(30_000, 250 * 2 ** Math.min(deferrals - 1, 7));
@@ -1130,19 +1137,31 @@ export class WorkerService {
       }
       throw new Error("Unknown queue task kind");
     } finally {
-      await stream?.finish();
       if (timer) clearInterval(timer);
-      await polling;
-      if (this.active.get(task.runId) === control)
-        this.active.delete(task.runId);
       try {
-        if (locked)
-          await connection.query(
-            "SELECT pg_advisory_unlock(hashtextextended($1,0))",
-            [`ruwen:project:${task.projectId}`],
-          );
+        await polling;
+        await stream?.finish();
       } finally {
-        if (!released) connection.release();
+        if (this.active.get(task.runId) === control)
+          this.active.delete(task.runId);
+        if (!released) {
+          let discard: Error | undefined;
+          try {
+            if (locked && !session.error)
+              await connection.query(
+                "SELECT pg_advisory_unlock(hashtextextended($1,0))",
+                [`ruwen:project:${task.projectId}`],
+              );
+          } catch (error) {
+            discard =
+              error instanceof Error
+                ? error
+                : new Error("PostgreSQL unlock failed");
+            reportError("worker_error", discard);
+          } finally {
+            session.release(discard);
+          }
+        }
       }
     }
   }

@@ -457,21 +457,24 @@ export async function runP3Smoke(options: SmokeOptions) {
       };
     else failure = error instanceof Error ? error.message : String(error);
   } finally {
-    results = (
-      await worker.db.pool.query<{ role: RoleId; result: RoleResult }>(
-        "SELECT role_id AS role,result FROM role_runs WHERE run_id IN (SELECT id FROM pipeline_runs WHERE project_id=$1) AND result IS NOT NULL ORDER BY id",
-        [fs.projectId],
-      )
-    ).rows;
-    retries = (
-      await worker.db.pool.query<{ role: string; count: string }>(
-        `SELECT role,count(*)::text FROM (
+    try {
+      results = (
+        await worker.db.pool.query<{ role: RoleId; result: RoleResult }>(
+          "SELECT role_id AS role,result FROM role_runs WHERE run_id IN (SELECT id FROM pipeline_runs WHERE project_id=$1) AND result IS NOT NULL ORDER BY id",
+          [fs.projectId],
+        )
+      ).rows;
+      retries = (
+        await worker.db.pool.query<{ role: string; count: string }>(
+          `SELECT role,count(*)::text FROM (
       SELECT role_id AS role FROM web_run_events WHERE project_id=$1 AND event_type='reset' AND reset_reason IN ('format_correction','prompt_overlap_correction')
       UNION ALL SELECT data->>'role' AS role FROM ideation_events WHERE project_id=$1 AND data->>'type'='reset' AND data->>'reason' IN ('format_correction','prompt_overlap_correction')) r GROUP BY role`,
-        [fs.projectId],
-      )
-    ).rows;
-    await worker.stop();
+          [fs.projectId],
+        )
+      ).rows;
+    } finally {
+      await worker.stop();
+    }
   }
   const roles = [...new Set(budget.calls.map((c) => c.role))].map((role) => {
     const calls = budget.calls.filter((c) => c.role === role);

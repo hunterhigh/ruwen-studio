@@ -3,9 +3,61 @@ import { readdir, readFile } from "node:fs/promises";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg, { type PoolClient } from "pg";
 import * as schema from "./schema.ts";
+
+const connectionCodes = new Set([
+  "57P01",
+  "57P02",
+  "57P03",
+  "57P04",
+  "ECONNRESET",
+  "ECONNREFUSED",
+  "ECONNABORTED",
+  "EPIPE",
+  "ETIMEDOUT",
+  "ENETUNREACH",
+  "EHOSTUNREACH",
+  "ENOTFOUND",
+]);
+
+function errorCode(error: unknown): string | undefined {
+  if (
+    error instanceof Error &&
+    "code" in error &&
+    typeof error.code === "string"
+  )
+    return error.code;
+}
+
+function connectionFailure(error: unknown): error is Error {
+  if (!(error instanceof Error)) return false;
+  const code = errorCode(error);
+  return (
+    ("severity" in error &&
+      (error.severity === "FATAL" || error.severity === "PANIC")) ||
+    (code !== undefined &&
+      (connectionCodes.has(code) || /^08[A-Z0-9]{3}$/.test(code)))
+  );
+}
+
+function logConnectionError(
+  source: "idle_pool" | "checked_out" | "rollback",
+  error: unknown,
+) {
+  const code = errorCode(error);
+  process.stderr.write(
+    `${JSON.stringify({
+      event: "postgres_connection_error",
+      source,
+      ...(code && connectionCodes.has(code) ? { error_code: code } : {}),
+    })}\n`,
+  );
+}
+
 export class Database {
   readonly pool: pg.Pool;
   readonly orm;
+  private readonly socketEnds = new Map<PoolClient, Promise<void>>();
+  private closing: Promise<void> | undefined;
   constructor(connectionString: string) {
     this.pool = new pg.Pool({
       connectionString,
@@ -13,13 +65,48 @@ export class Database {
       connectionTimeoutMillis: 10000,
       idleTimeoutMillis: 10000,
     });
+    this.pool.on("error", (error) => logConnectionError("idle_pool", error));
+    this.pool.on("connect", (client) => {
+      this.socketEnds.set(
+        client,
+        new Promise<void>((resolve) => {
+          client.once("end", () => {
+            this.socketEnds.delete(client);
+            resolve();
+          });
+        }),
+      );
+    });
     this.orm = drizzle(this.pool, { schema });
+  }
+  async checkout(onDisconnect?: (error: Error) => void) {
+    const client = await this.pool.connect();
+    let connectionError: Error | undefined;
+    const onError = (error: Error) => {
+      if (connectionError) return;
+      connectionError = error;
+      logConnectionError("checked_out", error);
+      onDisconnect?.(error);
+    };
+    client.on("error", onError);
+    return {
+      client,
+      get error() {
+        return connectionError;
+      },
+      release(error?: Error) {
+        client.release(connectionError ?? error);
+        client.off("error", onError);
+      },
+    };
   }
   async transaction<T>(
     fn: (client: PoolClient) => Promise<T>,
     options: { readOnly?: boolean } = {},
   ): Promise<T> {
-    const client = await this.pool.connect();
+    const session = await this.checkout();
+    const { client } = session;
+    let discard: Error | undefined;
     try {
       await client.query(
         options.readOnly
@@ -27,13 +114,26 @@ export class Database {
           : "BEGIN",
       );
       const value = await fn(client);
+      if (session.error) throw session.error;
       await client.query("COMMIT");
       return value;
     } catch (error) {
-      await client.query("ROLLBACK");
+      if (connectionFailure(error)) discard = error;
+      if (!discard && !session.error) {
+        try {
+          const rollback = { text: "ROLLBACK", query_timeout: 5000 };
+          await client.query(rollback);
+        } catch (rollbackError) {
+          discard =
+            rollbackError instanceof Error
+              ? rollbackError
+              : new Error("PostgreSQL rollback failed");
+          logConnectionError("rollback", rollbackError);
+        }
+      }
       throw error;
     } finally {
-      client.release();
+      session.release(discard);
     }
   }
   async migrate(): Promise<void> {
@@ -89,6 +189,10 @@ export class Database {
     }
   }
   close() {
-    return this.pool.end();
+    // pg-pool removes idle clients before their sockets end.
+    this.closing ??= this.pool.end().then(async () => {
+      await Promise.all(this.socketEnds.values());
+    });
+    return this.closing;
   }
 }

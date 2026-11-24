@@ -276,13 +276,14 @@ afterEach(async () => {
 it("actual pg-boss worker runs to both approval gates, commits once and emits transactional progress", async () => {
   const { service, fs } = await fixture({}, true);
   cleanups.push(() => service.stop());
-  const listener = await service.db.pool.connect();
+  const subscription = await service.db.checkout();
+  const listener = subscription.client;
   const notices: string[] = [];
   listener.on("notification", (message) => {
     if (message.payload) notices.push(message.payload);
   });
-  await listener.query("LISTEN ruwen_runs");
   try {
+    await listener.query("LISTEN ruwen_runs");
     const id = await service.enqueueChapter(fs, { chapter: 1 });
     await waitStatus(service, id, "AWAITING_CANDIDATE_APPROVAL");
     let run = await loadRun(fs, id);
@@ -334,8 +335,7 @@ it("actual pg-boss worker runs to both approval gates, commits once and emits tr
       ),
     ).toBe(true);
   } finally {
-    await listener.query("UNLISTEN *");
-    listener.release();
+    subscription.release(new Error("Temporary LISTEN session completed"));
   }
 }, 30000);
 it("queue producers reject a foreign owner and an unconfirmed or stale approval", async () => {

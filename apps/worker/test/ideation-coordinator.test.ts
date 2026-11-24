@@ -699,7 +699,8 @@ it.each([
   // OS exit and PostgreSQL releasing its dead backend session are separate boundaries.
   const deadline = Date.now() + 5000;
   while (true) {
-    const c = await p.db.pool.connect();
+    const session = await p.db.checkout();
+    const { client: c } = session;
     try {
       const acquired = (
         await c.query<{ locked: boolean }>(
@@ -714,7 +715,7 @@ it.each([
         break;
       }
     } finally {
-      c.release();
+      session.release();
     }
     if (Date.now() > deadline)
       throw new Error("Dead worker lock was not released");

@@ -23,6 +23,7 @@ import type {
   IdeationTaskStatus,
 } from "@ruwen/pipeline";
 import type { PgBoss } from "pg-boss";
+import { reportError } from "../../../config/observability.ts";
 import {
   assertNoOriginalWording,
   OriginalWordingStream,
@@ -132,13 +133,15 @@ export class IdeationRunner {
     } as IdeationActor;
     const service = createIdeationService(this.db, this.sessions),
       fs = new PostgresFS(this.db, job.projectId, job.ownerId);
-    const lock = await this.db.pool.connect();
     let locked = false;
     const control = new AbortController();
+    const session = await this.db.checkout((error) => control.abort(error));
+    const { client: lock } = session;
     const signal = jobSignal
       ? AbortSignal.any([jobSignal, control.signal])
       : control.signal;
     let cancellation: Promise<void> | undefined;
+    let pollFailed = false;
     let timer: ReturnType<typeof setInterval> | undefined;
     let eventTail = Promise.resolve();
     let eventError: unknown;
@@ -280,6 +283,11 @@ export class IdeationRunner {
           )
           .then((row) => {
             if (row.rows[0]?.cancel_requested) control.abort();
+          })
+          .catch((error) => {
+            pollFailed = true;
+            control.abort(error);
+            reportError("worker_error", error);
           })
           .finally(() => {
             cancellation = undefined;
@@ -515,17 +523,19 @@ export class IdeationRunner {
         ? requestGuardFailure.code
         : eventError
           ? "INTERNAL_ERROR"
-          : error instanceof IdeationFailure
-            ? error.code
-            : signal.aborted
-              ? "CANCELLED"
-              : error instanceof RoleSecurityError
-                ? "OUTPUT_BLOCKED"
-                : error instanceof RoleProviderError
-                  ? "PROVIDER_UNAVAILABLE"
-                  : error instanceof RoleExecutionError
-                    ? "CREATION_CHECK_FAILED"
-                    : "INTERRUPTED";
+          : session.error || pollFailed
+            ? "INTERRUPTED"
+            : error instanceof IdeationFailure
+              ? error.code
+              : signal.aborted
+                ? "CANCELLED"
+                : error instanceof RoleSecurityError
+                  ? "OUTPUT_BLOCKED"
+                  : error instanceof RoleProviderError
+                    ? "PROVIDER_UNAVAILABLE"
+                    : error instanceof RoleExecutionError
+                      ? "CREATION_CHECK_FAILED"
+                      : "INTERRUPTED";
       // A crash at a committed completion boundary is harmless; never downgrade saved work.
       await service.store.transaction(actor, async (tx) => {
         const task = await service.ownedTask(tx, actor, job.runId);
@@ -580,14 +590,21 @@ export class IdeationRunner {
       await cancellation;
       await eventTail;
       this.active.delete(job.runId);
+      let discard: Error | undefined;
       try {
-        if (locked)
+        if (locked && !session.error)
           await lock.query(
             "SELECT pg_advisory_unlock(hashtextextended($1,0))",
             [`ruwen:project:${job.projectId}`],
           );
+      } catch (error) {
+        discard =
+          error instanceof Error
+            ? error
+            : new Error("PostgreSQL unlock failed");
+        reportError("worker_error", discard);
       } finally {
-        lock.release();
+        session.release(discard);
       }
     }
   }

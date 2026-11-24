@@ -56,7 +56,8 @@ export async function killIdeationAt(
   }
   const deadline = Date.now() + 5000;
   while (true) {
-    const client = await db.pool.connect();
+    const session = await db.checkout();
+    const { client } = session;
     try {
       const acquired = (
         await client.query<{ locked: boolean }>(
@@ -72,7 +73,7 @@ export async function killIdeationAt(
         return;
       }
     } finally {
-      client.release();
+      session.release();
     }
     if (Date.now() > deadline)
       throw new Error("Dead worker lock was not released");

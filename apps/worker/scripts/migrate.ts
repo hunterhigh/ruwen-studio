@@ -1,12 +1,14 @@
 import { initializeBilling } from "@ruwen/billing";
 import { Database } from "@ruwen/db";
 import { PgBoss } from "pg-boss";
+import { reportError } from "../../../config/observability.ts";
 
 // Explicit release step. Never loads .env or starts consumers/models.
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is required");
 const db = new Database(connectionString);
 const boss = new PgBoss({ connectionString, migrate: true, supervise: false });
+boss.on("error", (error) => reportError("library_error", error));
 try {
   await db.migrate();
   await initializeBilling(db);
@@ -17,6 +19,9 @@ try {
   process.stderr.write('{"event":"migration_failed"}\n');
   process.exitCode = 1;
 } finally {
-  await boss.stop();
-  await db.close();
+  try {
+    await boss.stop();
+  } finally {
+    await db.close();
+  }
 }

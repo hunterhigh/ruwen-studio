@@ -6,7 +6,8 @@ import { Database } from "../src/index.ts";
 const db = new Database(inject("databaseUrl"));
 afterAll(() => db.close());
 it("0003 atomically removes every old prompt copy, including file history and system messages, and preserves unrelated bytes", async () => {
-  const client = await db.pool.connect();
+  const session = await db.checkout();
+  const { client } = session;
   const schema = `migration_${randomUUID().replaceAll("-", "")}`;
   const secret =
     "TEST_ONLY_MIGRATION_CANARY_0942_完整平台系统原文不能进入用户导出或历史文件。";
@@ -152,7 +153,10 @@ it("0003 atomically removes every old prompt copy, including file history and sy
       { role: "assistant", content: [] },
     ]);
   } finally {
-    await client.query("ROLLBACK");
-    client.release();
+    try {
+      if (!session.error) await client.query("ROLLBACK");
+    } finally {
+      session.release(new Error("Migration test session completed"));
+    }
   }
 });

@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
+import { startChapter } from "./chapter-review.ts";
 import { createDemo, signIn } from "./helpers.ts";
 import { captureFrame } from "./redesign-02.ts";
 
@@ -61,8 +62,8 @@ test("global frame: real project decisions, every navigation mode, persistent ba
   await page.evaluate(() => window.scrollTo(0, 0));
   await captureFrame(page, "overview-decisions");
   await projectNav.getByRole("link", { name: "章节写作", exact: true }).click();
-  await page.getByRole("button", { name: "开始写作", exact: true }).click();
-  await expect(page.getByTestId("run-status")).toHaveText("等待你阅读与批准", {
+  await startChapter(page);
+  await expect(page.getByTestId("run-status")).toHaveText("等你阅读与批准", {
     timeout: 90000,
   });
   await expect(page.locator(".decision-chip .badge-count")).toHaveText("2");

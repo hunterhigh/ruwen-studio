@@ -12,7 +12,9 @@ for (const refusal of [false, true]) {
     const runId = randomUUID();
     await page.route(`**/api/projects/${projectId}/runs`, (route) =>
       route.fulfill({
-        json: [{ id: runId, chapter: "1", status: "REQUESTED" }],
+        json: [
+          { id: runId, chapter: "1", kind: "chapter_run", status: "REQUESTED" },
+        ],
       }),
     );
     await page.route(`**/api/runs/${runId}`, (route) =>

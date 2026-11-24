@@ -5,10 +5,10 @@ export default async function ChaptersPage({
   searchParams,
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ run?: string }>;
+  searchParams: Promise<{ run?: string; view?: string }>;
 }) {
   const { projectId } = await params;
-  const { run } = await searchParams;
+  const { run, view } = await searchParams;
   await ownedPage({ projectId });
   if (run) {
     const owned = await ownedPage({ runId: run });
@@ -20,6 +20,7 @@ export default async function ChaptersPage({
   return (
     <ChapterStudio
       projectId={projectId}
+      memoryView={view === "memory"}
       {...(run ? { initialRun: run } : {})}
     />
   );

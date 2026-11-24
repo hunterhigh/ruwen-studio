@@ -2282,3 +2282,570 @@ textarea {
   font-size: 30px;
   font-weight: 600;
 }
+
+/* Chapter review desk */
+.chapter-redesign {
+  max-width: 1360px;
+  padding: 30px clamp(24px, 4vw, 56px) 56px;
+  min-width: 0;
+}
+.chapter-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin: 8px 0 26px;
+}
+.chapter-heading h1 {
+  font: 600 26px / 1.4 var(--serif);
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+.chapter-status-row,
+.chapter-history,
+.chapter-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.chapter-status-row,
+.chapter-history > span {
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.chapter-connection {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.chapter-connection i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-3);
+}
+.chapter-connection .connected {
+  background: var(--plot);
+}
+.chapter-history button:not(.ui-btn),
+.chapter-history select,
+.chapter-segment button,
+.chapter-note-toggles button {
+  background: transparent;
+  color: var(--ink-2);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.chapter-history button[aria-pressed="true"],
+.chapter-segment button[aria-pressed="true"],
+.chapter-note-toggles button[aria-pressed="true"] {
+  background: var(--paper);
+  border-color: var(--rule);
+  color: var(--ink);
+}
+.chapter-start form {
+  display: grid;
+  gap: 14px;
+}
+.chapter-start form p {
+  margin: 0;
+}
+.chapter-blank {
+  max-width: 760px;
+  min-height: 440px;
+  padding: 64px 36px;
+  margin: 34px auto;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+  border: 1px solid var(--rule-soft);
+  background: var(--paper);
+  box-shadow: 0 10px 28px rgb(36 49 62 / 7%);
+  border-radius: 3px;
+}
+.chapter-blank h1 {
+  font-weight: 600;
+  font-size: 30px;
+}
+.chapter-info,
+.chapter-problem,
+.chapter-edit-decision,
+.chapter-return {
+  padding: 16px 20px;
+  margin: 16px 0;
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: 5px;
+  overflow-wrap: anywhere;
+}
+.chapter-problem {
+  background: var(--seal-soft);
+}
+.chapter-problem h2,
+.chapter-return h2 {
+  font-family: var(--serif);
+  font-size: 19px;
+  margin-bottom: 7px;
+}
+.chapter-roles {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  padding: 0;
+  margin: 0 0 18px;
+  list-style: none;
+}
+.chapter-roles::before {
+  content: "";
+  position: absolute;
+  top: 23px;
+  left: 8.333%;
+  right: 8.333%;
+  height: 1px;
+  background: var(--rule);
+}
+.chapter-role {
+  position: relative;
+  text-align: center;
+}
+.role-0 {
+  --role-ink: var(--ink);
+  --role-tint: var(--desk-2);
+}
+.role-1 {
+  --role-ink: var(--reader);
+  --role-tint: var(--reader-bg);
+}
+.role-2 {
+  --role-ink: var(--editor);
+  --role-tint: var(--editor-bg);
+}
+.role-3 {
+  --role-ink: var(--plot);
+  --role-tint: var(--plot-bg);
+}
+.role-4 {
+  --role-ink: var(--real);
+  --role-tint: var(--real-bg);
+}
+.role-5 {
+  --role-ink: var(--memory);
+  --role-tint: var(--memory-bg);
+}
+.chapter-role > button {
+  width: 100%;
+  padding: 4px 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+.chapter-role small {
+  color: var(--ink-2);
+}
+.chapter-role-dot {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  background: var(--desk);
+  border: 1px dashed var(--ink-3);
+  border-radius: 50%;
+  font-size: 17px;
+}
+.is-done .chapter-role-dot {
+  color: var(--role-ink);
+  background: var(--role-tint);
+  border: 1px solid var(--role-tint);
+}
+.is-working .chapter-role-dot {
+  background: var(--role-ink);
+  border-color: var(--role-ink);
+  animation: chapter-breathe 2s ease-in-out infinite;
+}
+.is-failed .chapter-role-dot {
+  color: var(--paper);
+  background: var(--seal-deep);
+  border-color: var(--seal-deep);
+}
+@keyframes chapter-breathe {
+  50% {
+    box-shadow: 0 0 0 5px var(--role-tint);
+  }
+}
+.chapter-role-popover {
+  position: absolute;
+  z-index: 6;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 265px;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  background: var(--paper);
+  padding: 15px 17px;
+  text-align: left;
+  box-shadow: 0 8px 22px rgb(36 49 62 / 13%);
+}
+.chapter-role:first-child .chapter-role-popover {
+  left: 0;
+  transform: none;
+}
+.chapter-role:last-child .chapter-role-popover {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+.chapter-role-popover p {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+.chapter-role-popover h3 {
+  margin: 0;
+}
+.chapter-edit-decision {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: 18px;
+  row-gap: 6px;
+  padding: 12px 16px;
+}
+.chapter-edit-decision > div > span {
+  margin-left: 12px;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+.chapter-archived {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.chapter-archived del,
+.chapter-archived ins,
+.chapter-note-detail del,
+.chapter-note-detail ins {
+  color: var(--editor);
+}
+.chapter-archived ins {
+  margin-left: 8px;
+}
+.chapter-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 18px 0 12px;
+}
+.chapter-segment,
+.chapter-note-toggles {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.chapter-segment {
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 2px;
+}
+.chapter-note-toggles button[aria-pressed="false"] {
+  border: 1px dashed var(--rule);
+}
+.chapter-reading {
+  display: grid;
+  grid-template-columns: minmax(0, 760px) minmax(200px, 320px);
+  column-gap: 26px;
+  align-items: start;
+  justify-content: center;
+}
+.chapter-paper.manuscript {
+  position: relative;
+  margin: 0;
+  padding: 64px clamp(26px, 4.5vw, 64px) 72px;
+  background: var(--paper);
+  border-radius: 3px;
+  box-shadow: 0 8px 25px rgb(36 49 62 / 7%);
+  min-height: 440px;
+}
+.chapter-paper-meta.manuscript-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  font: 12px / 1.6 var(--sans);
+  color: var(--ink-2);
+  margin: 0;
+  padding: 0 0 13px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.chapter-paper h2 {
+  text-align: center;
+  font: 600 26px / 1.5 var(--serif);
+  letter-spacing: 0.3em;
+  margin: 25px 0 30px;
+  overflow-wrap: anywhere;
+}
+.chapter-paragraph.prose-paragraph {
+  max-width: 38em;
+  margin: 0 auto 0.6em;
+  font: 18px / 1.9 var(--serif);
+  text-indent: 2em;
+  text-align: justify;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.chapter-paper .manuscript-empty {
+  text-align: center;
+  margin: 56px 0;
+}
+.chapter-end {
+  text-align: center;
+  color: var(--ink-2);
+  font-size: 12px;
+  margin: 32px 0 0;
+}
+.chapter-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--ink);
+  vertical-align: text-bottom;
+  animation: chapter-blink 1.2s step-end infinite;
+}
+@keyframes chapter-blink {
+  50% {
+    opacity: 0;
+  }
+}
+.chapter-note-lane {
+  position: relative;
+  min-width: 0;
+}
+.chapter-note-lane > p {
+  color: var(--ink-2);
+  font-size: 13px;
+  padding: 9px 12px;
+}
+.chapter-note {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  border-left: 3px solid var(--note-ink);
+  background: var(--paper);
+  border-radius: 3px;
+  overflow-wrap: anywhere;
+}
+.chapter-note.is-reader {
+  --note-ink: var(--reader);
+  --note-tint: var(--reader-bg);
+}
+.chapter-note.is-editor {
+  --note-ink: var(--editor);
+  --note-tint: var(--editor-bg);
+}
+.chapter-note-toggle {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 12px 14px;
+  text-align: left;
+  color: var(--ink);
+  font-size: 13px;
+}
+.chapter-note-toggle strong {
+  color: var(--note-ink);
+  font-size: 12px;
+}
+.chapter-note-toggle[aria-expanded="true"] {
+  background: var(--note-tint);
+}
+.chapter-note-reason {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.chapter-note-toggle[aria-expanded="true"] .chapter-note-reason {
+  display: block;
+}
+.chapter-note-detail {
+  padding: 10px 14px;
+  font-size: 13px;
+}
+.chapter-note-detail p {
+  margin: 0 0 5px;
+}
+.chapter-note small {
+  color: var(--ink-2);
+}
+.chapter-inline-mark {
+  display: inline;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  background: transparent;
+  text-indent: 0;
+  white-space: inherit;
+  overflow-wrap: inherit;
+  text-align: inherit;
+}
+.chapter-reader-mark mark {
+  background: var(--reader-bg);
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--reader);
+}
+.chapter-reader-mark[aria-pressed="true"] mark {
+  background: #eacc87;
+}
+.chapter-edit-mark del {
+  color: var(--editor);
+  background: var(--editor-bg);
+}
+.chapter-edit-mark ins {
+  color: var(--editor);
+  text-underline-offset: 3px;
+}
+.chapter-edit-mark[aria-pressed="true"] {
+  background: var(--editor-bg);
+}
+.chapter-checks {
+  margin: 26px auto;
+}
+.chapter-checks h2 {
+  font: 600 20px / 1.4 var(--serif);
+}
+.chapter-verdicts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.chapter-verdict {
+  padding: 15px 18px;
+  background: var(--paper);
+  border-top: 3px solid var(--role-ink);
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+.chapter-verdict header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.chapter-verdict h3 {
+  margin: 0;
+}
+.chapter-verdict header > strong {
+  color: var(--plot);
+  font-size: 13px;
+}
+.chapter-verdict header > .chapter-verdict-fail {
+  color: var(--seal-deep);
+}
+.chapter-verdict blockquote {
+  margin: 8px 0;
+  font: 15px / 1.7 var(--serif);
+}
+.chapter-verdict-issue p {
+  margin: 4px 0;
+}
+.chapter-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 8;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  background: var(--paper);
+  border-top: 1px solid var(--rule);
+  padding: 12px 16px;
+  margin-top: 20px;
+  box-shadow: 0 -5px 20px rgb(36 49 62 / 8%);
+}
+.chapter-dock strong {
+  font: 600 16px / 1.4 var(--serif);
+}
+.chapter-dock small {
+  display: block;
+  color: var(--ink-2);
+  margin-top: 3px;
+}
+.chapter-read-conditions {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 12px;
+}
+.chapter-read-conditions li::before {
+  content: "○ ";
+}
+.chapter-read-conditions li[data-read="true"] {
+  color: var(--plot);
+}
+.chapter-read-conditions li[data-read="true"]::before {
+  content: "✓ ";
+}
+.chapter-return textarea {
+  display: block;
+  width: 100%;
+  margin-bottom: 5px;
+}
+.chapter-return .chapter-actions {
+  justify-content: flex-end;
+}
+.chapter-stamp {
+  position: absolute;
+  right: 22px;
+  top: 97px;
+  transform: rotate(-8deg);
+  transform-origin: center;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  width: 66px;
+  height: 66px;
+  border: 3px double var(--seal-deep);
+  color: var(--seal-deep);
+  font-family: var(--serif);
+  background: var(--paper);
+  pointer-events: none;
+}
+.chapter-stamp strong {
+  font-size: 24px;
+  line-height: 1.15;
+}
+.chapter-stamp.is-new {
+  animation: chapter-stamp-in 0.42s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+@keyframes chapter-stamp-in {
+  from {
+    opacity: 0;
+    transform: rotate(-8deg) scale(1.6);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(-8deg) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-working .chapter-role-dot,
+  .chapter-stamp.is-new,
+  .chapter-cursor {
+    animation: none;
+  }
+}

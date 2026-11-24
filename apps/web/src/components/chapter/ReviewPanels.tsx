@@ -1,0 +1,307 @@
+"use client";
+import { type RefObject, useEffect, useRef, useState } from "react";
+import {
+  chapterCopy as c,
+  changeKind,
+  editorDecision,
+  roleName,
+} from "../../copy/zh-CN.ts";
+import { SafeMarkdown } from "../SafeMarkdown.tsx";
+import {
+  type Detail,
+  type Edit,
+  parseChanges,
+  roleOnDeck,
+  roles,
+  stopped,
+  verdictFrom,
+} from "./review-data.ts";
+
+export function RoleChain({
+  data,
+  credits,
+  approved,
+}: {
+  data: Detail;
+  credits: readonly (bigint | null | undefined)[];
+  approved: boolean;
+}) {
+  const [open, setOpen] = useState<number>();
+  const chain = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    if (open === undefined) return;
+    const outside = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !chain.current?.contains(event.target)
+      )
+        setOpen(undefined);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(undefined);
+    };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+  return (
+    <ol ref={chain} className="chapter-roles" aria-label={c.progress}>
+      {roles.map((role, index) => {
+        const row = data.roles.findLast((item) => item.role_id === role);
+        const current =
+          !stopped.has(data.run.status) && roleOnDeck[data.run.status] === role;
+        const report = data.reports[role];
+        const readResources =
+          role === "wenxue-bianji" && report?.readResources
+            ? report.readResources
+                .filter((item) => item.path.split("/").includes("diagnostics"))
+                .map((item) => item.path.split("/").at(-1) ?? item.path)
+            : [];
+        const state =
+          row?.status === "failed" ||
+          row?.status === "usage_unknown" ||
+          row?.status === "blocked"
+            ? "failed"
+            : row?.status === "completed" || report
+              ? "done"
+              : !stopped.has(data.run.status) &&
+                  (row?.status === "running" || current)
+                ? "working"
+                : "waiting";
+        const points = credits[index];
+        const workingLabel = c.roleWorking[index];
+        const message =
+          state === "done"
+            ? points === undefined
+              ? c.accountUsage
+              : points === null
+                ? c.unknownUsage
+                : c.points(points)
+            : state === "working"
+              ? workingLabel
+              : state === "failed"
+                ? c.incomplete
+                : role === "jiyi-weihuyuan" && !approved
+                  ? c.afterApproval
+                  : c.waiting;
+        return (
+          <li key={role} className={`chapter-role role-${index} is-${state}`}>
+            <button
+              type="button"
+              aria-expanded={open === index}
+              onClick={() => setOpen(open === index ? undefined : index)}
+            >
+              <span className="chapter-role-dot" aria-hidden="true">
+                {state === "done" ? "✓" : state === "failed" ? "!" : ""}
+              </span>
+              <strong>{roleName[role]}</strong>
+              <small>{message}</small>
+            </button>
+            {open === index && (
+              <section className="chapter-role-popover">
+                <h3>{c.roleView}</h3>
+                <p>
+                  <strong>{index === 5 ? c.memorySees : c.sees}</strong>{" "}
+                  {c.roleAccess[index]?.[0]}
+                </p>
+                <p>
+                  <strong>{index === 5 ? c.memoryDoesNot : c.cannotSee}</strong>{" "}
+                  {c.roleAccess[index]?.[1]}
+                </p>
+                {!!readResources.length && (
+                  <p>
+                    {c.diagnoses}{" "}
+                    <SafeMarkdown
+                      plain
+                      inline
+                      content={readResources.join("、")}
+                    />
+                  </p>
+                )}
+              </section>
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+export function EditDecision({
+  data,
+  edits,
+  showRevision,
+}: {
+  data: Detail;
+  edits: Edit[];
+  showRevision: () => void;
+}) {
+  const editor = data.reports["wenxue-bianji"]?.output;
+  if (
+    !editor ||
+    typeof editor !== "object" ||
+    !("decision" in editor) ||
+    typeof editor.decision !== "string"
+  )
+    return null;
+  const decision =
+    editorDecision[editor.decision as keyof typeof editorDecision];
+  if (!decision) return null;
+  const local = editor.decision === "LOCAL_EDIT";
+  const span = edits.reduce(
+    (total, edit) => total + Array.from(edit.original).length,
+    0,
+  );
+  const percent = data.original
+    ? ((100 * span) / Array.from(data.original).length).toFixed(1)
+    : undefined;
+  const archived = [
+    ...parseChanges(data.factChanges),
+    ...parseChanges(data.literaryChanges),
+  ];
+  const facts = edits.filter((edit) => edit.kind === "fact").length;
+  return (
+    <section
+      className={`chapter-edit-decision${local ? "" : " chapter-problem"}`}
+    >
+      <div>
+        <strong>
+          {local && edits.length === 0
+            ? c.noEdits
+            : `${c.decision} · ${decision}`}
+        </strong>
+        {local
+          ? edits.length > 0 && (
+              <span>
+                {c.editSummary(
+                  edits.length,
+                  percent,
+                  facts,
+                  edits.length - facts,
+                )}
+              </span>
+            )
+          : "return_reason" in editor &&
+            typeof editor.return_reason === "string" && (
+              <SafeMarkdown content={editor.return_reason} />
+            )}
+      </div>
+      {local &&
+        edits.length > 0 &&
+        data.original &&
+        data.original !== data.prose && (
+          <button
+            type="button"
+            className="ui-btn ui-btn-ghost"
+            onClick={showRevision}
+          >
+            {c.original}
+          </button>
+        )}
+      {archived.length > 0 && (
+        <details className="chapter-archived">
+          <summary>{c.archivedChanges}</summary>
+          <ul>
+            {archived.map((edit, index) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: Saved change rows are immutable and carry no IDs.
+              <li key={`${index}-${edit.before}`}>
+                <strong>{changeKind[edit.kind]}</strong>{" "}
+                <del>
+                  <SafeMarkdown plain inline content={edit.before} />
+                </del>
+                <ins>
+                  <SafeMarkdown
+                    plain
+                    inline
+                    content={edit.after || c.deleted}
+                  />
+                </ins>
+                <SafeMarkdown content={edit.reason} />
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </section>
+  );
+}
+
+export function Verdicts({
+  data,
+  area,
+}: {
+  data: Detail;
+  area: RefObject<HTMLDivElement | null>;
+}) {
+  const plot = verdictFrom(data.reports["qingjie-heyanyuan"]?.output);
+  const reality = verdictFrom(data.reports["xianshi-heyanyuan"]?.output);
+  if (!plot && !reality) return null;
+  return (
+    <section className="chapter-checks" aria-label={c.checks}>
+      <h2>{c.checks}</h2>
+      <div className="chapter-verdicts" ref={area}>
+        {(
+          [
+            ["qingjie-heyanyuan", plot],
+            ["xianshi-heyanyuan", reality],
+          ] as const
+        ).map(([role, verdict], index) => (
+          <article className={`chapter-verdict role-${index + 3}`} key={role}>
+            <header>
+              <h3>{roleName[role]}</h3>
+              <strong
+                className={
+                  verdict?.pass === false ? "chapter-verdict-fail" : ""
+                }
+              >
+                {verdict?.pass === true
+                  ? c.passed
+                  : verdict?.pass === false
+                    ? c.failed
+                    : c.unchecked}
+              </strong>
+            </header>
+            {verdict?.issues.map((issue, i) => (
+              <div
+                // biome-ignore lint/suspicious/noArrayIndexKey: Verdict issues are immutable and carry no IDs.
+                key={`${i}-${issue.evidence}`}
+                className="chapter-verdict-issue"
+              >
+                {issue.promise && (
+                  <p>
+                    {c.requiredEvent} ·{" "}
+                    <SafeMarkdown plain inline content={issue.promise} />
+                  </p>
+                )}
+                {issue.problem && (
+                  <strong>
+                    {c.problems[issue.problem as keyof typeof c.problems]}
+                  </strong>
+                )}
+                {issue.category && (
+                  <strong>
+                    {c.categories[issue.category as keyof typeof c.categories]}
+                  </strong>
+                )}
+                {issue.evidence && (
+                  <blockquote>
+                    <SafeMarkdown content={issue.evidence} />
+                  </blockquote>
+                )}
+                {issue.rule_ref && (
+                  <p>
+                    {c.rule} ·{" "}
+                    <SafeMarkdown plain inline content={issue.rule_ref} />
+                  </p>
+                )}
+              </div>
+            ))}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}

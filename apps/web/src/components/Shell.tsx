@@ -62,7 +62,9 @@ export function Shell({
             <strong>
               <SafeMarkdown plain inline content={user.name || user.email} />
             </strong>
-            <SafeMarkdown plain inline content={user.email} />
+            <span className="sidebar-email" title={user.email}>
+              <SafeMarkdown plain inline content={user.email} />
+            </span>
             <button
               type="button"
               className="sidebar-signout"

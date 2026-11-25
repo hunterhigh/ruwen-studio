@@ -27,6 +27,40 @@ export const roleOnDeck: Partial<Record<RunStatus, ChapterRole>> = {
   CANDIDATE_APPROVED: "jiyi-weihuyuan",
 };
 
+const completedByStatus: Record<RunStatus, number> = {
+  REQUESTED: 0,
+  READINESS_OK: 0,
+  PACKET_COMPILED: 0,
+  AUTHOR_DONE: 1,
+  READER_DONE: 2,
+  EDITOR_DONE: 3,
+  PLOT_CHECKED: 4,
+  REALITY_CHECKED: 5,
+  AWAITING_CANDIDATE_APPROVAL: 5,
+  CANDIDATE_APPROVED: 5,
+  MEMORY_PREVIEW_READY: 6,
+  AWAITING_MEMORY_APPROVAL: 6,
+  MEMORY_COMMITTED: 6,
+  DONE: 6,
+  RETURNED: 0,
+  FAILED_PRECONDITION: 0,
+  FAILED: 0,
+  CANCELLED: 0,
+};
+
+export function completedRoleCount(
+  status: RunStatus,
+  events: ReadonlyArray<{ status: RunStatus }> = [],
+) {
+  const count = completedByStatus[status] ?? 0;
+  if (status !== "RETURNED" && status !== "FAILED" && status !== "CANCELLED")
+    return count;
+  return events.reduce(
+    (known, event) => Math.max(known, completedByStatus[event.status] ?? 0),
+    count,
+  );
+}
+
 export type ChangeKind = "fact" | "literary";
 export interface Edit {
   original: string;

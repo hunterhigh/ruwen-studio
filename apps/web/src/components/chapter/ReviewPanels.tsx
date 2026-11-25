@@ -8,6 +8,7 @@ import {
 } from "../../copy/zh-CN.ts";
 import { SafeMarkdown } from "../SafeMarkdown.tsx";
 import {
+  completedRoleCount,
   type Detail,
   type Edit,
   parseChanges,
@@ -47,10 +48,12 @@ export function RoleChain({
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, [open]);
+  const completed = completedRoleCount(data.run.status, data.run.events);
   return (
     <ol ref={chain} className="chapter-roles" aria-label={c.progress}>
       {roles.map((role, index) => {
         const row = data.roles.findLast((item) => item.role_id === role);
+        const inferred = !row && index < completed;
         const current =
           !stopped.has(data.run.status) && roleOnDeck[data.run.status] === role;
         const report = data.reports[role];
@@ -65,13 +68,13 @@ export function RoleChain({
           row?.status === "usage_unknown" ||
           row?.status === "blocked"
             ? "failed"
-            : row?.status === "completed" || report
+            : row?.status === "completed" || report || inferred
               ? "done"
               : !stopped.has(data.run.status) &&
                   (row?.status === "running" || current)
                 ? "working"
                 : "waiting";
-        const points = credits[index];
+        const points = inferred ? undefined : credits[index];
         const workingLabel = c.roleWorking[index];
         const message =
           state === "done"
@@ -151,6 +154,17 @@ export function EditDecision({
     editorDecision[editor.decision as keyof typeof editorDecision];
   if (!decision) return null;
   const local = editor.decision === "LOCAL_EDIT";
+  const reason =
+    "return_reason" in editor && typeof editor.return_reason === "string"
+      ? editor.return_reason
+      : undefined;
+  const shownInNextStep =
+    (editor.decision === "RESTAGE" ||
+      editor.decision === "RETURN_CONSTRUCTION") &&
+    data.run.status === "RETURNED" &&
+    Boolean(
+      data.run.returnReason && reason?.trim() === data.run.returnReason.trim(),
+    );
   const span = edits.reduce(
     (total, edit) => total + Array.from(edit.original).length,
     0,
@@ -171,7 +185,9 @@ export function EditDecision({
         <strong>
           {local && edits.length === 0
             ? c.noEdits
-            : `${c.decision} · ${decision}`}
+            : shownInNextStep
+              ? decision
+              : `${c.decision} · ${decision}`}
         </strong>
         {local
           ? edits.length > 0 && (
@@ -184,10 +200,7 @@ export function EditDecision({
                 )}
               </span>
             )
-          : "return_reason" in editor &&
-            typeof editor.return_reason === "string" && (
-              <SafeMarkdown content={editor.return_reason} />
-            )}
+          : reason && !shownInNextStep && <SafeMarkdown content={reason} />}
       </div>
       {local &&
         edits.length > 0 &&

@@ -4,6 +4,7 @@ import {
   chapterCopy as c,
   confirmation,
   errorCopy,
+  memoryCopy,
   runStatus,
   runStatusTone,
 } from "../../copy/zh-CN.ts";
@@ -19,8 +20,8 @@ import {
 } from "../role-streams.ts";
 import { SafeMarkdown } from "../SafeMarkdown.tsx";
 import { useApi } from "../useApi.ts";
-import { ExistingMemoryReview } from "./ExistingMemoryReview.tsx";
 import { Manuscript } from "./Manuscript.tsx";
+import { MemoryReview } from "./MemoryReview.tsx";
 import { EditDecision, RoleChain, Verdicts } from "./ReviewPanels.tsx";
 import {
   chapterTitle,
@@ -257,7 +258,25 @@ export function RunDesk({
     if (await confirm(confirmation.cancelRun)) await action("cancel");
   };
   const reviewUrl = `/projects/${projectId}/chapters?run=${encodeURIComponent(id)}`;
-  const showMemory = memory && Boolean(data?.run.memoryPreviewSha256);
+  if (memory && data?.run.memoryPreviewSha256) {
+    return (
+      <MemoryReview
+        data={data}
+        chapter={chapter}
+        reviewUrl={reviewUrl}
+        overviewUrl={`/projects/${projectId}`}
+        readOnly={readOnly}
+        busy={locked}
+        error={error || (loadError ? errorCopy.INTERNAL_ERROR : "")}
+        onApprove={() => approve("memory")}
+        onAbandon={async () => {
+          if (await confirm(memoryCopy.abandonConfirmation))
+            await action("cancel");
+        }}
+      />
+    );
+  }
+  const memoryCount = data?.memoryFiles.length ?? 0;
   return (
     <section
       ref={workspace}
@@ -364,62 +383,43 @@ export function RunDesk({
           )}
         </section>
       )}
-      {showMemory && data ? (
-        <>
-          <a className="ui-btn ui-btn-ghost" href={reviewUrl}>
-            {c.backToProse}
-          </a>
-          <ExistingMemoryReview
-            key={data.run.memoryPreviewSha256}
-            data={data}
-            readOnly={readOnly}
-            busy={locked}
-            onApprove={() => approve("memory")}
-          />
-        </>
-      ) : (
-        <>
-          {data && (
-            <RoleChain data={data} credits={credits} approved={approved} />
-          )}
-          {data && (
-            <EditDecision
-              data={data}
-              edits={edits}
-              showRevision={() => {
-                setRevised(true);
-                setRevisionHint(true);
-                requestAnimationFrame(() =>
-                  workspace.current
-                    ?.querySelector(".chapter-tools")
-                    ?.scrollIntoView({ block: "center" }),
-                );
-              }}
-            />
-          )}
-          {revisionHint && revised && (
-            <p className="chapter-info">{c.revisionHelp}</p>
-          )}
-          <Manuscript
-            prose={prose}
-            original={data?.original ?? ""}
-            edits={edits}
-            reactions={reactions}
-            revised={revised}
-            setRevised={setRevised}
-            chapter={chapter}
-            title={title || chapter}
-            candidate={Boolean(digest)}
-            approved={approved}
-            approvedAt={approvedAt}
-            animateSeal={sealRequested}
-            writing={writing}
-            end={end}
-            complete={Boolean(digest && prose)}
-          />
-          {data && <Verdicts data={data} area={verdicts} />}
-        </>
+      {data && <RoleChain data={data} credits={credits} approved={approved} />}
+      {data && (
+        <EditDecision
+          data={data}
+          edits={edits}
+          showRevision={() => {
+            setRevised(true);
+            setRevisionHint(true);
+            requestAnimationFrame(() =>
+              workspace.current
+                ?.querySelector(".chapter-tools")
+                ?.scrollIntoView({ block: "center" }),
+            );
+          }}
+        />
       )}
+      {revisionHint && revised && (
+        <p className="chapter-info">{c.revisionHelp}</p>
+      )}
+      <Manuscript
+        prose={prose}
+        original={data?.original ?? ""}
+        edits={edits}
+        reactions={reactions}
+        revised={revised}
+        setRevised={setRevised}
+        chapter={chapter}
+        title={title || chapter}
+        candidate={Boolean(digest)}
+        approved={approved}
+        approvedAt={approvedAt}
+        animateSeal={sealRequested}
+        writing={writing}
+        end={end}
+        complete={Boolean(digest && prose)}
+      />
+      {data && <Verdicts data={data} area={verdicts} />}
       {mutable && waiting && returning && (
         <form
           className="chapter-return"
@@ -459,7 +459,7 @@ export function RunDesk({
           </div>
         </form>
       )}
-      {mutable && !showMemory && waiting ? (
+      {mutable && waiting ? (
         <footer className="chapter-dock">
           <div>
             <strong>{c.approvalQuestion(chapter)}</strong>
@@ -512,18 +512,28 @@ export function RunDesk({
       ) : (
         mutable && (
           <footer className="chapter-dock">
-            {status === "AWAITING_MEMORY_APPROVAL" && !showMemory ? (
+            {status === "AWAITING_MEMORY_APPROVAL" ? (
               <>
-                <strong>{c.memoryReady(data?.memoryFiles.length ?? 0)}</strong>
+                <strong>
+                  {memoryCount ? c.memoryReady(memoryCount) : memoryCopy.empty}
+                </strong>
                 <a
-                  className="ui-btn ui-btn-primary"
+                  className={`ui-btn ${memoryCount ? "ui-btn-primary" : "ui-btn-ghost"}`}
                   href={`${reviewUrl}&view=memory`}
                 >
                   {c.readMemory}
                 </a>
+                {!memoryCount && (
+                  <SealButton
+                    disabled={locked || !data?.run.memoryPreviewSha256}
+                    onClick={() => approve("memory")}
+                  >
+                    {locked ? c.approving : memoryCopy.confirmEmpty}
+                  </SealButton>
+                )}
               </>
             ) : (
-              approved && !showMemory && <strong>{c.approvedPreparing}</strong>
+              approved && <strong>{c.approvedPreparing}</strong>
             )}
             <button
               type="button"

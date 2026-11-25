@@ -390,6 +390,12 @@ p {
   color: var(--ink-2);
   font-weight: 600;
 }
+.sidebar-email {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .preview-label {
   color: #9eb9c5;
   font-size: 10px;
@@ -1021,29 +1027,6 @@ p {
 .return-form .button {
   justify-self: start;
 }
-.memory-review {
-  background: var(--paper);
-  padding: 30px;
-  margin-top: 30px;
-  border: 1px solid #cbd9e1;
-  border-radius: 6px;
-}
-.memory-review header {
-  margin-bottom: 28px;
-}
-.memory-review header h2 {
-  font-family: var(--story);
-  font-weight: 500;
-  font-size: 25px;
-}
-.memory-review details {
-  border-top: 1px solid #dbe4eb;
-  padding: 15px 0;
-}
-.memory-review summary {
-  cursor: pointer;
-  font-size: 12px;
-}
 .file-diff {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1408,9 +1391,6 @@ textarea {
   }
   .run-footer {
     display: block;
-  }
-  .memory-review {
-    padding: 25px 20px;
   }
   .history-selector {
     max-width: 100%;
@@ -2784,6 +2764,246 @@ textarea {
   display: block;
   color: var(--ink-2);
   margin-top: 3px;
+}
+
+.memory-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+.memory-update {
+  display: block;
+}
+.memory-summary > section {
+  padding: 14px 18px;
+  overflow-wrap: anywhere;
+}
+.memory-summary > section + section {
+  border-inline-start: 1px solid var(--rule-soft);
+}
+.memory-summary h2 {
+  margin: 0 0 6px;
+  color: var(--memory);
+  font: 600 12px / 1.5 var(--sans);
+}
+.memory-summary ul {
+  margin: 0;
+  padding-inline-start: 16px;
+}
+.memory-summary p {
+  margin: 0;
+  color: var(--ink-2);
+}
+.memory-review-grid {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
+}
+.memory-index,
+.memory-document,
+.memory-empty {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+}
+.memory-index {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+}
+.memory-progress {
+  padding: 12px 15px 10px;
+  font-size: 12px;
+}
+.memory-progress progress {
+  display: block;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  margin-top: 7px;
+  border: none;
+  border-radius: 4px;
+  background: var(--rule-soft);
+  overflow: hidden;
+  accent-color: var(--plot);
+}
+.memory-progress progress::-webkit-progress-bar {
+  background: var(--rule-soft);
+}
+.memory-progress progress::-webkit-progress-value {
+  background: var(--plot);
+}
+.memory-progress progress::-moz-progress-bar {
+  background: var(--plot);
+}
+.memory-file-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 1px 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  border-top: 1px solid var(--rule-soft);
+  background: transparent;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+.memory-file-row strong {
+  grid-column: 1;
+  font-size: 13px;
+}
+.memory-file-row small {
+  grid-column: 1;
+  color: var(--ink-2);
+}
+.memory-file-row:hover,
+.memory-file-row[aria-current="true"] {
+  background: var(--memory-bg);
+}
+.memory-file-row[aria-current="true"] {
+  box-shadow: inset 3px 0 var(--memory);
+}
+.memory-file-row:focus-visible {
+  outline-offset: -3px;
+}
+.memory-read-flag {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: var(--ink-2);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.memory-read-flag[data-read="true"] {
+  color: var(--plot);
+}
+.memory-document > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--rule-soft);
+  background: var(--desk);
+  border-radius: 8px 8px 0 0;
+}
+.memory-document h2,
+.memory-empty h2 {
+  margin: 0;
+  font: 600 14px / 1.6 var(--sans);
+  overflow-wrap: anywhere;
+}
+.memory-check {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  white-space: nowrap;
+  font-size: 12px;
+  margin: 0;
+}
+.memory-check input {
+  width: auto;
+  accent-color: var(--plot);
+}
+.memory-document-body,
+.memory-empty {
+  padding: 16px 18px;
+  font: 15px / 1.75 var(--serif);
+  overflow-wrap: anywhere;
+}
+.memory-empty > p {
+  margin: 0;
+}
+.memory-empty > section {
+  border-top: 1px solid var(--rule-soft);
+  margin-top: 12px;
+  padding-top: 10px;
+}
+.memory-technical {
+  margin: 14px 0;
+  color: var(--ink-2);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.memory-technical p {
+  margin: 4px 0;
+}
+.memory-dock .chapter-actions {
+  margin-inline-start: auto;
+}
+.text-diff {
+  display: grid;
+  gap: 12px;
+  font: 15px / 1.75 var(--serif);
+}
+.text-diff-section {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.text-diff-section h4 {
+  margin: 0 0 2px;
+  font: 600 12px / 1.6 var(--sans);
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.text-diff-line {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 3px;
+}
+.text-diff-line.is-removed {
+  background: var(--seal-soft);
+  color: var(--seal-deep);
+}
+.text-diff-line.is-added {
+  background: var(--plot-bg);
+}
+.text-diff-label {
+  padding-top: 3px;
+  text-align: center;
+  font: 600 11px / 1.65 var(--sans);
+}
+.text-diff-line.is-added .text-diff-label {
+  color: var(--plot);
+}
+.text-diff-content,
+.text-diff-fold .plain-content {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.text-diff-content ins.text-diff-mark {
+  text-decoration: underline;
+  text-decoration-color: var(--plot);
+  text-underline-offset: 0.18em;
+}
+.text-diff-fold {
+  padding: 2px 8px;
+  background: var(--desk);
+  border-radius: 4px;
+  color: var(--ink-2);
+}
+.text-diff-fold summary {
+  padding: 4px 0;
+  font: 12px / 1.65 var(--sans);
+}
+.text-diff-fold .plain-content {
+  margin: 4px 0;
+  font: inherit;
+}
+.text-diff-empty {
+  color: var(--ink-2);
+  margin: 0;
 }
 .chapter-read-conditions {
   list-style: none;

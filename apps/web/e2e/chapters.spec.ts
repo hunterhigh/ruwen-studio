@@ -16,6 +16,7 @@ import {
   createDemo,
   signIn,
 } from "./helpers.ts";
+import { captureMemory, readMemory } from "./memory-review.ts";
 
 test("imported user Markdown cannot execute HTML, load images or create non-https links", async ({
   page,
@@ -233,19 +234,20 @@ test("real browser: register, project, paced SSE, two approvals, files/export, o
   await captureChapter(page, "approved-memory-ready");
   await page.getByRole("link", { name: "阅读资料变更", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "阅读资料变更，再决定是否提交。" }),
+    page.getByRole("heading", { name: "第 1 章 · 资料变更" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "批准并提交资料变更", exact: true }),
+    page.getByRole("button", { name: "提交资料变更", exact: true }),
   ).toBeDisabled();
-  await page.getByLabel("我已逐项阅读资料变更预览，确认提交").check();
+  await captureMemory(page, "initial");
+  await readMemory(page, true);
   const memoryRefresh = decisionRefreshAfter(page, "approve-memory");
-  await page
-    .getByRole("button", { name: "批准并提交资料变更", exact: true })
-    .click();
+  await page.getByRole("button", { name: "提交资料变更", exact: true }).click();
   await memoryRefresh;
   await expect(page.getByTestId("run-status")).toHaveText("已完成");
   await expect(decisions).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "回到项目概览" })).toBeVisible();
+  await captureMemory(page, "submitted");
   await page.getByRole("link", { name: "回到正文", exact: true }).click();
   await expect(page.locator(".chapter-stamp")).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, 0));

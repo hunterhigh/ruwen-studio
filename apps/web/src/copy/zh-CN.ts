@@ -323,14 +323,6 @@ export const chapterCopy = {
   collapse: "收起",
   close: "取消",
   countInput: (n: number) => `${n} / 1000`,
-  memoryTitle: "阅读资料变更，再决定是否提交。",
-  memoryIntro: "正文批准和资料变更批准是两个独立决定。",
-  memoryEmpty: "本次记忆维护没有提出文件变更，仍需确认预览。",
-  memoryBefore: "当前资料",
-  memoryAfter: "提交后预览",
-  memoryQuestion: "提交这份资料变更？",
-  memoryConfirmed: "我已逐项阅读资料变更预览，确认提交",
-  memorySubmit: "批准并提交资料变更",
   roleWorking: [
     "正在写",
     "正在读",
@@ -361,6 +353,58 @@ export const chapterCopy = {
     canon: "正典",
   },
 } as const;
+export const diffCopy = {
+  added: "增",
+  removed: "删",
+  empty: "没有文本内容",
+  fold: (n: number) => `未改动 ${n} 段，点击展开`,
+} as const;
+
+export const memoryCopy = {
+  workspace: "资料提交视图",
+  title: (chapter: string) => `${chapter} · 资料变更`,
+  approvedAt: (date: string) => `正文已于 ${date} 批准。`,
+  independent: "批准正文和提交资料是两个独立决定。",
+  summary: {
+    new_facts: "新事实",
+    state_changes: "状态变化",
+    invalidated: "失效资料",
+    scope_changes: "作用域变化",
+  },
+  none: "没有",
+  index: "资料阅读进度",
+  progress: (read: number, total: number) => `已阅 ${read} / ${total}`,
+  read: "✓ 已阅",
+  unread: "未阅",
+  markRead: "已阅",
+  changed: (count: number) => `改 ${count} 段`,
+  added: (count: number) => `增 ${count} 段`,
+  removed: (count: number) => `删 ${count} 段`,
+  unchanged: (count: number) => `未改 ${count} 段`,
+  fromEmpty: (count: number) => `原内容为空，${count} 行`,
+  nextChapter: "下一章状态",
+  stateRecord: "状态记录",
+  updated: "预览已更新，请重新阅读",
+  technical: "技术信息",
+  path: "文件路径",
+  hash: "预览哈希",
+  question: (count: number) => `提交这 ${count} 项资料变更？`,
+  atomic: "提交后，资料文件、注册表和审计账本会在同一次操作里更新。",
+  readCondition: (count: number) => `逐项阅读 ${count} 个变更`,
+  empty: "这次没有资料需要变更",
+  confirmEmpty: "确认，无需变更",
+  submit: "提交资料变更",
+  submitted: (chapter: string) => `资料已提交 · ${chapter}完成。`,
+  committed: "正文和资料都已按两次批准写入项目。",
+  overview: "回到项目概览",
+  abandonConfirmation: {
+    title: "放弃本次运行？",
+    body: "已批准的正文不会撤销，资料变更不会提交。",
+    confirmLabel: "放弃本次运行",
+    tone: "danger",
+  },
+} as const;
+
 export const confirmation = {
   cancelRun: {
     title: "放弃本次运行？",

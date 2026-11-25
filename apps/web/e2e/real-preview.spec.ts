@@ -5,6 +5,7 @@ import { expect, test } from "@playwright/test";
 import { Database } from "@ruwen/db";
 import { realPreviewCoordinates } from "../../../config/real-preview.ts";
 import { readCandidate, startChapter } from "./chapter-review.ts";
+import { readMemory } from "./memory-review.ts";
 
 test.use({ baseURL: realPreviewCoordinates().baseURL });
 let preview: ChildProcess;
@@ -123,10 +124,8 @@ test("human-started preview rehearsal uses a separate persistent sandbox and can
   await page.getByRole("button", { name: "批准正文", exact: true }).click();
   await expect(page.getByTestId("run-status")).toHaveText("等你批准资料变更");
   await page.getByRole("link", { name: "阅读资料变更", exact: true }).click();
-  await page.getByLabel("我已逐项阅读资料变更预览，确认提交").check();
-  await page
-    .getByRole("button", { name: "批准并提交资料变更", exact: true })
-    .click();
+  await readMemory(page);
+  await page.getByRole("button", { name: "提交资料变更", exact: true }).click();
   await expect(page.getByTestId("run-status")).toHaveText("已完成");
   const db = new Database(realPreviewCoordinates().databaseURL);
   try {

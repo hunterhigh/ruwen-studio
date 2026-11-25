@@ -7,6 +7,7 @@ import {
   roleName,
 } from "../../copy/zh-CN.ts";
 import { SafeMarkdown } from "../SafeMarkdown.tsx";
+import { RoleInputPopover } from "./RoleInputPopover.tsx";
 import {
   completedRoleCount,
   type Detail,
@@ -57,12 +58,6 @@ export function RoleChain({
         const current =
           !stopped.has(data.run.status) && roleOnDeck[data.run.status] === role;
         const report = data.reports[role];
-        const readResources =
-          role === "wenxue-bianji" && report?.readResources
-            ? report.readResources
-                .filter((item) => item.path.split("/").includes("diagnostics"))
-                .map((item) => item.path.split("/").at(-1) ?? item.path)
-            : [];
         const state =
           row?.status === "failed" ||
           row?.status === "usage_unknown" ||
@@ -104,27 +99,11 @@ export function RoleChain({
               <small>{message}</small>
             </button>
             {open === index && (
-              <section className="chapter-role-popover">
-                <h3>{c.roleView}</h3>
-                <p>
-                  <strong>{index === 5 ? c.memorySees : c.sees}</strong>{" "}
-                  {c.roleAccess[index]?.[0]}
-                </p>
-                <p>
-                  <strong>{index === 5 ? c.memoryDoesNot : c.cannotSee}</strong>{" "}
-                  {c.roleAccess[index]?.[1]}
-                </p>
-                {!!readResources.length && (
-                  <p>
-                    {c.diagnoses}{" "}
-                    <SafeMarkdown
-                      plain
-                      inline
-                      content={readResources.join("、")}
-                    />
-                  </p>
-                )}
-              </section>
+              <RoleInputPopover
+                role={role}
+                manifest={row?.inputManifest}
+                fallback={c.roleAccess[index]}
+              />
             )}
           </li>
         );

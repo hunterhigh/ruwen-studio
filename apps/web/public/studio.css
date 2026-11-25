@@ -2491,6 +2491,75 @@ textarea {
 .chapter-role-popover h3 {
   margin: 0;
 }
+.chapter-input-summary {
+  flex-basis: 100%;
+  margin: -6px 0 0;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+.chapter-role-manifest {
+  width: 390px;
+  max-block-size: min(490px, 52vh);
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.chapter-manifest-block + .chapter-manifest-block,
+.chapter-manifest-technical {
+  border-top: 1px solid var(--rule-soft);
+  margin-top: 8px;
+  padding-top: 8px;
+}
+.chapter-manifest-block h3 {
+  color: var(--role-ink);
+  font-size: 13px;
+}
+.chapter-manifest-block ul {
+  margin: 6px 0 0;
+  padding-inline-start: 16px;
+}
+.chapter-manifest-block li + li {
+  margin-top: 3px;
+}
+.chapter-manifest-block p {
+  margin-top: 4px;
+}
+.chapter-manifest-packet {
+  margin-top: 8px;
+}
+.chapter-manifest-packet p {
+  font-weight: 600;
+}
+.chapter-manifest-budget {
+  height: 4px;
+  border-radius: 4px;
+  margin-top: 5px;
+  background: var(--rule-soft);
+  overflow: hidden;
+}
+.chapter-manifest-budget span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--plot);
+}
+.chapter-manifest-technical dl {
+  margin: 6px 0 0;
+}
+.chapter-manifest-technical dt {
+  font-weight: 600;
+}
+.chapter-manifest-technical dd {
+  margin: 0 0 3px;
+  color: var(--ink-2);
+}
+.chapter-role-legacy {
+  color: var(--ink-2);
+  padding: 4px 7px;
+  background: var(--desk);
+  border-radius: 3px;
+}
 .chapter-edit-decision {
   display: flex;
   flex-wrap: wrap;

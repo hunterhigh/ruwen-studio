@@ -20,6 +20,7 @@ import {
 } from "../role-streams.ts";
 import { SafeMarkdown } from "../SafeMarkdown.tsx";
 import { useApi } from "../useApi.ts";
+import { authorInputsSummary } from "./input-manifest-view.ts";
 import { Manuscript } from "./Manuscript.tsx";
 import { MemoryReview } from "./MemoryReview.tsx";
 import { EditDecision, RoleChain, Verdicts } from "./ReviewPanels.tsx";
@@ -91,6 +92,10 @@ export function RunDesk({
   const returnInput = useRef<HTMLTextAreaElement>(null);
   const workspace = useRef<HTMLElement>(null);
   const status = data?.run.status ?? row.status;
+  const inputSummary = authorInputsSummary(
+    data?.roles.findLast(({ role_id }) => role_id === "xiaoshuo-zuozhe")
+      ?.inputManifest,
+  );
   const terminal = stopped.has(status);
   const digest = data?.run.candidateSha256 ?? "";
   const waiting = status === "AWAITING_CANDIDATE_APPROVAL";
@@ -315,6 +320,9 @@ export function RunDesk({
           </div>
         </div>
         {historyControls}
+        {inputSummary && (
+          <p className="chapter-input-summary">{inputSummary}</p>
+        )}
       </header>
       {readOnly && (
         <p className="chapter-info">

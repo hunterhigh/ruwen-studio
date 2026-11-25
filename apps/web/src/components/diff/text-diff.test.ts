@@ -48,7 +48,8 @@ describe("text diff", () => {
 
   it("keeps an unchanged final paragraph when another paragraph follows it", () => {
     expect(
-      diffText("原文。\n", "原文。\n\n增补。\n").groups[0]?.blocks,
+      diffText("原文。\n", `原文。${"\n".repeat(100_000)}增补。\n`).groups[0]
+        ?.blocks,
     ).toEqual([
       { kind: "same", paragraphs: ["原文。"] },
       { kind: "added", text: "增补。" },

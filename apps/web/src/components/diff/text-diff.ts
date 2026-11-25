@@ -79,8 +79,8 @@ type DiffSection = {
 
 function paragraphs(text: string) {
   return text
-    .replace(/^(?:[^\S\n]*\n)+|(?:\n[^\S\n]*)+$/g, "")
     .split(/\n(?:[^\S\n]*\n)+/)
+    .map((part) => part.replace(/^[^\S\n]*\n|\n[^\S\n]*$/g, ""))
     .filter((part) => part.trim());
 }
 

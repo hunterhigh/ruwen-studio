@@ -106,7 +106,7 @@ P6保存未知用量为NULL并标记usage_unknown，已报告的部分usage仍�
 
 ## OQ-027 · 岗位输入记录界面（已解决，块 3T）
 
-块 3T 已在章节审稿桌用 `roles[].inputManifest` 展示实际材料、按规则隔离的类别、作者资料包预算与页头摘要。路径与哈希放进“技术信息”。旧运行保留固定岗位说明。核验员显示接口选定的重核验记录。见 [块 3T 报告](reports/frontend-redesign/03t.md)。
+块 3T 已在章节审稿桌用 `roles[].inputManifest` 展示实际材料、按规则隔离的类别、作者资料包预算与页头摘要。路径与哈希放进“技术信息”。旧运行保留固定岗位说明。核验员显示接口选定的重核验记录。见 [块 3T 报告](reports/frontend-redesign/03t.md) 与 [PR #57](https://github.com/hunterhigh/ruwen-studio/pull/57)。
 
 ## OQ-028 · 候选稿版本审计与重核验失败（借鉴块 E）
 

@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { ideationCopy as c } from "../src/copy/zh-CN.ts";
 import { readCandidate, startChapter } from "./chapter-review.ts";
-import { createDemo, selectMessageRange, signIn } from "./helpers.ts";
+import {
+  createDemoFromShelf as createDemo,
+  selectMessageRange,
+  signIn,
+} from "./helpers.ts";
 import {
   approvePreviewKind,
   compileIdeationChapter,

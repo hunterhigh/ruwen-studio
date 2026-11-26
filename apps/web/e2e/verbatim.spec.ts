@@ -1,7 +1,11 @@
 import { expect, type Locator, test } from "@playwright/test";
 import { previewConfiguration } from "../../../config/preview.ts";
 import { ideationCopy as c } from "../src/copy/zh-CN.ts";
-import { createDemo, selectMessageRange, signIn } from "./helpers.ts";
+import {
+  createDemoFromShelf as createDemo,
+  selectMessageRange,
+  signIn,
+} from "./helpers.ts";
 import { ideationHttpFixture } from "./ideation-http-fixture.ts";
 import {
   captureIdeation05,

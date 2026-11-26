@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { expect, type Page, test } from "@playwright/test";
 import type { Detail } from "../src/components/chapter/review-data.ts";
 import { chapterCopy, roleName } from "../src/copy/zh-CN.ts";
-import { createDemo, signIn } from "./helpers.ts";
+import { createDemoFromShelf as createDemo, signIn } from "./helpers.ts";
 
 const stages = [
   ["xiaoshuo-zuozhe", "author"],

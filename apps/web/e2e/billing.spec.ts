@@ -4,7 +4,11 @@ import { Database } from "@ruwen/db";
 import { previewConfiguration } from "../../../config/preview.ts";
 import { runtimeSettings } from "../../../config/settings.ts";
 import { startChapter } from "./chapter-review.ts";
-import { confirmAction, createDemo, signIn } from "./helpers.ts";
+import {
+  confirmAction,
+  createDemoFromShelf as createDemo,
+  signIn,
+} from "./helpers.ts";
 
 test("sandbox purchase records a real ledger entry once and refreshes segregated balances", async ({
   page,

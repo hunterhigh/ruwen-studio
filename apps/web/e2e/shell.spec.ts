@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { ideationCopy as c } from "../src/copy/zh-CN.ts";
 import { startChapter } from "./chapter-review.ts";
-import { createDemo, signIn } from "./helpers.ts";
+import { createDemoFromShelf as createDemo, signIn } from "./helpers.ts";
 import { createIdeationSession } from "./ideation-review.ts";
 import { captureFrame } from "./redesign-02.ts";
 

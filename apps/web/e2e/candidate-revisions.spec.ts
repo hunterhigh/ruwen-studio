@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readCandidate } from "./chapter-review.ts";
-import { createDemo, signIn } from "./helpers.ts";
+import { createDemoFromShelf as createDemo, signIn } from "./helpers.ts";
 
 test("候选稿保存后核验基准过期，只有新版哈希可批准", async ({ page }) => {
   await signIn(page);

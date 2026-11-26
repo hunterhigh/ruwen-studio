@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { ideationCopy as c } from "../src/copy/zh-CN.ts";
-import { createDemo, signIn } from "./helpers.ts";
+import { createDemoFromShelf as createDemo, signIn } from "./helpers.ts";
 import { ideationHttpFixture } from "./ideation-http-fixture.ts";
 import { captureIdeation05, sessionButton } from "./ideation-review.ts";
 

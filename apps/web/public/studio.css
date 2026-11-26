@@ -4177,3 +4177,327 @@ textarea {
   margin: 4px 0 0;
   overflow-wrap: anywhere;
 }
+
+/* 块 9 账户与用量 */
+.account-heading.page-heading {
+  margin-bottom: 24px;
+}
+.account-heading h1 {
+  margin: 0;
+}
+.account-grid {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  align-items: start;
+  gap: 26px;
+}
+.account-side,
+.account-usage-column {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+.account-panel {
+  min-width: 0;
+  padding: 21px 23px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--paper);
+}
+.account-panel h2 {
+  margin: 0 0 14px;
+  font: 600 18px / 1.45 var(--serif);
+}
+.account-bank + .account-bank {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+.account-bank h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 7px;
+  font-size: 14px;
+}
+.account-bank h3 small,
+.account-record-meta small,
+.account-roles small,
+.account-review-alert li small {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--desk);
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 400;
+}
+.account-balance-label,
+.account-muted {
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.account-balance-label {
+  margin: 0;
+}
+.account-balance-value {
+  margin: 1px 0 9px;
+  overflow-wrap: anywhere;
+  font: 600 34px / 1.23 var(--serif);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.account-balance-value small {
+  font: 400 14px / 1.6 var(--sans);
+}
+.account-bank dl {
+  margin: 0;
+  font-size: 13px;
+}
+.account-bank dl > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 4px;
+}
+.account-bank dt {
+  color: var(--ink-2);
+}
+.account-bank dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.account-utc {
+  margin: 13px 0 14px;
+}
+.account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.account-warning {
+  padding: 9px 12px;
+  border: 1px solid var(--reader-bg);
+  border-radius: 5px;
+  background: var(--reader-bg);
+  color: #674715;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.account-limit {
+  margin-top: 16px;
+  padding-top: 13px;
+  border-top: 1px solid var(--rule);
+}
+.account-limit p {
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+.account-limit input {
+  width: 100%;
+  padding: 6px 9px;
+  margin-bottom: 8px;
+}
+.account-devices p {
+  margin-bottom: 12px;
+}
+.account-activity {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  text-align: left;
+}
+.account-activity th {
+  padding: 5px 6px 7px;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 400;
+}
+.account-activity th:last-child {
+  width: 130px;
+  text-align: right;
+}
+.account-activity td {
+  padding: 11px 6px;
+  border-bottom: 1px solid var(--rule-soft);
+  vertical-align: middle;
+}
+.account-activity .account-run-row td {
+  padding: 0;
+}
+.account-activity .account-amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.account-run-summary {
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr) minmax(85px, 130px);
+  gap: 8px;
+  align-items: baseline;
+  padding: 10px 6px;
+}
+.account-run-summary::-webkit-details-marker,
+.account-review-alert summary::-webkit-details-marker {
+  display: none;
+}
+.account-disclosure {
+  width: 7px;
+  height: 7px;
+  border: solid var(--ink-2);
+  border-width: 0 1px 1px 0;
+  transform: rotate(-45deg);
+}
+.account-run-row details[open] .account-disclosure {
+  transform: rotate(45deg) translateY(-2px);
+}
+.account-run-title,
+.account-record-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.account-run-title time,
+.account-record-meta {
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 400;
+}
+.account-record-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+.account-roles,
+.account-review-alert ul,
+.account-review-history ul,
+.account-pending-checkouts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.account-roles {
+  padding: 1px 6px 8px 25px;
+  background: var(--desk);
+}
+.account-roles li,
+.account-review-alert li,
+.account-pending-checkouts li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 5px 0;
+  font-size: 12px;
+}
+.account-roles li small,
+.account-review-alert li small {
+  margin-left: 6px;
+}
+.account-unverified {
+  color: #674715;
+}
+.account-usage-footnote {
+  margin: 12px 0 0;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.account-usage > .account-muted {
+  margin: 10px 0 0;
+}
+.account-review-alert {
+  padding: 9px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--reader-bg);
+  border-radius: 5px;
+  background: var(--reader-bg);
+  color: #674715;
+  font-size: 13px;
+}
+.account-review-alert summary {
+  display: list-item;
+}
+.account-review-alert summary::-webkit-details-marker {
+  display: revert;
+}
+.account-review-alert ul {
+  margin-top: 6px;
+  border-top: 1px solid rgb(103 71 21 / 26%);
+}
+.account-review-history li + li {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule-soft);
+}
+.account-review-history li p {
+  margin-bottom: 4px;
+}
+.account-review-history .plain-content {
+  margin: 0;
+  font: 13px / 1.65 var(--sans);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.account-purchase-dialog.ui-confirm-dialog {
+  width: 490px;
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 24px;
+}
+.account-purchase-dialog h2 {
+  margin-bottom: 14px;
+  font-size: 22px;
+}
+.account-purchase-dialog .account-warning {
+  color: #674715;
+}
+.account-purchase-dialog .account-payment-note {
+  padding: 8px 11px;
+  border-radius: 4px;
+  background: var(--desk);
+}
+.account-plans {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.account-plans legend {
+  margin-bottom: 5px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.account-plans label {
+  flex-direction: row;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.account-plans label:has(input:checked) {
+  border-color: var(--ink);
+  background: var(--desk);
+}
+.account-plans label > span {
+  overflow-wrap: anywhere;
+}
+.account-plans label > span > span,
+.account-plans label > span > small {
+  display: block;
+  color: var(--ink-2);
+  font-weight: 400;
+}
+.account-plans input {
+  accent-color: var(--ink);
+}
+.account-pending-checkouts {
+  padding-top: 4px;
+  margin-top: 10px;
+  border-top: 1px solid var(--rule-soft);
+}

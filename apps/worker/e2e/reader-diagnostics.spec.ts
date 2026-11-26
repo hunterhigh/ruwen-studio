@@ -4,7 +4,10 @@ import { publicRoleResult } from "@ruwen/core";
 import { Database, PostgresFS } from "@ruwen/db";
 import { previewConfiguration } from "../../../config/preview.ts";
 import { defaultFauxResponse } from "../../../packages/agents/src/faux.ts";
-import { createDemo, signIn } from "../../web/e2e/helpers.ts";
+import {
+  createDemoFromShelf as createDemo,
+  signIn,
+} from "../../web/e2e/helpers.ts";
 
 test("owner can read adjusted, dropped and attempted reader diagnostics in the existing project file browser", async ({
   page,

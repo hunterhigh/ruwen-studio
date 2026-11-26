@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { previewConfiguration } from "../../../config/preview.ts";
-import { confirmAction, createDemo, signIn } from "./helpers.ts";
+import {
+  confirmAction,
+  createDemoFromShelf as createDemo,
+  signIn,
+} from "./helpers.ts";
 import { ideationHttpFixture } from "./ideation-http-fixture.ts";
 
 test("task cancellation waits for the shared confirmation and preserves the original task endpoint", async ({

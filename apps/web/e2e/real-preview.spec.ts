@@ -5,6 +5,7 @@ import { expect, test } from "@playwright/test";
 import { Database } from "@ruwen/db";
 import { realPreviewCoordinates } from "../../../config/real-preview.ts";
 import { readCandidate, startChapter } from "./chapter-review.ts";
+import { createDemoFromShelf } from "./helpers.ts";
 import { readMemory } from "./memory-review.ts";
 
 test.use({ baseURL: realPreviewCoordinates().baseURL });
@@ -70,15 +71,7 @@ test("human-started preview rehearsal uses a separate persistent sandbox and can
   expect(account.sandboxEnabled).toBe(false);
   expect(account.release.realChargingEnabled).toBe(false);
   expect(Number(account.balance)).toBeGreaterThanOrEqual(250000);
-  await page
-    .getByRole("button", { name: "新建项目", exact: false })
-    .first()
-    .click();
-  await page.getByLabel("项目名称").fill("DeepSeek 试用启动演练");
-  await page.getByLabel("从哪里开始").selectOption("demo");
-  await page.getByRole("button", { name: "创建项目", exact: true }).click();
-  await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+$/);
-  const project = page.url().split("/").at(-1);
+  const project = await createDemoFromShelf(page, "DeepSeek 试用启动演练");
   await page.goto(`/projects/${project}/ideation`);
   await page.getByLabel("新会话名称", { exact: true }).fill("独立试用会话");
   await page.getByRole("button", { name: "新建构思会话", exact: true }).click();

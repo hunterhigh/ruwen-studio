@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { readCandidate, startChapter } from "./chapter-review.ts";
-import { createDemo, selectMessageRange, signIn } from "./helpers.ts";
+import {
+  createDemoFromShelf as createDemo,
+  selectMessageRange,
+  signIn,
+} from "./helpers.ts";
 import { readMemory } from "./memory-review.ts";
 
 test("persisted faux project: conversation → handoff → downstream preview → compilation → chapter → two canonical approval gates", async ({

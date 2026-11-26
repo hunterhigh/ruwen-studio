@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
-import { createDemo, signIn } from "./helpers.ts";
+import { createDemoFromShelf as createDemo, signIn } from "./helpers.ts";
 import { ideationHttpFixture } from "./ideation-http-fixture.ts";
 
 for (const refusal of [false, true]) {

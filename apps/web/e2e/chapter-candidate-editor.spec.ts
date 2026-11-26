@@ -8,7 +8,7 @@ import {
   frameCopy,
 } from "../src/copy/zh-CN.ts";
 import { readCandidate } from "./chapter-review.ts";
-import { createDemo, signIn } from "./helpers.ts";
+import { createDemoFromShelf as createDemo, signIn } from "./helpers.ts";
 
 async function prepare(page: Page) {
   await page.setViewportSize({ width: 1440, height: 900 });

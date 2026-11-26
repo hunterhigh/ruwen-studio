@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { annotationCopy, chapterCopy, runStatus } from "../src/copy/zh-CN.ts";
 import { captureChapter, startChapter } from "./chapter-review.ts";
-import { createDemo, signIn } from "./helpers.ts";
+import { createDemoFromShelf as createDemo, signIn } from "./helpers.ts";
 
 const scenarios = [
   ["restage", "RETURNED", "需要重写"],

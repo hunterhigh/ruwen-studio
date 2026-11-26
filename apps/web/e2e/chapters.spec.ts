@@ -42,8 +42,11 @@ test("imported user Markdown cannot execute HTML, load images or create non-http
     fileURLToPath(new URL("../../../fixtures/demo-project", import.meta.url)),
   );
   const bytes = await exportProjectZip(source);
-  await expect(page.locator('input[type="file"]')).toBeEnabled();
-  await page.locator('input[type="file"]').setInputFiles({
+  const [chooser] = await Promise.all([
+    page.waitForEvent("filechooser"),
+    page.getByRole("button", { name: "导入 ZIP", exact: true }).first().click(),
+  ]);
+  await chooser.setFiles({
     name: "用户资料.zip",
     mimeType: "application/zip",
     buffer: Buffer.from(bytes),

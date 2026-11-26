@@ -129,6 +129,7 @@ export function IdeationStudio({
   const [message, setMessage] = useState("");
   const [title, setTitle] = useState("");
   const [creating, setCreating] = useState(false);
+  const [interactive, setInteractive] = useState(false);
   const [receipt, setReceipt] = useState<IdeationApprovalReceipt>();
   const sequence = useRef(0);
   const messagesBox = useRef<HTMLDivElement>(null);
@@ -221,6 +222,7 @@ export function IdeationStudio({
     setCompileOpen(
       new URL(window.location.href).searchParams.get("compile") === "1",
     );
+    setInteractive(true);
   }, []);
   useEffect(() => {
     setView(undefined);
@@ -549,7 +551,7 @@ export function IdeationStudio({
             <button
               className="ui-btn ui-btn-ghost"
               type="button"
-              disabled={busy}
+              disabled={!interactive || busy}
               onClick={() => setCreating(true)}
             >
               {c.newSession}
@@ -708,6 +710,7 @@ export function IdeationStudio({
           <div className="ideation-tabs">
             <button
               type="button"
+              disabled={!interactive}
               aria-pressed={tab === "pending"}
               onClick={() => changeTab("pending")}
             >
@@ -715,6 +718,7 @@ export function IdeationStudio({
             </button>
             <button
               type="button"
+              disabled={!interactive}
               aria-pressed={tab === "processed"}
               onClick={() => changeTab("processed")}
             >
@@ -724,6 +728,7 @@ export function IdeationStudio({
           <button
             className="ui-btn ui-btn-ghost"
             type="button"
+            disabled={!interactive}
             aria-expanded={compileOpen}
             onClick={() => toggleCompile(!compileOpen)}
           >

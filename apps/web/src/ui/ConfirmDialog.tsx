@@ -19,6 +19,7 @@ export interface ConfirmOptions {
   tone?: "danger" | "normal";
 }
 export interface ConfirmDialogProps extends ConfirmOptions {
+  children?: ReactNode;
   onConfirm: () => void;
   onCancel?: () => void;
 }
@@ -27,6 +28,7 @@ export function ConfirmDialog({
   body,
   confirmLabel = uiCopy.confirm,
   tone = "normal",
+  children,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -73,6 +75,7 @@ export function ConfirmDialog({
       >
         <h2 id={titleId}>{title}</h2>
         <p id={bodyId}>{body}</p>
+        {children}
         <div className="ui-dialog-actions">
           <button
             ref={cancel}

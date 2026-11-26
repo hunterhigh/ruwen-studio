@@ -1,11 +1,17 @@
 import { expect, type Locator, test } from "@playwright/test";
 import { previewConfiguration } from "../../../config/preview.ts";
+import { ideationCopy as c } from "../src/copy/zh-CN.ts";
 import {
   createDemoFromShelf as createDemo,
   selectMessageRange,
   signIn,
 } from "./helpers.ts";
 import { ideationHttpFixture } from "./ideation-http-fixture.ts";
+import {
+  captureIdeation05,
+  createIdeationSession,
+  inbox,
+} from "./ideation-review.ts";
 
 async function select(source: Locator, start: number, end: number) {
   await source.evaluate(
@@ -28,7 +34,7 @@ test("v1.2 typed HTTP fixture: own-message codepoint selection, both destination
   const composer = page.getByLabel("想和协调员说的话", { exact: true });
   const chosen = "😀保留原句，\n 下一行。";
   await composer.fill(`序${chosen}尾`);
-  await page.getByRole("button", { name: "发送给协调员", exact: true }).click();
+  await page.getByRole("button", { name: c.send, exact: true }).click();
   const source = page
     .getByLabel("你的消息原文，可选中文字", { exact: true })
     .last();
@@ -58,6 +64,8 @@ test("v1.2 typed HTTP fixture: own-message codepoint selection, both destination
     .getByRole("button", { name: "逐字保留到本章", exact: true })
     .click();
   const card = page.getByRole("article", { name: "预览详情", exact: true });
+  await expect(card.getByText(c.verbatimText, { exact: true })).toBeVisible();
+  await captureIdeation05(page, "verbatim");
   await expect(card).toContainText(chosen);
   const approval = card.getByRole("button", {
     name: "批准逐字保留",
@@ -66,12 +74,12 @@ test("v1.2 typed HTTP fixture: own-message codepoint selection, both destination
   await expect(approval).toBeDisabled();
   await card
     .getByRole("checkbox", {
-      name: "我已阅读此版本，确认这次批准",
+      name: c.confirm.verbatim,
       exact: true,
     })
     .check();
   await approval.click();
-  await expect(card.getByText("已批准", { exact: true })).toBeVisible();
+  await expect(card).toContainText("已批准");
   expect(fixture.verbatimRequests[0]).toMatchObject({
     start: 1,
     end: 1 + Array.from(chosen).length,
@@ -90,17 +98,21 @@ test("v1.2 typed HTTP fixture: own-message codepoint selection, both destination
     .click();
   await expect(card).toContainText("追加到文件末尾");
   await expect(
-    card.getByRole("button", { name: "交回协调员修改", exact: true }),
-  ).toBeDisabled();
-  await card.getByRole("button", { name: "拒绝此预览", exact: true }).click();
-  await expect(card.getByText("已拒绝", { exact: true })).toBeVisible();
+    card.getByRole("button", { name: c.openRevision, exact: true }),
+  ).toHaveCount(0);
+  await card.getByRole("button", { name: c.reject, exact: true }).click();
+  await page
+    .getByRole("dialog", { name: c.rejectConfirmation.title })
+    .getByRole("button", { name: c.rejectConfirmation.confirmLabel })
+    .click();
+  await expect(card).toContainText("已拒绝");
   await expect(
     page
       .locator(".message-assistant")
       .getByRole("button", { name: "逐字保留到本章", exact: true }),
   ).toHaveCount(0);
   await composer.fill("😀".repeat(601));
-  await page.getByRole("button", { name: "发送给协调员", exact: true }).click();
+  await page.getByRole("button", { name: c.send, exact: true }).click();
   const longSource = page
     .getByLabel("你的消息原文，可选中文字", { exact: true })
     .last();
@@ -160,13 +172,12 @@ test("persisted v1.2: Unicode user selection appends only after approval and sur
   if (previewConfig.port !== 3000)
     expect(cookies.some((c) => c.name.includes("ruwen."))).toBe(false);
   await page.goto(`/projects/${projectId}/ideation`);
-  await page.getByLabel("新会话名称", { exact: true }).fill("我的原句");
-  await page.getByRole("button", { name: "新建构思会话", exact: true }).click();
+  await createIdeationSession(page, "我的原句");
   const chosen = "😀保留原句，\n 下一行。";
   await page
     .getByLabel("想和协调员说的话", { exact: true })
     .fill(`序${chosen}尾`);
-  await page.getByRole("button", { name: "发送给协调员", exact: true }).click();
+  await page.getByRole("button", { name: c.send, exact: true }).click();
   const source = page.getByLabel("你的消息原文，可选中文字", { exact: true });
   await expect(source).toHaveValue(`序${chosen}尾`);
   await expect(
@@ -214,15 +225,19 @@ test("persisted v1.2: Unicode user selection appends only after approval and sur
   ).toBe(before.text);
   await card
     .getByRole("checkbox", {
-      name: "我已阅读此版本，确认这次批准",
+      name: c.confirm.verbatim,
       exact: true,
     })
     .check();
   await card.getByRole("button", { name: "批准逐字保留", exact: true }).click();
-  await expect(card.getByText("已批准", { exact: true })).toBeVisible();
+  await expect(card).toContainText("已批准");
+  await expect(page).toHaveURL(new RegExp(`preview=${preview.id}`));
   await page.reload();
-  await page.getByLabel("预览类型", { exact: true }).selectOption("verbatim");
+  await expect(
+    inbox(page).getByRole("button", { name: c.processed, exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(card.getByText("已批准", { exact: true })).toBeVisible();
+  await expect(card).toContainText(chosen);
   const after = await (
     await page.request.get(
       `/api/projects/${projectId}/files?path=${encodeURIComponent("世界/当前态势.md")}`,

@@ -1,4 +1,4 @@
-import { registry } from "@ruwen/core";
+import { registry, state } from "@ruwen/core";
 import { securityLimits } from "../../../../../../../../config/security.ts";
 import { IdeationStudio } from "../../../../../components/IdeationStudio.tsx";
 import { ownedPage } from "../../../../../server/page-auth.ts";
@@ -11,6 +11,17 @@ export default async function IdeationPage({
   const { projectId } = await params;
   const owned = await ownedPage({ projectId });
   const metadata = await registry.readRegistry(owned.fs);
+  const story = await state.loadState(owned.fs).catch(() => undefined);
+  const approved = story?.last_approved_prose;
+  const previous =
+    approved &&
+    typeof approved === "object" &&
+    "path" in approved &&
+    typeof approved.path === "string"
+      ? /^chapters\/chapter-(\d+)\.md$/.exec(approved.path)?.[1]
+      : undefined;
+  const nextChapter =
+    approved === null ? 1 : previous ? Number(previous) + 1 : undefined;
   let scope: Record<string, unknown> = {};
   if (
     await owned.fs.exists("authoring-ruwen-v5/manifests/author-manifest.json")
@@ -29,7 +40,7 @@ export default async function IdeationPage({
     <IdeationStudio
       key={projectId}
       projectId={projectId}
-      modelMode={owned.services.worker.modelMode}
+      nextChapter={nextChapter}
       compileScope={{
         volume: field("volume"),
         arc: field("arc"),

@@ -5,33 +5,49 @@ import type {
   IdeationCursor,
   IdeationMessage,
   IdeationPreviewV1_2 as IdeationPreview,
+  IdeationPreviewId,
   IdeationResult,
   IdeationSession,
   IdeationSessionId,
   IdeationTask,
 } from "@ruwen/pipeline";
 import { useRouter } from "next/navigation.js";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { confirmation, frameCopy } from "../copy/zh-CN.ts";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  ideationCopy as c,
+  confirmation,
+  errorCopy,
+  frameCopy,
+  type IdeationUiErrorCode,
+  previewStatus,
+  roleName,
+} from "../copy/zh-CN.ts";
 import { useConfirm } from "../ui/ConfirmDialog.tsx";
+import { useToast } from "../ui/Toast.tsx";
 import {
   allIdeationPages,
   createIdeationClient,
   newRequestId,
 } from "./ideation/client.ts";
 import {
-  errorCopy,
-  type IdeationUiErrorCode,
-  kindNames,
-  previewStatus,
-  roleNames,
-  taskStatus,
-} from "./ideation/copy.ts";
-import { PreviewCard, Structured } from "./ideation/PreviewCard.tsx";
+  ideationTime,
+  PreviewCard,
+  previewKind,
+} from "./ideation/PreviewCard.tsx";
+import { TaskStrip } from "./ideation/TaskStrip.tsx";
 import {
   VerbatimSelection,
   type VerbatimTargetOption,
 } from "./ideation/VerbatimSelection.tsx";
+import { useProjectDecisionContext } from "./project/ProjectDecisions.tsx";
 import {
   applyRoleFrame,
   emptyRoleStreams,
@@ -45,65 +61,98 @@ type View = {
   previews: readonly IdeationPreview[];
   tasks: readonly IdeationTask[];
 };
+type Area = "conversation" | "inbox" | "sessions" | "decision";
+type Inbox = "pending" | "processed";
+
 class UiError extends Error {
   constructor(readonly code: IdeationUiErrorCode) {
     super(code);
   }
 }
+
 function unwrap<T>(result: IdeationResult<T>) {
   if (!result.ok) throw new UiError(result.error.code);
   return result.value;
 }
+
+function writeQuery(fields: Record<string, string | null>) {
+  const url = new URL(window.location.href);
+  for (const [name, value] of Object.entries(fields)) {
+    if (value === null) url.searchParams.delete(name);
+    else url.searchParams.set(name, value);
+  }
+  window.history.replaceState(window.history.state, "", url);
+}
+
 export function IdeationErrorNotice({ code }: { code: IdeationUiErrorCode }) {
   return (
-    <div className="error" role="alert">
+    <div className="ideation-error" role="alert">
       <p>{errorCopy[code]}</p>
-      {code === "INSUFFICIENT_CREDITS" && (
-        <a href="/account">查看账户与点数 →</a>
-      )}
-      {code === "UNAUTHENTICATED" && <a href="/sign-in">重新登录 →</a>}
-      <small>不会自动重试或发起付款。</small>
+      {code === "INSUFFICIENT_CREDITS" && <a href="/account">{c.account}</a>}
+      {code === "UNAUTHENTICATED" && <a href="/sign-in">{c.login}</a>}
     </div>
   );
 }
+
 export function IdeationStudio({
   projectId,
   compileScope,
   compileSources,
+  nextChapter,
   chatLimit,
   verbatimTargets,
 }: {
   projectId: string;
   compileScope: Omit<IdeationContextScope, "project" | "chapter">;
   compileSources: readonly { id: string; path: string; sha256: string }[];
-  modelMode: string;
+  nextChapter: number | undefined;
   chatLimit: number;
   verbatimTargets: readonly VerbatimTargetOption[];
 }) {
   const confirm = useConfirm();
+  const toast = useToast();
   const router = useRouter();
+  const { refresh: refreshDecisions } = useProjectDecisionContext();
   const [adapter] = useState(() => createIdeationClient(projectId));
-  const [selected, setSelected] = useState<IdeationSessionId>(
-    "" as IdeationSessionId,
-  );
-  const selectSession = useCallback((id: IdeationSessionId) => {
-    setSelected(id);
-    const url = new URL(window.location.href);
-    url.searchParams.set("session", id);
-    window.history.replaceState(window.history.state, "", url);
-  }, []);
+  const [selected, setSelected] = useState<IdeationSessionId>();
   const [sessions, setSessions] = useState<readonly IdeationSession[]>([]);
-  const [streams, setStreams] = useState(emptyRoleStreams),
-    [view, setView] = useState<View>();
-  const [selectedPreview, setSelectedPreview] = useState(""),
-    [filter, setFilter] = useState<IdeationPreview["kind"] | "all">("all");
-  const [error, setError] = useState<IdeationUiErrorCode>(),
-    [busy, setBusy] = useState(false),
-    [notice, setNotice] = useState("");
-  const [message, setMessage] = useState(""),
-    [title, setTitle] = useState(""),
-    [receipt, setReceipt] = useState<IdeationApprovalReceipt>();
+  const [view, setView] = useState<View>();
+  const [streams, setStreams] = useState(emptyRoleStreams);
+  const [selectedPreview, setSelectedPreview] = useState("");
+  const [inboxTab, setInboxTab] = useState<Inbox>("pending");
+  const [compileOpen, setCompileOpen] = useState(false);
+  const [error, setError] = useState<{
+    area: Area;
+    code: IdeationUiErrorCode;
+  }>();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [title, setTitle] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [interactive, setInteractive] = useState(false);
+  const [receipt, setReceipt] = useState<IdeationApprovalReceipt>();
   const sequence = useRef(0);
+  const messagesBox = useRef<HTMLDivElement>(null);
+  const currentCard = useRef<HTMLDivElement>(null);
+  const nameInput = useRef<HTMLInputElement>(null);
+  const follow = useRef(true);
+
+  const selectSession = useCallback(
+    (id: IdeationSessionId, preservePreview = false) => {
+      setSelected(id);
+      setSelectedPreview(
+        preservePreview
+          ? (new URL(window.location.href).searchParams.get("preview") ?? "")
+          : "",
+      );
+      writeQuery(
+        preservePreview ? { session: id } : { session: id, preview: null },
+      );
+      follow.current = true;
+    },
+    [],
+  );
+
   const refresh = useCallback(async () => {
     const version = ++sequence.current;
     try {
@@ -119,12 +168,19 @@ export function IdeationStudio({
       if (version !== sequence.current) return;
       setSessions(listed);
       if (!selected) {
-        const requested = new URL(window.location.href).searchParams.get(
-          "session",
-        );
-        const current =
-          listed.find((item) => item.id === requested) ?? listed[0];
-        if (current) selectSession(current.id);
+        const query = new URL(window.location.href).searchParams;
+        let session = listed.find((item) => item.id === query.get("session"));
+        const preview = query.get("preview");
+        if (!session && preview && listed.length > 1) {
+          const result = await adapter.api.getPreview({
+            previewId: preview as IdeationPreviewId,
+          });
+          if (version !== sequence.current) return;
+          if (result.ok)
+            session = listed.find((item) => item.id === result.value.sessionId);
+        }
+        const current = session ?? listed[0];
+        if (current) selectSession(current.id, true);
         return;
       }
       const [session, messages, previews, tasks] = await Promise.all([
@@ -145,29 +201,34 @@ export function IdeationStudio({
           }),
         ),
       ]);
-      const next = {
-        session: unwrap(session),
-        messages: unwrap(messages),
-        previews: unwrap(previews),
-        tasks: unwrap(tasks),
-      };
-      if (version === sequence.current) {
-        setView(next);
-      }
+      if (version === sequence.current)
+        setView({
+          session: unwrap(session),
+          messages: unwrap(messages),
+          previews: unwrap(previews),
+          tasks: unwrap(tasks),
+        });
     } catch (caught) {
       if (version === sequence.current)
-        setError(caught instanceof UiError ? caught.code : "INTERNAL_ERROR");
+        setError({
+          area: "conversation",
+          code: caught instanceof UiError ? caught.code : "INTERNAL_ERROR",
+        });
     }
   }, [adapter, selected, selectSession]);
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
   useEffect(() => {
+    setCompileOpen(
+      new URL(window.location.href).searchParams.get("compile") === "1",
+    );
+    setInteractive(true);
+  }, []);
+  useEffect(() => {
     setView(undefined);
-    setSelectedPreview("");
-    setFilter("all");
+    setInboxTab("pending");
     setReceipt(undefined);
     setError(undefined);
-    setNotice("");
     setMessage("");
     void refresh();
   }, [refresh]);
@@ -180,7 +241,8 @@ export function IdeationStudio({
           applyRoleFrame(old, { ...event, runId: event.runId ?? "" }),
         );
       } else {
-        if (event.type === "error") setError(event.error.code);
+        if (event.type === "error")
+          setError({ area: "conversation", code: event.error.code });
         void refreshRef.current();
       }
     });
@@ -190,21 +252,90 @@ export function IdeationStudio({
     };
   }, [adapter, projectId, selected]);
   useEffect(() => () => adapter.dispose(), [adapter]);
+  useLayoutEffect(() => {
+    const display = messagesBox.current;
+    if (display && follow.current) display.scrollTop = display.scrollHeight;
+  });
+  useEffect(() => {
+    if (creating) nameInput.current?.focus();
+  }, [creating]);
+
+  const active = view?.session.id === selected ? view : undefined;
+  const closed = active?.session.status === "closed";
+  const allPreviews = active?.previews ?? [];
+  const chosen = allPreviews.find((item) => item.id === selectedPreview);
+  const tab = chosen
+    ? chosen.status === "pending"
+      ? "pending"
+      : "processed"
+    : inboxTab;
+  const pending = allPreviews.filter(({ status }) => status === "pending");
   const previews =
-    view?.previews.filter((item) => filter === "all" || item.kind === filter) ??
-    [];
-  const preview =
-    previews.find((item) => item.id === selectedPreview) ?? previews[0];
-  const closed = view?.session.status === "closed";
-  async function operation(callback: () => Promise<void>) {
+    tab === "pending"
+      ? pending
+      : allPreviews.filter(({ status }) => status !== "pending");
+  const preview = chosen ?? previews[0];
+  const newer =
+    preview &&
+    allPreviews.find(
+      ({ supersedesPreviewId }) => supersedesPreviewId === preview.id,
+    );
+  const role = active?.tasks.find(
+    ({ id }) => id === receipt?.startedTaskId,
+  )?.role;
+  const sourcePaths = useMemo(
+    () =>
+      new Map(
+        [...compileSources, ...verbatimTargets].map(({ id, path }) => [
+          id,
+          path,
+        ]),
+      ),
+    [compileSources, verbatimTargets],
+  );
+  const chars = Array.from(message).length;
+  const responding = Boolean(active?.session.currentTurnId);
+  const canSend =
+    active &&
+    !busy &&
+    !closed &&
+    !responding &&
+    message.trim() &&
+    chars <= chatLimit;
+
+  function openPreview(id: IdeationPreviewId, reveal = false) {
+    setError((current) => (current?.area === "decision" ? undefined : current));
+    setSelectedPreview(id);
+    writeQuery({ preview: id });
+    if (reveal)
+      requestAnimationFrame(() =>
+        currentCard.current?.scrollIntoView({
+          block: "nearest",
+          behavior: "instant",
+        }),
+      );
+  }
+  function changeTab(next: Inbox) {
+    setInboxTab(next);
+    setError((current) => (current?.area === "decision" ? undefined : current));
+    setSelectedPreview("");
+    writeQuery({ preview: null });
+  }
+  function toggleCompile(open: boolean) {
+    setCompileOpen(open);
+    writeQuery({ compile: open ? "1" : null });
+  }
+  async function operation(area: Area, callback: () => Promise<void>) {
     setBusy(true);
     setError(undefined);
-    setNotice("");
     try {
       await callback();
       await refreshRef.current();
     } catch (caught) {
-      setError(caught instanceof UiError ? caught.code : "INTERNAL_ERROR");
+      setError({
+        area,
+        code: caught instanceof UiError ? caught.code : "INTERNAL_ERROR",
+      });
     } finally {
       setBusy(false);
     }
@@ -214,9 +345,10 @@ export function IdeationStudio({
     text: string,
     trialRead: boolean,
   ) {
-    if (!preview || !view) return;
+    if (!preview || !active) return;
     const target = preview;
-    await operation(async () => {
+    openPreview(target.id);
+    await operation("decision", async () => {
       const request = {
         clientRequestId: newRequestId(),
         previewId: target.id,
@@ -237,10 +369,8 @@ export function IdeationStudio({
               })
             : await adapter.api.approvePreview({ ...request, confirmed: true });
         setReceipt(unwrap(result));
-        setNotice(
-          target.kind === "handoff"
-            ? "通讯门已批准，下游任务已受理。"
-            : "预览已批准，提交结果已保存。后续任务仍遵守各自批准门。",
+        toast(
+          target.kind === "handoff" ? c.approvedHandoff : c.approvedPreview,
         );
         router.refresh();
       } else if (kind === "reject") {
@@ -251,52 +381,111 @@ export function IdeationStudio({
           }),
         );
         setReceipt(undefined);
-        setNotice("已拒绝此预览。理由只留在协调员会话。");
+        toast(c.rejected);
       } else {
         unwrap(await adapter.api.revisePreview({ ...request, content: text }));
         setReceipt(undefined);
-        setNotice("修改意见已交回协调员；旧版保留，新版需要重新阅读与批准。");
+        toast(c.revised);
       }
+      refreshDecisions();
     });
   }
-  return (
-    <main className="ideation-page">
-      <header className="compact-heading">
-        <div>
-          <h1>{frameCopy.ideation}</h1>
-        </div>
-      </header>
-      <p className="notice">
-        对话与任务会保存到当前项目。每份预览先阅读、再决定；批准后才提交资料或执行委托。点数按实际用量结算。
-      </p>
-      {error && <IdeationErrorNotice code={error} />}
-      {notice && <output className="notice">{notice}</output>}
-      <div className="ideation-desk">
-        <aside className="ideation-sessions" aria-label="会话列表">
-          <span className="eyebrow">想法的来处</span>
-          <h2>构思会话</h2>
-          <label className="session-select-label">
-            构思会话
-            <select
-              aria-label="构思会话"
-              value={selected}
-              disabled={busy}
-              onChange={(event) => {
-                const value = sessions.find(
-                  (row) => row.id === event.target.value,
+
+  function compile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    if (!active || busy) return;
+    void operation("inbox", async () => {
+      unwrap(
+        await adapter.api.requestIdeationCompilation({
+          sessionId: active.session.id,
+          chapter: String(form.get("chapter")),
+          scope: {
+            volume: String(form.get("volume") ?? "").trim() || null,
+            arc: String(form.get("arc") ?? "").trim() || null,
+            scene_type: String(form.get("scene_type") ?? "").trim() || null,
+            pov: String(form.get("pov") ?? "").trim() || null,
+          },
+          sources: compileSources
+            .filter((item) => form.getAll("source").includes(item.id))
+            .map((item) => ({
+              resourceId: item.id,
+              expectedSha256: item.sha256,
+            })) as never,
+          clientRequestId: newRequestId(),
+        }),
+      );
+      toggleCompile(false);
+      toast(c.compileSent);
+    });
+  }
+
+  function renderMessage(item: IdeationMessage) {
+    const previewsFromTurn =
+      item.role === "assistant"
+        ? (active?.tasks.find(({ id }) => item.turnId === id)
+            ?.outputPreviewIds ?? [])
+        : [];
+    return (
+      <article
+        key={item.id}
+        className={`ideation-message message-${item.role}`}
+      >
+        <span className="ideation-message-role">
+          {item.role === "user" ? c.you : c.coordinator}
+        </span>
+        {item.role === "user" ? (
+          <VerbatimSelection
+            message={item}
+            targets={verbatimTargets}
+            busy={busy}
+            onChoose={(request) => {
+              void operation("inbox", async () => {
+                const created = unwrap(
+                  await adapter.api.createVerbatimPreview({
+                    ...request,
+                    clientRequestId: newRequestId(),
+                  }),
                 );
-                if (value) selectSession(value.id);
-              }}
-            >
-              {sessions.map((session, index) => (
-                <option key={session.id} value={session.id}>
-                  {index < 2 ? session.title : `会话 ${index + 1}`}
-                </option>
-              ))}
-            </select>
-          </label>
-          <ul>
-            {sessions.map((session) => (
+                openPreview(created.id, true);
+                toast(c.verbatimCreated);
+                refreshDecisions();
+              });
+            }}
+          />
+        ) : (
+          <SafeMarkdown content={item.content} />
+        )}
+        {previewsFromTurn.flatMap((id) => {
+          const item = allPreviews.find((row) => row.id === id);
+          return item
+            ? [
+                <button
+                  key={id}
+                  type="button"
+                  className="ideation-preview-pointer"
+                  onClick={() => openPreview(id, true)}
+                >
+                  {c.pointer(previewKind(item))}
+                </button>,
+              ]
+            : [];
+        })}
+      </article>
+    );
+  }
+
+  return (
+    <main
+      className="ideation-page ideation-desk"
+      aria-label={frameCopy.ideation}
+    >
+      <aside className="ideation-sessions" aria-label={c.sessions}>
+        <h2>{c.sessionHeading}</h2>
+        <ul>
+          {sessions.map((session) => {
+            const time = ideationTime(session.updatedAt);
+            return (
               <li key={session.id}>
                 <button
                   type="button"
@@ -306,164 +495,184 @@ export function IdeationStudio({
                 >
                   <SafeMarkdown inline plain content={session.title} />
                   <small>
-                    {session.status === "closed"
-                      ? "已关闭 · 停止新对话"
-                      : "开放"}
+                    {session.status === "closed" ? c.closed : c.open}
+                    {time && (
+                      <>
+                        {" "}
+                        · <time dateTime={session.updatedAt}>{time}</time>
+                      </>
+                    )}
                   </small>
                 </button>
               </li>
-            ))}
-          </ul>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              void operation(async () => {
-                const result = unwrap(
-                  await adapter.api.createIdeationSession({
-                    clientRequestId: newRequestId(),
-                    title,
-                  }),
-                );
-                setTitle("");
-                selectSession(result.id);
-              });
-            }}
-          >
-            <label>
-              新会话名称
+            );
+          })}
+        </ul>
+        <div className="ideation-new-session">
+          {error?.area === "sessions" && (
+            <IdeationErrorNotice code={error.code} />
+          )}
+          {creating ? (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (busy || !title.trim()) return;
+                void operation("sessions", async () => {
+                  const result = unwrap(
+                    await adapter.api.createIdeationSession({
+                      clientRequestId: newRequestId(),
+                      title,
+                    }),
+                  );
+                  setTitle("");
+                  setCreating(false);
+                  selectSession(result.id);
+                });
+              }}
+            >
               <input
+                ref={nameInput}
+                aria-label={c.sessionName}
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 required
                 maxLength={80}
-                placeholder="为一个新想法留位置"
+                placeholder={c.sessionPlaceholder}
+                disabled={busy}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    setTitle("");
+                    setCreating(false);
+                  }
+                }}
               />
-            </label>
+            </form>
+          ) : (
             <button
-              className="button secondary"
-              type="submit"
-              disabled={busy || !title.trim()}
+              className="ui-btn ui-btn-ghost"
+              type="button"
+              disabled={!interactive || busy}
+              onClick={() => setCreating(true)}
             >
-              新建构思会话
+              {c.newSession}
             </button>
-          </form>
-          <p className="fine-print">
-            会话原话留在本会话；你批准的逐字资料会按目标权限使用。下游委托仍须通过通讯门。
-          </p>
-        </aside>
-        <section className="ideation-conversation" aria-label="协调员会话">
+          )}
+          <p>{c.privacy}</p>
+        </div>
+      </aside>
+
+      <section className="ideation-conversation" aria-label={c.conversation}>
+        {active && (
           <header>
-            <div>
-              <span className="eyebrow">与你对话的岗位</span>
-              <h2>创意协调员</h2>
-            </div>
-            {view && (
+            <h2>
+              <SafeMarkdown inline plain content={active.session.title} />
+            </h2>
+            {!closed && (
               <button
+                className="ui-btn ui-btn-ghost ideation-close"
                 type="button"
-                className="text-button"
-                disabled={busy || closed}
+                disabled={busy}
                 onClick={async () => {
-                  if (await confirm(confirmation.closeSession))
-                    void operation(async () => {
+                  if (await confirm(c.closeConfirmation))
+                    void operation("conversation", async () => {
                       unwrap(
                         await adapter.api.closeIdeationSession({
-                          sessionId: view.session.id,
+                          sessionId: active.session.id,
                           clientRequestId: newRequestId(),
                         }),
                       );
-                      setNotice("会话已关闭，已有任务和预览仍可操作。");
                     });
                 }}
               >
-                关闭会话
+                {c.close}
               </button>
             )}
           </header>
-          <div className="ideation-messages" aria-live="polite">
-            {view?.messages.map((item) => (
-              <article
-                key={item.id}
-                className={`ideation-message message-${item.role}`}
-              >
-                <span className="eyebrow">
-                  {item.role === "user" ? "你" : "协调员"}
-                </span>
-                {item.role === "user" ? (
-                  <VerbatimSelection
-                    message={item}
-                    targets={verbatimTargets}
-                    busy={busy}
-                    onChoose={(request) => {
-                      void operation(async () => {
-                        const created = unwrap(
-                          await adapter.api.createVerbatimPreview({
-                            ...request,
-                            clientRequestId: newRequestId(),
-                          }),
-                        );
-                        setFilter("verbatim");
-                        setSelectedPreview(created.id);
-                        setNotice(
-                          "逐字预览已生成。请阅读选区和目标，再单独批准。",
-                        );
-                      });
-                    }}
+        )}
+        <div
+          ref={messagesBox}
+          className="ideation-messages"
+          aria-live="polite"
+          onScroll={(event) => {
+            const list = event.currentTarget;
+            follow.current =
+              list.scrollHeight - list.clientHeight - list.scrollTop < 80;
+          }}
+        >
+          {!active?.messages.length && (
+            <div className="ideation-chat-empty">
+              <h2>{c.emptyTitle}</h2>
+              <p>{c.emptyDescription}</p>
+            </div>
+          )}
+          {active?.messages.map(renderMessage)}
+          {active?.tasks
+            .filter(
+              (task) =>
+                task.stage === "coordinator" &&
+                (["QUEUED", "RUNNING"].includes(task.status) ||
+                  Boolean(
+                    roleStreamText(streams, selected ?? "", task.id, task.role),
+                  )) &&
+                !active.messages.some(
+                  (item) =>
+                    item.role === "assistant" && item.turnId === task.id,
+                ),
+            )
+            .map((task) => (
+              <div className="ideation-message message-assistant" key={task.id}>
+                <span className="ideation-message-role">{c.coordinator}</span>
+                <div data-testid="ideation-stream">
+                  <SafeMarkdown
+                    content={roleStreamText(
+                      streams,
+                      selected ?? "",
+                      task.id,
+                      task.role,
+                    )}
                   />
-                ) : (
-                  <SafeMarkdown content={item.content} />
-                )}
-              </article>
-            ))}
-            {view && !view.messages.length && (
-              <div className="ideation-chat-empty">
-                <h3>从一个放不下的念头开始</h3>
-                <p>聊聊人物、冲突，或你希望读到的那种感觉。</p>
-              </div>
-            )}
-            {view?.tasks
-              .filter(
-                (task) =>
-                  task.stage === "coordinator" &&
-                  (["QUEUED", "RUNNING"].includes(task.status) ||
-                    !!roleStreamText(streams, selected, task.id, task.role)) &&
-                  !view.messages.some(
-                    (item) =>
-                      item.role === "assistant" && item.turnId === task.id,
-                  ),
-              )
-              .map((task) => (
-                <div
-                  className="ideation-message message-assistant"
-                  key={task.id}
-                >
-                  <span className="eyebrow">
-                    协调员 · {taskStatus[task.status]}
-                  </span>
-                  <div data-testid="ideation-stream">
-                    <SafeMarkdown
-                      content={roleStreamText(
-                        streams,
-                        selected,
-                        task.id,
-                        task.role,
-                      )}
-                    />
-                  </div>
+                  {["QUEUED", "RUNNING"].includes(task.status) && (
+                    <span className="ideation-cursor" aria-hidden="true" />
+                  )}
                 </div>
-              ))}
-          </div>
+              </div>
+            ))}
+        </div>
+        <TaskStrip
+          key={selected}
+          tasks={active?.tasks ?? []}
+          busy={busy}
+          onPreview={(id) => openPreview(id, true)}
+          onCancel={async (task) => {
+            if (await confirm(confirmation.cancelTask))
+              void operation("conversation", async () => {
+                unwrap(
+                  await adapter.api.cancelIdeationTask({
+                    taskId: task.id,
+                    clientRequestId: newRequestId(),
+                  }),
+                );
+                toast(c.cancelledTask);
+              });
+          }}
+        />
+        {error?.area === "conversation" && (
+          <IdeationErrorNotice code={error.code} />
+        )}
+        {closed ? (
+          <p className="ideation-closed">{c.closedComposer}</p>
+        ) : (
           <form
             className="ideation-composer"
             onSubmit={(event) => {
               event.preventDefault();
-              if (!view) return;
-              void operation(async () => {
-                if (Array.from(message).length > chatLimit)
-                  throw new UiError("INPUT_LIMIT_EXCEEDED");
+              if (!active || !canSend) return;
+              follow.current = true;
+              void operation("conversation", async () => {
                 unwrap(
                   await adapter.api.sendIdeationMessage({
-                    sessionId: view.session.id,
-                    expectedSessionRevision: view.session.revision,
+                    sessionId: active.session.id,
+                    expectedSessionRevision: active.session.revision,
                     clientRequestId: newRequestId(),
                     content: message,
                   }),
@@ -472,279 +681,185 @@ export function IdeationStudio({
               });
             }}
           >
-            <label>
-              想和协调员说的话
-              <textarea
-                aria-label="想和协调员说的话"
-                rows={4}
-                value={message}
-                disabled={closed || !view}
-                onChange={(event) => setMessage(event.target.value)}
-                placeholder={
-                  closed
-                    ? "此会话已关闭，可新建会话继续。"
-                    : "说说你想写什么，哪些事实不能改变。"
-                }
-              />
-            </label>
+            <textarea
+              aria-label={c.composer}
+              rows={3}
+              value={message}
+              disabled={!active}
+              placeholder={c.composerPlaceholder}
+              onChange={(event) => setMessage(event.target.value)}
+            />
             <div>
-              <small>
-                {Array.from(message).length} / {chatLimit} 字符
+              <small data-over={chars > chatLimit}>
+                {c.inputCount(chars, chatLimit)}
               </small>
               <button
-                className="button primary"
+                className="ui-btn ui-btn-primary"
                 type="submit"
-                disabled={
-                  busy ||
-                  closed ||
-                  !view ||
-                  !!view.session.currentTurnId ||
-                  !message.trim()
-                }
+                disabled={!canSend}
               >
-                {view?.session.currentTurnId
-                  ? "协调员正在回应…"
-                  : "发送给协调员"}
+                {responding ? c.responding : c.send}
               </button>
             </div>
           </form>
-        </section>
-        <section className="ideation-review" aria-label="构思预览工作台">
-          <header>
-            <span className="eyebrow">先阅读，再决定</span>
-            <h2>每个决定，留给你。</h2>
-            <p>理解、委托与变更分开阅读。你的决定只绑定眼前这一版。</p>
-          </header>
-          <label>
-            预览类型
-            <select
-              aria-label="预览类型"
-              value={filter}
-              onChange={(event) => {
-                const value = event.target.value;
-                if (value === "all" || value in kindNames) {
-                  setFilter(value as typeof filter);
-                  setSelectedPreview("");
-                }
-              }}
+        )}
+      </section>
+
+      <section className="ideation-review" aria-label={c.inbox}>
+        <header className="ideation-inbox-head">
+          <div className="ideation-tabs">
+            <button
+              type="button"
+              disabled={!interactive}
+              aria-pressed={tab === "pending"}
+              onClick={() => changeTab("pending")}
             >
-              <option value="all">全部预览</option>
-              {Object.entries(kindNames).map(([kind, name]) => (
-                <option key={kind} value={kind}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <section className="ideation-preview-list" aria-label="预览列表">
-            {previews.map((item) => (
-              <button
-                type="button"
-                key={item.id}
-                className={preview?.id === item.id ? "selected" : ""}
-                onClick={() => setSelectedPreview(item.id)}
-              >
-                <span>
-                  {kindNames[item.kind]} · 版本 {item.revision} ·{" "}
-                  {previewStatus[item.status]}
-                  {item.kind === "expression_candidate"
-                    ? item.approvalStage === "activation"
-                      ? " · 激活阶段"
-                      : " · 候选阶段"
-                    : ""}
-                </span>
-                <SafeMarkdown inline plain content={item.summary} />
-              </button>
-            ))}
-          </section>
-          {preview ? (
-            <PreviewCard
-              key={`${preview.id}:${preview.sha256}:${closed}`}
-              preview={preview}
-              busy={busy}
-              canRevise={!closed}
-              onAction={(kind, text, trialRead) => {
-                void decide(kind, text, trialRead);
-              }}
-            />
-          ) : (
-            <div className="empty-state">
-              <h3>预览会在这里等待你</h3>
-              <p>先与协调员对话，或切换预览类型。</p>
-            </div>
-          )}
-          {receipt && (
-            <details className="ideation-receipt">
-              <summary>上次批准记录</summary>
-              <Structured
-                value={{
-                  decisionId: receipt.id,
-                  previewId: receipt.previewId,
-                  startedTaskId: receipt.startedTaskId,
-                  committedFiles: receipt.committedFiles,
-                  projectionRegistered: receipt.projectionRegistered,
-                }}
-              />
-            </details>
-          )}
-        </section>
-      </div>
-      <section className="ideation-tasks" aria-label="下游任务">
-        <header>
-          <div>
-            <span className="eyebrow">委托之后</span>
-            <h2>任务与用量</h2>
+              {c.pending(pending.length)}
+            </button>
+            <button
+              type="button"
+              disabled={!interactive}
+              aria-pressed={tab === "processed"}
+              onClick={() => changeTab("processed")}
+            >
+              {c.processed}
+            </button>
           </div>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              const form = new FormData(event.currentTarget);
-              if (!view) return;
-              void operation(async () => {
-                unwrap(
-                  await adapter.api.requestIdeationCompilation({
-                    sessionId: view.session.id,
-                    chapter: String(form.get("chapter")),
-                    scope: {
-                      volume: String(form.get("volume") ?? "").trim() || null,
-                      arc: String(form.get("arc") ?? "").trim() || null,
-                      scene_type:
-                        String(form.get("scene_type") ?? "").trim() || null,
-                      pov: String(form.get("pov") ?? "").trim() || null,
-                    },
-                    sources: compileSources
-                      .filter((source) =>
-                        form.getAll("source").includes(source.id),
-                      )
-                      .map((source) => ({
-                        resourceId: source.id,
-                        expectedSha256: source.sha256,
-                      })) as never,
-                    clientRequestId: newRequestId(),
-                  }),
-                );
-                setNotice("编译任务已受理，生成的章节情境仍需要你阅读并批准。");
-              });
-            }}
+          <button
+            className="ui-btn ui-btn-ghost"
+            type="button"
+            disabled={!interactive}
+            aria-expanded={compileOpen}
+            onClick={() => toggleCompile(!compileOpen)}
           >
+            {c.compile}
+          </button>
+        </header>
+        {error?.area === "inbox" && <IdeationErrorNotice code={error.code} />}
+        {compileOpen && (
+          <form className="ideation-compile" onSubmit={compile}>
             <label>
-              编译章节
+              {c.compileChapter}
               <input
                 name="chapter"
                 type="number"
                 min="1"
                 max="9999"
-                defaultValue="1"
+                defaultValue={
+                  nextChapter && nextChapter <= 9999 ? nextChapter : undefined
+                }
                 required
               />
             </label>
             <details>
-              <summary>编译作用域与补充来源</summary>
-              {(["volume", "arc", "scene_type", "pov"] as const).map(
-                (field, index) => (
+              <summary>{c.compileExtra}</summary>
+              <div className="ideation-scope">
+                {(
+                  Object.keys(
+                    c.compileFields,
+                  ) as (keyof typeof c.compileFields)[]
+                ).map((field) => (
                   <label key={field}>
-                    {["卷", "篇章", "场景类型", "视角"][index]}
+                    {c.compileFields[field]}
                     <input
                       name={field}
                       defaultValue={compileScope[field] ?? ""}
                       maxLength={80}
                     />
                   </label>
-                ),
-              )}
-              <p className="fine-print">
-                故事、当前状态等必需资料由服务端核对；可再选择相关来源。
-              </p>
+                ))}
+              </div>
               {compileSources.map((source) => (
-                <label key={source.id}>
+                <label className="ideation-check" key={source.id}>
                   <input type="checkbox" name="source" value={source.id} />
                   <SafeMarkdown inline plain content={source.path} />
                 </label>
               ))}
             </details>
+            <p>{c.compileHelp}</p>
             <button
-              className="button secondary"
+              className="ui-btn ui-btn-primary"
               type="submit"
-              disabled={busy || !view}
+              disabled={busy || !active}
             >
-              编译章节情境
+              {c.compileStart}
             </button>
           </form>
-        </header>
-        <p className="fine-print">{frameCopy.usageRecords}</p>
-        <div className="ideation-task-list">
-          {view?.tasks.map((task) => (
-            <article key={task.id} className="ideation-task">
-              <div>
-                <strong>{roleNames[task.role]}</strong>
-                <span className="preview-state">{taskStatus[task.status]}</span>
-              </div>
-              <p className="fine-print">
-                输入 {task.usage.inputTokens} · 输出 {task.usage.outputTokens} ·
-                cacheRead {task.usage.cacheReadTokens} · cacheWrite{" "}
-                {task.usage.cacheWriteTokens} ·{" "}
-                {task.usage.costUsd === null
-                  ? "费用未记录"
-                  : `记录成本 $${task.usage.costUsd}`}{" "}
-              </p>
-              {task.error && <p>{errorCopy[task.error.code]}</p>}
-              {task.stage !== "coordinator" && (
-                <SafeMarkdown
-                  content={roleStreamText(
-                    streams,
-                    selected,
-                    task.id,
-                    task.role,
+        )}
+        <section className="ideation-preview-list" aria-label={c.previewList}>
+          {previews.map((item) => {
+            const time = ideationTime(item.createdAt);
+            return (
+              <button
+                type="button"
+                key={item.id}
+                aria-current={preview?.id === item.id ? "true" : undefined}
+                data-kind={item.kind}
+                data-handled={item.status !== "pending"}
+                onClick={() => openPreview(item.id)}
+              >
+                <span>
+                  {previewKind(item)}
+                  {item.kind === "expression_candidate" && (
+                    <>
+                      {" "}
+                      ·{" "}
+                      {item.approvalStage === "activation"
+                        ? c.activationStage
+                        : c.candidateStage}
+                    </>
                   )}
-                />
-              )}
-              <div className="decision-actions">
-                {task.outputPreviewIds.map((id) => (
-                  <button
-                    key={id}
-                    type="button"
-                    className="text-button"
-                    onClick={() => {
-                      setFilter("all");
-                      setSelectedPreview(id);
-                      document
-                        .querySelector('[aria-label="构思预览工作台"]')
-                        ?.scrollIntoView({
-                          behavior: "smooth",
-                          block: "start",
-                        });
-                    }}
-                  >
-                    查看对应预览
-                  </button>
-                ))}
-                {!["SUCCEEDED", "CANCELLED", "FAILED", "INTERRUPTED"].includes(
-                  task.status,
-                ) && (
-                  <button
-                    className="text-button danger"
-                    type="button"
-                    disabled={busy}
-                    onClick={async () => {
-                      if (await confirm(confirmation.cancelTask))
-                        void operation(async () => {
-                          unwrap(
-                            await adapter.api.cancelIdeationTask({
-                              taskId: task.id,
-                              clientRequestId: newRequestId(),
-                            }),
-                          );
-                          setNotice("任务已取消，没有撤销已批准资料。");
-                        });
-                    }}
-                  >
-                    取消任务
-                  </button>
-                )}
-              </div>
-            </article>
-          ))}
-        </div>
+                  {item.status !== "pending" && (
+                    <> · {previewStatus[item.status]}</>
+                  )}
+                </span>
+                <strong>
+                  <SafeMarkdown inline plain content={item.summary} />
+                </strong>
+                <small>
+                  {c.revision(item.revision)}
+                  {time ? (
+                    <>
+                      {" "}
+                      · <time dateTime={item.createdAt}>{time}</time>
+                    </>
+                  ) : (
+                    <> · {roleName[item.role]}</>
+                  )}
+                </small>
+              </button>
+            );
+          })}
+        </section>
+        {preview ? (
+          <div ref={currentCard} className="ideation-card-wrap">
+            <PreviewCard
+              key={`${preview.id}:${preview.sha256}:${closed}`}
+              preview={preview}
+              busy={busy}
+              canRevise={!closed}
+              externalSearch={
+                active?.session.capabilities.externalSearch ?? false
+              }
+              sources={sourcePaths}
+              receipt={receipt?.previewId === preview.id ? receipt : undefined}
+              startedRole={role ? roleName[role] : undefined}
+              error={
+                error?.area === "decision" ? (
+                  <IdeationErrorNotice code={error.code} />
+                ) : undefined
+              }
+              onNewer={newer ? () => openPreview(newer.id, true) : undefined}
+              onAction={(kind, text, trialRead) =>
+                void decide(kind, text, trialRead)
+              }
+            />
+          </div>
+        ) : (
+          <p className="ideation-inbox-empty">
+            {tab === "pending" ? c.emptyInbox : c.emptyProcessed}
+          </p>
+        )}
       </section>
     </main>
   );

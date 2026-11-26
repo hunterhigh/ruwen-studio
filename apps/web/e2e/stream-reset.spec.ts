@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
+import { ideationCopy as c } from "../src/copy/zh-CN.ts";
 import { createDemoFromShelf as createDemo, signIn } from "./helpers.ts";
 import { ideationHttpFixture } from "./ideation-http-fixture.ts";
+import { captureIdeation05, sessionButton } from "./ideation-review.ts";
 
 for (const refusal of [false, true]) {
   test(`chapter delta → reset → ${refusal ? "refusal" : "corrected delta"} clears only the current attempt and ignores replay`, async ({
@@ -107,7 +109,7 @@ for (const refusal of [false, true]) {
     try {
       await page.goto(`/projects/${projectId}/ideation`);
       await expect(
-        page.getByText("交给下游的干净委托", { exact: true }),
+        page.getByText(c.handoffHelp, { exact: true }),
       ).toBeVisible();
       const s1 = fixture.demo.initialSessionId,
         s2 = fixture.demo.sessions[1]?.id;
@@ -136,6 +138,7 @@ for (const refusal of [false, true]) {
         text: expected as never,
       });
       await expect(first).toHaveText(expected);
+      if (!refusal) await captureIdeation05(page, "streaming");
       const run2 = await fixture.addRun(s1);
       await expect(page.getByTestId("ideation-stream")).toHaveCount(2);
       await fixture.emit(s1, run2, {
@@ -157,9 +160,7 @@ for (const refusal of [false, true]) {
         reset,
       );
       await expect(first).toHaveText(expected);
-      await page
-        .getByLabel("构思会话", { exact: true })
-        .selectOption({ label: "渡河之前" });
+      await sessionButton(page, "渡河之前").click();
       await expect(
         page.getByRole("heading", {
           name: "从一个放不下的念头开始",
@@ -177,9 +178,7 @@ for (const refusal of [false, true]) {
       await expect(page.getByTestId("ideation-stream")).toHaveText(
         "另一会话的独立文本。",
       );
-      await page
-        .getByLabel("构思会话", { exact: true })
-        .selectOption({ label: "北岸冬信" });
+      await sessionButton(page, "北岸冬信").click();
       await expect(page.getByTestId("ideation-stream")).toHaveCount(2);
       await expect(first).toHaveText(expected);
       await expect(page.getByTestId("ideation-stream").nth(1)).toHaveText(

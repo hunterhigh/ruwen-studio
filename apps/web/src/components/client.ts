@@ -4,17 +4,18 @@ export class ApiError extends Error {
     message: string,
     readonly code?: string,
     readonly details?: unknown,
+    readonly status?: number,
   ) {
     super(message);
   }
 }
 export async function request<T = unknown>(
   url: string,
-  options: RequestInit = {},
+  { csrf = false, ...options }: RequestInit & { csrf?: boolean } = {},
 ): Promise<T> {
   const method = options.method ?? "GET";
   const headers = new Headers(options.headers);
-  if (method !== "GET") {
+  if (method !== "GET" || csrf) {
     token ??= fetch("/api/csrf", {
       credentials: "same-origin",
       cache: "no-store",
@@ -55,9 +56,13 @@ export async function request<T = unknown>(
           ? value.code
           : undefined,
         data,
+        response.status,
       );
     throw new ApiError(
       typeof value === "string" ? value : "请求未完成，请重试。",
+      undefined,
+      undefined,
+      response.status,
     );
   }
   return data as T;

@@ -1,8 +1,9 @@
 "use client";
 import { usePathname } from "next/navigation.js";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { frameCopy } from "../copy/zh-CN.ts";
 import { useConfirm } from "../ui/ConfirmDialog.tsx";
+import { DraftLeaveContext } from "./chapter/draft-navigation.ts";
 import { post } from "./client.ts";
 import { PreviewBanner } from "./PreviewBanner.tsx";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
@@ -19,6 +20,7 @@ export function Shell({
 }) {
   const pathname = usePathname();
   const confirm = useConfirm();
+  const leaveDraft = useRef<(() => Promise<boolean>) | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState("");
   return (
@@ -71,6 +73,7 @@ export function Shell({
               disabled={signingOut}
               onClick={async () => {
                 if (!(await confirm(frameCopy.signOutConfirmation))) return;
+                if (leaveDraft.current && !(await leaveDraft.current())) return;
                 setSigningOut(true);
                 setError("");
                 try {
@@ -87,7 +90,9 @@ export function Shell({
             {error && <p role="alert">{error}</p>}
           </div>
         </aside>
-        <div className="studio-main">{children}</div>
+        <DraftLeaveContext.Provider value={leaveDraft}>
+          <div className="studio-main">{children}</div>
+        </DraftLeaveContext.Provider>
       </div>
     </>
   );

@@ -1,5 +1,6 @@
 "use client";
 import {
+  type ReactNode,
   type RefObject,
   useCallback,
   useLayoutEffect,
@@ -35,12 +36,24 @@ function notesFor(
   edits: Edit[],
   reactions: Reaction[],
   revised: boolean,
+  currentUserVersion: boolean,
 ): Note[] {
   const ranges = locateEdits(original, edits);
+  const currentRanges = currentUserVersion
+    ? locateEdits(
+        prose,
+        edits.map((edit) => ({
+          ...edit,
+          original: edit.replacement,
+          replacement: edit.original,
+        })),
+      )
+    : ranges;
   return [
     ...reactions.map((reaction, i) => {
       const match = readerPosition(reaction, original, prose, ranges);
-      const mark = revised ? match.originalSpan : match.cleanSpan;
+      const mark =
+        revised && !currentUserVersion ? match.originalSpan : match.cleanSpan;
       return {
         id: `reader-${i}`,
         edit: false,
@@ -50,16 +63,18 @@ function notesFor(
           readerReaction[reaction.type as keyof typeof readerReaction] ??
           roleName["qinggan-duzhe"],
         mark,
-        position: mark?.start ?? (revised ? undefined : match.fallback),
+        position:
+          mark?.start ??
+          (revised || currentUserVersion ? undefined : match.fallback),
         hint: mark
           ? undefined
-          : match.originalSpan && !revised
+          : match.originalSpan && !revised && !currentUserVersion
             ? c.deletedAnchor
             : c.missingAnchor,
       };
     }),
     ...edits.map((edit, i) => {
-      const range = ranges.find((item) => item.index === i);
+      const range = currentRanges.find((item) => item.index === i);
       return {
         id: `editor-${i}`,
         edit: true,
@@ -67,7 +82,8 @@ function notesFor(
         reason: edit.reason,
         original: edit.original,
         replacement: edit.replacement,
-        position: revised ? range?.start : range?.cleanStart,
+        position:
+          revised || currentUserVersion ? range?.start : range?.cleanStart,
         mark: revised ? range : undefined,
         hint: range ? undefined : c.missingAnchor,
       };
@@ -105,6 +121,10 @@ export function Manuscript({
   reactions,
   revised,
   setRevised,
+  currentUserVersion,
+  controls,
+  alternate,
+  note,
   chapter,
   title,
   candidate,
@@ -121,6 +141,10 @@ export function Manuscript({
   reactions: Reaction[];
   revised: boolean;
   setRevised: (value: boolean) => void;
+  currentUserVersion: boolean;
+  controls: ReactNode;
+  alternate: ReactNode;
+  note: ReactNode;
   chapter: string;
   title: string;
   candidate: boolean;
@@ -138,11 +162,12 @@ export function Manuscript({
   const cards = useRef(new Map<string, HTMLElement>());
   const lane = useRef<HTMLElement>(null);
   const paper = useRef<HTMLElement>(null);
-  const source = revised && original ? original : prose;
+  const source = revised && original && !currentUserVersion ? original : prose;
+  const showingAlternate = Boolean(alternate);
   const notes = useMemo(
     () =>
-      notesFor(prose, original, edits, reactions, revised && Boolean(original)),
-    [prose, original, edits, reactions, revised],
+      notesFor(prose, original, edits, reactions, revised, currentUserVersion),
+    [prose, original, edits, reactions, revised, currentUserVersion],
   );
   const visible = notes.filter((note) => (note.edit ? editorOn : readerOn));
   const blocks = proseBlocks(source, notes);
@@ -182,6 +207,7 @@ export function Manuscript({
 
   useLayoutEffect(placeNotes);
   useLayoutEffect(() => {
+    if (showingAlternate) return;
     const observer = new ResizeObserver(placeNotes);
     if (paper.current) observer.observe(paper.current);
     window.addEventListener("resize", placeNotes);
@@ -194,12 +220,13 @@ export function Manuscript({
       observer.disconnect();
       window.removeEventListener("resize", placeNotes);
     };
-  }, [placeNotes]);
+  }, [placeNotes, showingAlternate]);
 
   function activate(note: Note, fromText: boolean) {
     const next = expanded === note.id ? undefined : note.id;
     setExpanded(next);
-    if (next && note.edit && !revised && original) setRevised(true);
+    if (next && note.edit && !revised && (original || currentUserVersion))
+      setRevised(true);
     if (next)
       requestAnimationFrame(() => {
         const target = fromText
@@ -214,46 +241,40 @@ export function Manuscript({
       });
   }
 
-  return (
-    <>
-      {!writing && source && (
-        <div className="chapter-tools">
-          <div className="chapter-segment">
-            <button
-              type="button"
-              aria-pressed={!revised}
-              onClick={() => setRevised(false)}
-            >
-              {c.clean}
-            </button>
-            <button
-              type="button"
-              aria-pressed={revised}
-              disabled={!original}
-              onClick={() => setRevised(true)}
-            >
-              {c.revised}
-            </button>
-          </div>
-          <div className="chapter-note-toggles">
-            <span>{c.notes}</span>
-            <button
-              type="button"
-              aria-pressed={readerOn}
-              onClick={() => showReader(!readerOn)}
-            >
-              {c.reader(reactions.length)}
-            </button>
-            <button
-              type="button"
-              aria-pressed={editorOn}
-              onClick={() => showEditor(!editorOn)}
-            >
-              {c.editor(edits.length)}
-            </button>
-          </div>
+  const tools = !writing && source && (
+    <div className="chapter-tools">
+      {controls}
+      {!showingAlternate && (
+        <div className="chapter-note-toggles">
+          <span>{c.notes}</span>
+          <button
+            type="button"
+            aria-pressed={readerOn}
+            onClick={() => showReader(!readerOn)}
+          >
+            {c.reader(reactions.length)}
+          </button>
+          <button
+            type="button"
+            aria-pressed={editorOn}
+            onClick={() => showEditor(!editorOn)}
+          >
+            {c.editor(edits.length)}
+          </button>
         </div>
       )}
+    </div>
+  );
+  if (showingAlternate)
+    return (
+      <>
+        {tools}
+        <div className="chapter-alternate">{alternate}</div>
+      </>
+    );
+  return (
+    <>
+      {tools}
       <div className="chapter-reading">
         <article className="manuscript chapter-paper" ref={paper}>
           {approved && (
@@ -280,6 +301,7 @@ export function Manuscript({
             </span>
             <span>{c.chars(Array.from(source).length)}</span>
           </div>
+          {note}
           <h2>
             <SafeMarkdown plain inline content={title} />
           </h2>
@@ -385,7 +407,13 @@ export function Manuscript({
                       >
                         {edit ? (
                           <>
-                            <del>{body}</del>
+                            <del>
+                              <SafeMarkdown
+                                plain
+                                inline
+                                content={edit.original}
+                              />
+                            </del>
                             <ins>
                               <SafeMarkdown
                                 plain

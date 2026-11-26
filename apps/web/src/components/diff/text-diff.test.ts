@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { diffText } from "./text-diff.ts";
+import { countTextChanges, diffText } from "./text-diff.ts";
 
 describe("text diff", () => {
+  it("counts each added, removed or changed paragraph once", () => {
+    expect(countTextChanges("同一段\r\n\r\n结尾", "同一段\n\n结尾")).toBe(0);
+    expect(
+      countTextChanges(
+        "开头\n\n旧段。旧句。\n\n转折\n\n要删的一段\n\n收尾",
+        "开头\n\n新段。新句。\n\n转折\n\n收尾\n\n新增一段",
+      ),
+    ).toBe(3);
+  });
+
   it("aligns unchanged paragraphs and detects additions and deletions", () => {
     const diff = diffText(
       "开头\n\n删除一段\n\n转折\n\n收尾",

@@ -4,6 +4,7 @@ import { candidateCopy as c, errorCopy } from "../../copy/zh-CN.ts";
 import { useConfirm } from "../../ui/ConfirmDialog.tsx";
 import { ApiError, post } from "../client.ts";
 import { useDraftLeave } from "./draft-navigation.ts";
+import type { AnnotationRevision } from "./review-annotations.ts";
 import type { Detail } from "./review-data.ts";
 
 function saveError(cause: unknown) {
@@ -78,13 +79,32 @@ export function useCandidateActions(
   }, [checkNeedsRefresh, pendingCheck, refresh]);
 
   async function reload() {
-    if (saving || !(await confirmDiscard())) return;
+    if (saving || !(await confirmDiscard())) return false;
     setSaving(true);
-    if (await refresh()) {
+    const next = await refresh();
+    if (next) {
       setNeedsRefresh(false);
       discard();
     }
     setSaving(false);
+    return Boolean(next);
+  }
+
+  async function persistRevision(
+    baseSha256: string,
+    input: { text: string } | { op: AnnotationRevision; editIds: string[] },
+  ) {
+    setSaving(true);
+    try {
+      await post(`/api/runs/${id}/candidate/revisions`, {
+        baseSha256,
+        ...input,
+      });
+      discard();
+      setNeedsRefresh(!(await refresh()));
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function save() {
@@ -93,20 +113,12 @@ export function useCandidateActions(
       setDraftError(c.empty);
       return;
     }
-    setSaving(true);
     setDraftError("");
     try {
-      await post(`/api/runs/${id}/candidate/revisions`, {
-        baseSha256: draft.baseSha256,
-        text: draft.text,
-      });
-      discard();
-      setNeedsRefresh(!(await refresh()));
+      await persistRevision(draft.baseSha256, { text: draft.text });
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 409) setConflict(true);
       else setDraftError(saveError(cause));
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -147,6 +159,11 @@ export function useCandidateActions(
     leave,
     reload,
     save,
+    async editAnnotation(editId: string, op: AnnotationRevision) {
+      if (!digest || !waiting || saving || needsRefresh || draft) return false;
+      await persistRevision(digest, { op, editIds: [editId] });
+      return true;
+    },
     reverify,
     checking,
     checkError:

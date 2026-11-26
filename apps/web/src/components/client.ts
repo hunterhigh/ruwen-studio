@@ -61,7 +61,7 @@ export async function request<T = unknown>(
     throw new ApiError(
       typeof value === "string" ? value : "请求未完成，请重试。",
       undefined,
-      undefined,
+      data,
       response.status,
     );
   }

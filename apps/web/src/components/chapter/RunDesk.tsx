@@ -1,5 +1,5 @@
 "use client";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   chapterCopy as c,
   confirmation,
@@ -31,11 +31,10 @@ import { authorInputsSummary } from "./input-manifest-view.ts";
 import { Manuscript } from "./Manuscript.tsx";
 import { MemoryReview } from "./MemoryReview.tsx";
 import { EditDecision, RoleChain, Verdicts } from "./ReviewPanels.tsx";
+import { reviewAnnotations } from "./review-annotations.ts";
 import {
   chapterTitle,
   type Detail,
-  editsFrom,
-  readingFrom,
   roleCredits,
   roles,
   stopped,
@@ -43,6 +42,7 @@ import {
   type Usage,
 } from "./review-data.ts";
 import type { RunSummary } from "./runs.ts";
+import { useAnnotationReview } from "./useAnnotationReview.ts";
 import { useCandidateActions } from "./useCandidateActions.ts";
 
 function failureCopy(detail: Detail | undefined) {
@@ -110,6 +110,13 @@ export function RunDesk({
   const readingKey = `${digest}:${data?.run.verificationRunId ?? ""}`;
   const waiting = status === "AWAITING_CANDIDATE_APPROVAL";
   const revision = useCandidateActions(id, data, waiting && !readOnly, refresh);
+  const review = useAnnotationReview({
+    runId: id,
+    refresh,
+    revise: revision.editAnnotation,
+    reload: revision.reload,
+  });
+  const reviews = useMemo(() => reviewAnnotations(data), [data]);
   const versions = data?.run.candidateVersions ?? [];
   const current = versions.find(
     ({ version }) => version === data?.run.candidateVersion,
@@ -152,8 +159,7 @@ export function RunDesk({
     data?.prose || roleStreamText(streams, id, id, "xiaoshuo-zuozhe");
   const chapter = c.chapter(Number(row.chapter));
   const title = chapterTitle(prose);
-  const edits = editsFrom(data?.reports["wenxue-bianji"]?.output);
-  const reactions = readingFrom(data?.reports["qinggan-duzhe"]?.output);
+  const edits = reviews.editors.map(({ finding }) => finding);
   const credits = roles.map((role) =>
     roleCredits(account?.usage ?? [], id, role),
   );
@@ -331,6 +337,14 @@ export function RunDesk({
     setRevised(false);
     setSelectedVersion(version === current?.version ? undefined : version);
   }
+  function startEditing() {
+    if (!mutable || !waiting || locked || revision.draft) return;
+    setSelectedVersion(undefined);
+    setReturning(false);
+    review.clearFailure();
+    setRevised(false);
+    revision.startEditing();
+  }
   return (
     <section
       ref={workspace}
@@ -499,8 +513,10 @@ export function RunDesk({
       <Manuscript
         prose={prose}
         original={data?.original ?? ""}
-        edits={edits}
-        reactions={reactions}
+        reviews={reviews}
+        review={review}
+        canEditAnnotations={mutable && waiting && !locked && !revisited}
+        onEditCandidate={startEditing}
         revised={revised}
         setRevised={setRevised}
         currentUserVersion={current?.source === "user"}
@@ -527,13 +543,7 @@ export function RunDesk({
                   type="button"
                   aria-pressed={Boolean(revision.draft)}
                   disabled={locked}
-                  onClick={() => {
-                    if (revision.draft) return;
-                    setSelectedVersion(undefined);
-                    setReturning(false);
-                    setRevised(false);
-                    revision.startEditing();
-                  }}
+                  onClick={startEditing}
                 >
                   {v.modify}
                 </button>
@@ -604,7 +614,12 @@ export function RunDesk({
         complete={Boolean(digest && prose)}
       />
       {data && !revisited && (
-        <Verdicts data={data} area={verdicts} staleBasis={staleBasis} />
+        <Verdicts
+          reviews={reviews}
+          review={review}
+          area={verdicts}
+          staleBasis={staleBasis}
+        />
       )}
       {revision.checkError && (
         <p className="chapter-problem" role="alert">

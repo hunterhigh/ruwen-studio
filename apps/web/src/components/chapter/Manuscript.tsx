@@ -6,25 +6,42 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
-  useState,
 } from "react";
 import {
+  annotationCopy as a,
   chapterCopy as c,
   changeKind,
   readerReaction,
   roleName,
 } from "../../copy/zh-CN.ts";
 import { SafeMarkdown } from "../SafeMarkdown.tsx";
-import { locateEdits, readerPosition, type Span } from "./marks.ts";
-import { chapterTitle, type Edit, type Reaction } from "./review-data.ts";
+import { AnnotationCard, AnnotationHeader } from "./AnnotationCard.tsx";
+import { AnnotationRail } from "./AnnotationRail.tsx";
+import {
+  locateEdits,
+  readerPosition,
+  type Span,
+  uniquePosition,
+} from "./marks.ts";
+import {
+  type AnnotationView,
+  markerFraction,
+  type ReviewAnnotations,
+  showsAnnotation,
+} from "./review-annotations.ts";
+import { chapterTitle } from "./review-data.ts";
+import type { AnnotationReview } from "./useAnnotationReview.ts";
 
 type Note = {
   id: string;
+  annotation: AnnotationView;
+  ordinal: number;
   label: string;
   reason: string;
   original: string;
   replacement?: string;
   position?: number | undefined;
+  markerPosition?: number | undefined;
   mark?: Span | undefined;
   hint?: string | undefined;
   edit: boolean;
@@ -33,29 +50,36 @@ type Note = {
 function notesFor(
   prose: string,
   original: string,
-  edits: Edit[],
-  reactions: Reaction[],
+  reviews: ReviewAnnotations,
   revised: boolean,
   currentUserVersion: boolean,
 ): Note[] {
+  const edits = reviews.editors.map(({ finding }) => finding);
   const ranges = locateEdits(original, edits);
+  const source = revised && original && !currentUserVersion ? original : prose;
   const currentRanges = currentUserVersion
     ? locateEdits(
         prose,
-        edits.map((edit) => ({
-          ...edit,
-          original: edit.replacement,
-          replacement: edit.original,
-        })),
+        reviews.editors.map(({ finding: edit, annotation }) =>
+          annotation.status === "dismissed"
+            ? edit
+            : {
+                ...edit,
+                original: edit.replacement,
+                replacement: edit.original,
+              },
+        ),
       )
     : ranges;
   return [
-    ...reactions.map((reaction, i) => {
+    ...reviews.readers.map(({ finding: reaction, annotation }) => {
       const match = readerPosition(reaction, original, prose, ranges);
       const mark =
         revised && !currentUserVersion ? match.originalSpan : match.cleanSpan;
       return {
-        id: `reader-${i}`,
+        id: annotation.id,
+        annotation,
+        ordinal: reaction.sourceIndex + 1,
         edit: false,
         original: reaction.anchor,
         reason: reaction.note,
@@ -63,6 +87,7 @@ function notesFor(
           readerReaction[reaction.type as keyof typeof readerReaction] ??
           roleName["qinggan-duzhe"],
         mark,
+        markerPosition: uniquePosition(source, reaction.anchor),
         position:
           mark?.start ??
           (revised || currentUserVersion ? undefined : match.fallback),
@@ -73,10 +98,13 @@ function notesFor(
             : c.missingAnchor,
       };
     }),
-    ...edits.map((edit, i) => {
+    ...reviews.editors.map(({ finding: edit, annotation }, i) => {
       const range = currentRanges.find((item) => item.index === i);
+      const reverted = annotation.status === "dismissed";
       return {
-        id: `editor-${i}`,
+        id: annotation.id,
+        annotation,
+        ordinal: edit.sourceIndex + 1,
         edit: true,
         label: changeKind[edit.kind],
         reason: edit.reason,
@@ -84,7 +112,15 @@ function notesFor(
         replacement: edit.replacement,
         position:
           revised || currentUserVersion ? range?.start : range?.cleanStart,
-        mark: revised ? range : undefined,
+        mark: revised && !reverted ? range : undefined,
+        markerPosition: range
+          ? uniquePosition(
+              source,
+              reverted || (revised && !currentUserVersion)
+                ? edit.original
+                : edit.replacement,
+            )
+          : undefined,
         hint: range ? undefined : c.missingAnchor,
       };
     }),
@@ -117,8 +153,10 @@ function proseBlocks(source: string, notes: Note[]) {
 export function Manuscript({
   prose,
   original,
-  edits,
-  reactions,
+  reviews,
+  review,
+  canEditAnnotations,
+  onEditCandidate,
   revised,
   setRevised,
   currentUserVersion,
@@ -137,8 +175,10 @@ export function Manuscript({
 }: {
   prose: string;
   original: string;
-  edits: Edit[];
-  reactions: Reaction[];
+  reviews: ReviewAnnotations;
+  review: AnnotationReview;
+  canEditAnnotations: boolean;
+  onEditCandidate: () => void;
   revised: boolean;
   setRevised: (value: boolean) => void;
   currentUserVersion: boolean;
@@ -155,21 +195,45 @@ export function Manuscript({
   end: RefObject<HTMLDivElement | null>;
   complete: boolean;
 }) {
-  const [readerOn, showReader] = useState(true);
-  const [editorOn, showEditor] = useState(true);
-  const [expanded, setExpanded] = useState<string>();
+  const { active: expanded, setActive: setExpanded } = review;
   const anchors = useRef(new Map<string, HTMLElement>());
   const cards = useRef(new Map<string, HTMLElement>());
-  const lane = useRef<HTMLElement>(null);
+  const lane = useRef<HTMLDivElement>(null);
   const paper = useRef<HTMLElement>(null);
   const source = revised && original && !currentUserVersion ? original : prose;
   const showingAlternate = Boolean(alternate);
   const notes = useMemo(
-    () =>
-      notesFor(prose, original, edits, reactions, revised, currentUserVersion),
-    [prose, original, edits, reactions, revised, currentUserVersion],
+    () => notesFor(prose, original, reviews, revised, currentUserVersion),
+    [prose, original, reviews, revised, currentUserVersion],
   );
-  const visible = notes.filter((note) => (note.edit ? editorOn : readerOn));
+  const visible = notes.filter(({ annotation }) =>
+    showsAnnotation(annotation, review.filter),
+  );
+  const verificationIssues = reviews.verdicts.flatMap(({ role, issues }) =>
+    issues
+      .filter(({ annotation }) => showsAnnotation(annotation, review.filter))
+      .map(({ finding, annotation }) => ({
+        annotation,
+        position: uniquePosition(source, finding.evidence ?? ""),
+        label: a.locate(roleName[role], finding.sourceIndex + 1),
+      })),
+  );
+  const markers = [
+    ...visible.map(
+      ({ annotation, edit, markerPosition: position, ordinal }) => ({
+        annotation,
+        position,
+        label: a.locate(
+          roleName[edit ? "wenxue-bianji" : "qinggan-duzhe"],
+          ordinal,
+        ),
+      }),
+    ),
+    ...verificationIssues,
+  ].flatMap(({ annotation, position, label }) => {
+    const fraction = markerFraction(position, source.length);
+    return fraction === undefined ? [] : [{ annotation, fraction, label }];
+  });
   const blocks = proseBlocks(source, notes);
   const first = blocks[0];
   if (first && title !== chapter) {
@@ -227,43 +291,25 @@ export function Manuscript({
     setExpanded(next);
     if (next && note.edit && !revised && (original || currentUserVersion))
       setRevised(true);
-    if (next)
-      requestAnimationFrame(() => {
-        const target = fromText
-          ? cards.current.get(note.id)
-          : (anchors.current.get(note.id) ?? paper.current);
-        target?.scrollIntoView({
-          block: "center",
-          behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
-            ? "instant"
-            : "smooth",
-        });
+    if (next) scrollToAnnotation(note.id, fromText);
+  }
+
+  function scrollToAnnotation(id: string, fromText: boolean) {
+    requestAnimationFrame(() => {
+      const target = fromText
+        ? cards.current.get(id)
+        : (anchors.current.get(id) ?? paper.current);
+      target?.scrollIntoView({
+        block: "center",
+        behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "instant"
+          : "smooth",
       });
+    });
   }
 
   const tools = !writing && source && (
-    <div className="chapter-tools">
-      {controls}
-      {!showingAlternate && (
-        <div className="chapter-note-toggles">
-          <span>{c.notes}</span>
-          <button
-            type="button"
-            aria-pressed={readerOn}
-            onClick={() => showReader(!readerOn)}
-          >
-            {c.reader(reactions.length)}
-          </button>
-          <button
-            type="button"
-            aria-pressed={editorOn}
-            onClick={() => showEditor(!editorOn)}
-          >
-            {c.editor(edits.length)}
-          </button>
-        </div>
-      )}
-    </div>
+    <div className="chapter-tools">{controls}</div>
   );
   if (showingAlternate)
     return (
@@ -277,6 +323,17 @@ export function Manuscript({
       {tools}
       <div className="chapter-reading">
         <article className="manuscript chapter-paper" ref={paper}>
+          {!writing && markers.length > 0 && (
+            <AnnotationRail
+              paper={paper}
+              markers={markers}
+              active={expanded}
+              onActivate={(id) => {
+                setExpanded(id);
+                scrollToAnnotation(id, false);
+              }}
+            />
+          )}
           {approved && (
             <div className={`chapter-stamp${animateSeal ? " is-new" : ""}`}>
               <strong>{c.seal}</strong>
@@ -341,6 +398,22 @@ export function Manuscript({
               return (
                 // Offsets belong to one immutable draft; the streaming draft only appends or resets.
                 <div className="prose-paragraph chapter-paragraph" key={start}>
+                  {verificationIssues
+                    .filter(
+                      ({ position }) =>
+                        position !== undefined &&
+                        position >= previousEnd &&
+                        (index === blocks.length - 1 || position < end),
+                    )
+                    .map(({ annotation }) => (
+                      <span
+                        key={annotation.id}
+                        ref={(node) => {
+                          if (node) anchors.current.set(annotation.id, node);
+                          else anchors.current.delete(annotation.id);
+                        }}
+                      />
+                    ))}
                   {here
                     .filter(
                       (note) =>
@@ -443,55 +516,48 @@ export function Manuscript({
             </div>
           )}
         </article>
-        <aside className="chapter-note-lane" ref={lane} aria-label={c.notes}>
-          {writing || !source ? (
-            <p>{c.awaitingNotes}</p>
-          ) : (
-            !visible.length && <p>{c.noNotes}</p>
+        <aside className="chapter-note-lane" aria-label={c.notes}>
+          {!writing && reviews.all.length > 0 && (
+            <AnnotationHeader notes={reviews.all} review={review} />
           )}
-          {visible.map((note) => (
-            <section
-              key={note.id}
-              className={`chapter-note ${note.edit ? "is-editor" : "is-reader"}`}
-              ref={(node) => {
-                if (node) cards.current.set(note.id, node);
-                else cards.current.delete(note.id);
-              }}
-            >
-              <button
-                type="button"
-                className="chapter-note-toggle"
-                aria-expanded={expanded === note.id}
-                onClick={() => activate(note, false)}
+          {verificationIssues.length > 0 && (
+            <a className="chapter-annotation-jump" href="#chapter-verification">
+              {a.viewVerification}
+            </a>
+          )}
+          <div className="chapter-note-list" ref={lane}>
+            {writing || !source ? (
+              <p>{c.awaitingNotes}</p>
+            ) : (
+              !visible.length &&
+              !verificationIssues.length && (
+                <p>{review.filter === "all" ? c.noNotes : a.emptyFilter}</p>
+              )
+            )}
+            {visible.map((note) => (
+              <section
+                key={note.id}
+                className={`chapter-note ${note.edit ? "is-editor" : "is-reader"}`}
+                ref={(node) => {
+                  if (node) cards.current.set(note.id, node);
+                  else cards.current.delete(note.id);
+                }}
               >
-                <strong>
-                  {roleName[note.edit ? "wenxue-bianji" : "qinggan-duzhe"]} ·{" "}
-                  {note.label}
-                </strong>
-                <span className="chapter-note-reason">
-                  <SafeMarkdown plain inline content={note.reason} />
-                </span>
-                {note.hint && !note.edit && (
-                  <>
-                    <q>
-                      <SafeMarkdown plain inline content={note.original} />
-                    </q>
-                    <small>{note.hint}</small>
-                  </>
-                )}
-              </button>
-              {(expanded === note.id || (note.edit && note.hint)) && (
-                <div className="chapter-note-detail">
+                <AnnotationCard
+                  note={note.annotation}
+                  label={`${roleName[note.edit ? "wenxue-bianji" : "qinggan-duzhe"]} · ${note.label}`}
+                  summary={note.reason}
+                  review={review}
+                  canEdit={canEditAnnotations}
+                  onToggle={() => activate(note, false)}
+                  onEdit={onEditCandidate}
+                >
                   {note.edit ? (
-                    <>
-                      <p>
-                        {c.before}{" "}
+                    <div className="chapter-note-detail">
+                      <div className="chapter-note-edit-preview">
                         <del>
                           <SafeMarkdown plain inline content={note.original} />
                         </del>
-                      </p>
-                      <p>
-                        {c.after}{" "}
                         <ins>
                           <SafeMarkdown
                             plain
@@ -499,20 +565,23 @@ export function Manuscript({
                             content={note.replacement || c.deleted}
                           />
                         </ins>
-                      </p>
+                      </div>
                       {note.hint && <small>{note.hint}</small>}
-                    </>
+                    </div>
                   ) : (
-                    !note.hint && (
-                      <q>
-                        <SafeMarkdown plain inline content={note.original} />
-                      </q>
+                    (note.hint || expanded === note.id) && (
+                      <div className="chapter-note-detail">
+                        <q>
+                          <SafeMarkdown plain inline content={note.original} />
+                        </q>
+                        {note.hint && <small>{note.hint}</small>}
+                      </div>
                     )
                   )}
-                </div>
-              )}
-            </section>
-          ))}
+                </AnnotationCard>
+              </section>
+            ))}
+          </div>
         </aside>
       </div>
     </>

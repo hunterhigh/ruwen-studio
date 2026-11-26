@@ -264,6 +264,7 @@ test("real browser: register, project, paced SSE, two approvals, files/export, o
   expect(download.headers()["content-type"]).toBe("application/zip");
   expect((await download.body()).subarray(0, 2).toString()).toBe("PK");
   await page.getByRole("link", { name: "项目资料", exact: true }).click();
+  await page.getByRole("button", { name: "chapters/", exact: true }).click();
   await page
     .getByRole("button", { name: "chapters/chapter-001.md", exact: true })
     .click();

@@ -65,7 +65,9 @@ test("global frame: real project decisions, every navigation mode, persistent ba
   await expect(page.locator(".decision-chip .badge-count")).toHaveText("2");
   await captureFrame(page, "chapters-decisions");
   await projectNav.getByRole("link", { name: "项目资料", exact: true }).click();
-  await expect(page.locator(".file-tree button").first()).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "项目/项目章程.md", exact: true }),
+  ).toBeVisible();
   await captureFrame(page, "files");
   // Minimum desktop width must retain the bar and all four modes without overflow.
   await page.setViewportSize({ width: 1180, height: 900 });

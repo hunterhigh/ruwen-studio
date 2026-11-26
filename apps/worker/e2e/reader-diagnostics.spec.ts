@@ -61,12 +61,22 @@ test("owner can read adjusted, dropped and attempted reader diagnostics in the e
     await db.close();
   }
   await page.goto(`/projects/${projectId}/files`);
+  await page.getByRole("searchbox", { name: "筛选文件" }).fill(path);
   await page.getByRole("button", { name: path, exact: true }).click();
   const content = page.locator(".file-content");
-  await expect(content).toContainText("anchor_adjusted");
-  await expect(content).toContainText("dropped_reactions");
-  await expect(content).toContainText("星际舰队已经飞出银河系");
-  await expect(content).toContainText('"attempt": 1');
+  await expect(
+    content.getByText("锚点已校正", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(
+    content.getByText("未能定位的读者反应", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(
+    content.getByText("星际舰队已经飞出银河系", { exact: true }).first(),
+  ).toBeVisible();
+  const attempt = content.getByText("尝试次数", { exact: true }).first();
+  await expect(
+    attempt.locator("xpath=ancestor::dl[1]").getByText("1", { exact: true }),
+  ).toBeVisible();
   await expect(content).toContainText(
     "Prose anchors must quote the current prose exactly",
   );

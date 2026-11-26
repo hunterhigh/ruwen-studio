@@ -42,6 +42,13 @@ function literal(source: string, anchor: string): Span | undefined {
   return start < 0 ? undefined : { start, end: start + anchor.length };
 }
 
+export function uniquePosition(source: string, anchor: string) {
+  const span = literal(source, anchor);
+  return span && source.indexOf(anchor, span.start + 1) < 0
+    ? span.start
+    : undefined;
+}
+
 export function readerPosition(
   reaction: Reaction,
   original: string,

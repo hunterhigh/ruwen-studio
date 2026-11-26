@@ -62,6 +62,7 @@ export function completedRoleCount(
 }
 
 export type ChangeKind = "fact" | "literary";
+type Indexed<T> = T & { sourceIndex: number };
 export interface Edit {
   original: string;
   replacement: string;
@@ -93,18 +94,18 @@ function object(value: unknown): Record<string, unknown> {
     : {};
 }
 
-export function editsFrom(value: unknown): Edit[] {
+export function editsFrom(value: unknown): Indexed<Edit>[] {
   const { edits } = object(value);
   return Array.isArray(edits)
-    ? edits.filter((item): item is Edit => {
-        const edit = object(item);
-        return (
-          typeof edit.original === "string" &&
-          edit.original.length > 0 &&
-          typeof edit.replacement === "string" &&
-          typeof edit.reason === "string" &&
-          (edit.kind === "fact" || edit.kind === "literary")
-        );
+    ? edits.flatMap((item, sourceIndex) => {
+        const { original, replacement, reason, kind } = object(item);
+        return typeof original === "string" &&
+          original.length > 0 &&
+          typeof replacement === "string" &&
+          typeof reason === "string" &&
+          (kind === "fact" || kind === "literary")
+          ? [{ original, replacement, reason, kind, sourceIndex }]
+          : [];
       })
     : [];
 }
@@ -128,16 +129,16 @@ export function parseChanges(value: string | undefined): Change[] {
   }
 }
 
-export function readingFrom(value: unknown): Reaction[] {
+export function readingFrom(value: unknown): Indexed<Reaction>[] {
   const { reactions } = object(value);
   return Array.isArray(reactions)
-    ? reactions.filter((item): item is Reaction => {
-        const reaction = object(item);
-        return (
-          typeof reaction.anchor === "string" &&
-          typeof reaction.type === "string" &&
-          typeof reaction.note === "string"
-        );
+    ? reactions.flatMap((item, sourceIndex) => {
+        const { anchor, type, note } = object(item);
+        return typeof anchor === "string" &&
+          typeof type === "string" &&
+          typeof note === "string"
+          ? [{ anchor, type, note, sourceIndex }]
+          : [];
       })
     : [];
 }
@@ -148,9 +149,26 @@ export function verdictFrom(value: unknown) {
   return {
     pass,
     issues: Array.isArray(issues)
-      ? issues.filter(
-          (item): item is Issue => item !== null && typeof item === "object",
-        )
+      ? issues.flatMap((item, sourceIndex): Indexed<Issue>[] => {
+          const { promise, problem, evidence, category, rule_ref } =
+            object(item);
+          if (
+            ![promise, problem, evidence, category, rule_ref].some(
+              (entry) => typeof entry === "string",
+            )
+          )
+            return [];
+          return [
+            {
+              sourceIndex,
+              ...(typeof promise === "string" && { promise }),
+              ...(typeof problem === "string" && { problem }),
+              ...(typeof evidence === "string" && { evidence }),
+              ...(typeof category === "string" && { category }),
+              ...(typeof rule_ref === "string" && { rule_ref }),
+            },
+          ];
+        })
       : [],
   };
 }

@@ -2311,8 +2311,7 @@ textarea {
 }
 .chapter-history button:not(.ui-btn),
 .chapter-history select,
-.chapter-segment button,
-.chapter-note-toggles button {
+.chapter-segment button {
   background: transparent;
   color: var(--ink-2);
   border: 1px solid transparent;
@@ -2321,8 +2320,7 @@ textarea {
   font-size: 12px;
 }
 .chapter-history button[aria-pressed="true"],
-.chapter-segment button[aria-pressed="true"],
-.chapter-note-toggles button[aria-pressed="true"] {
+.chapter-segment button[aria-pressed="true"] {
   background: var(--paper);
   border-color: var(--rule);
   color: var(--ink);
@@ -2595,8 +2593,7 @@ textarea {
   gap: 10px;
   margin: 18px 0 12px;
 }
-.chapter-segment,
-.chapter-note-toggles {
+.chapter-segment {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -2606,9 +2603,6 @@ textarea {
   border: 1px solid var(--rule);
   border-radius: 6px;
   padding: 2px;
-}
-.chapter-note-toggles button[aria-pressed="false"] {
-  border: 1px dashed var(--rule);
 }
 .chapter-view-controls,
 .chapter-version-select,
@@ -2761,7 +2755,10 @@ textarea {
   position: relative;
   min-width: 0;
 }
-.chapter-note-lane > p {
+.chapter-note-list {
+  position: relative;
+}
+.chapter-note-list > p {
   color: var(--ink-2);
   font-size: 13px;
   padding: 9px 12px;
@@ -2775,11 +2772,13 @@ textarea {
   border-radius: 3px;
   overflow-wrap: anywhere;
 }
-.chapter-note.is-reader {
+.chapter-note.is-reader,
+.chapter-annotation-marker.is-reader {
   --note-ink: var(--reader);
   --note-tint: var(--reader-bg);
 }
-.chapter-note.is-editor {
+.chapter-note.is-editor,
+.chapter-annotation-marker.is-editor {
   --note-ink: var(--editor);
   --note-tint: var(--editor-bg);
 }
@@ -2816,6 +2815,203 @@ textarea {
 }
 .chapter-note-detail p {
   margin: 0 0 5px;
+}
+.chapter-note-detail small {
+  display: block;
+}
+.chapter-annotation-header {
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--paper);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.chapter-annotation-progress {
+  height: 3px;
+  margin: 8px 0;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--rule-soft);
+}
+.chapter-annotation-progress span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--plot);
+}
+.chapter-segment.chapter-annotation-filters {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
+}
+.chapter-annotation-filters button {
+  padding-inline: 2px;
+  white-space: nowrap;
+}
+.chapter-annotation-jump {
+  display: inline-block;
+  margin: 0 12px 7px;
+  color: var(--plot);
+  font-size: 12px;
+}
+.chapter-annotation-card {
+  border-radius: 3px;
+}
+.chapter-annotation-card[data-active="true"] {
+  box-shadow: inset 0 0 0 1px var(--note-ink);
+}
+.chapter-annotation-main {
+  position: relative;
+}
+.chapter-note-toggle.has-actions {
+  padding-inline-end: 66px;
+}
+.chapter-note-toggle.is-collapsed {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+  padding-block: 8px;
+}
+.chapter-note-toggle.is-collapsed .chapter-note-reason {
+  display: block;
+  color: var(--ink-2);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.chapter-annotation-actions {
+  position: absolute;
+  inset-block-start: 8px;
+  inset-inline-end: 8px;
+  display: flex;
+  gap: 4px;
+}
+.chapter-annotation-actions button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 13px / 1 var(--sans);
+}
+.chapter-annotation-actions button:hover:not(:disabled),
+.chapter-annotation-actions button[aria-pressed="true"] {
+  background: var(--desk-2);
+}
+.chapter-note-edit-preview {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  background: var(--desk);
+  border-radius: 3px;
+  font: 14px / 1.6 var(--serif);
+}
+.chapter-note-edit-preview ins {
+  text-underline-offset: 3px;
+}
+.chapter-annotation-feedback {
+  display: flex;
+  gap: 4px;
+  padding: 0 10px 8px;
+  flex-wrap: wrap;
+}
+.chapter-annotation-feedback button {
+  padding: 2px 7px;
+  border: 1px solid transparent;
+  border-radius: 20px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.chapter-annotation-feedback button:hover:not(:disabled) {
+  border-color: var(--rule);
+}
+.chapter-annotation-feedback button[aria-pressed="true"] {
+  color: var(--paper);
+  background: var(--ink);
+}
+.chapter-annotation-feedback .chapter-annotation-restore {
+  margin-inline-end: auto;
+  text-decoration: underline;
+  border-radius: 3px;
+}
+.chapter-annotation-legacy,
+.chapter-annotation-error {
+  display: block;
+  margin: 0 10px 8px;
+  font-size: 12px;
+}
+.chapter-annotation-error {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+  padding: 8px;
+  border-radius: 3px;
+  background: var(--seal-soft);
+}
+.chapter-annotation-rail {
+  position: absolute;
+  inset-inline-start: calc(100% + 5px);
+  width: 6px;
+  min-width: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: var(--rule-soft);
+  pointer-events: none;
+  z-index: 1;
+}
+.chapter-annotation-marker {
+  position: absolute;
+  inset-inline-start: -5px;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.chapter-annotation-marker::after {
+  display: block;
+  width: 6px;
+  height: 2px;
+  margin: auto;
+  background: var(--note-ink);
+  content: "";
+}
+.chapter-annotation-marker[data-processed="true"]::after {
+  opacity: 0.4;
+}
+.chapter-annotation-marker[aria-pressed="true"] {
+  z-index: 1;
+}
+.chapter-annotation-marker[aria-pressed="true"]::after {
+  height: 4px;
+}
+.chapter-verdict-issue.is-plot,
+.chapter-annotation-marker.is-plot {
+  --note-ink: var(--plot);
+  --note-tint: var(--plot-bg);
+}
+.chapter-verdict-issue.is-reality,
+.chapter-annotation-marker.is-reality {
+  --note-ink: var(--real);
+  --note-tint: var(--real-bg);
+}
+.chapter-verdict-issue {
+  border-inline-start: 3px solid var(--note-ink);
+  background: var(--desk);
+  border-radius: 3px;
+  margin-top: 10px;
 }
 .chapter-note small {
   color: var(--ink-2);
@@ -2854,6 +3050,7 @@ textarea {
 }
 .chapter-checks {
   margin: 26px auto;
+  scroll-margin-top: 90px;
 }
 .chapter-checks h2 {
   font: 600 20px / 1.4 var(--serif);

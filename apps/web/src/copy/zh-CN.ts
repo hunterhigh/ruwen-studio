@@ -200,6 +200,37 @@ export const annotationStatsCopy = {
   loading: "正在读取意见反馈…",
   noRate: "—",
 };
+export const annotationCopy = {
+  count: (total: number, processed: number) =>
+    `意见 ${total} · 已处理 ${processed}`,
+  filter: "筛选意见",
+  filters: {
+    all: "全部",
+    open: "未处理",
+    reader: "读者",
+    editor: "编辑",
+    verification: "核验",
+  },
+  accepted: "已采纳",
+  ignored: "已忽略",
+  reverted: "已撤销",
+  accept: "采纳",
+  ignore: "忽略",
+  revert: "撤销这处修改",
+  restore: "恢复这处修改",
+  useful: "有用",
+  notUseful: "没用",
+  markers: "页边定位条",
+  locate: (label: string, n: number) => `定位${label}第 ${n} 条意见`,
+  viewVerification: "查看核验意见",
+  emptyFilter: "没有符合筛选的意见。",
+  missingAnchor: "这处已被改动，请在修改模式里手动处理",
+  openEditor: "进入修改模式",
+  updateFailed: "意见未能更新，请稍后再试。",
+  refreshFailed: "意见已保存，请刷新查看。",
+  oldFeedback: "这条旧意见没有可处理记录。",
+} as const;
+
 export const candidateCopy = {
   modify: "修改",
   editor: "候选稿正文",
@@ -226,18 +257,18 @@ export const candidateCopy = {
   author: "作者原稿",
   editorVersion: "编辑稿",
   userVersion: (n: number) => `你的第 ${n} 版`,
-  versionNumber: (n: number) => `第 ${n} 版`,
   changeCount: (n: number) => `你修改了 ${n} 处`,
-  viewing: (n: number) => `正在查看第 ${n} 版，批准针对的是最新版本`,
+  viewing: (label: string) => `正在查看${label}，批准针对的是最新版本`,
   latest: "回到最新版本",
   compare: "与上一版对比",
   hideComparison: "收起对比",
-  comparisonLabel: (from: number, to: number) => `第 ${from} 版与第 ${to} 版`,
+  comparisonLabel: (from: string, to: string) => `${from}与${to}`,
+  previousVersion: "上一版",
   versionLoading: "正在读取版本…",
   versionFailed: "暂时无法读取这份稿件，请稍后再试。",
-  staleBasis: (n: number | undefined) =>
-    n === undefined ? "基于此前版本" : `基于第 ${n} 版`,
-  staleReading: "看过核验结论（核验基于修改前的版本）",
+  staleBasis: (label: string | undefined) => `基于${label ?? "此前版本"}`,
+  staleReading: (label: string | undefined) =>
+    `看过核验结论（基于${label ?? "修改前的版本"}）`,
   reverify: "重新核验",
   reverifying: "正在重新核验…",
   reverifyConfirmation: {

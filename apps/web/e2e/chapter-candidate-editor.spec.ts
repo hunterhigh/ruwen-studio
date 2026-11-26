@@ -38,7 +38,8 @@ async function prepare(page: Page) {
 }
 
 async function capture(page: Page, filename: string) {
-  if (process.env.FRONTEND_RED03E_SCREENSHOTS !== "1") return;
+  const captureMode = process.env.FRONTEND_RED03E_SCREENSHOTS;
+  if (captureMode !== "1" && captureMode !== filename) return;
   await expect(page.locator(".project-bar")).toHaveAttribute(
     "aria-busy",
     "false",
@@ -77,7 +78,7 @@ test("edits a candidate, inspects its history, reverifies and approves the lates
   });
   const first = `${initial}\n\n院外传来另一阵车轮声。\n`;
   const latest = `${first}\n窗上的薄纸轻轻抖了一下。\n`;
-  const basis = c.staleBasis(before.run.candidateVersion);
+  const basis = c.staleBasis(c.editorVersion);
   const badges = page.getByText(basis, { exact: true });
   const rev = page.getByRole("button", { name: c.reverify, exact: true });
 
@@ -104,12 +105,10 @@ test("edits a candidate, inspects its history, reverifies and approves the lates
   };
   await expect(field).toHaveCount(0);
   await expect(
-    page.getByText(
-      `${c.versionNumber(firstVersion.version)} · ${c.changeCount(1)}`,
-    ),
+    page.getByText(`${c.userVersion(1)} · ${c.changeCount(1)}`),
   ).toBeVisible();
   await expect(badges).toHaveCount(2);
-  await expect(page.getByText(c.staleReading)).toBeVisible();
+  await expect(page.getByText(c.staleReading(c.editorVersion))).toBeVisible();
   await page.locator(".chapter-verdicts").scrollIntoViewIfNeeded();
   await capture(page, "verification-stale");
 
@@ -136,7 +135,7 @@ test("edits a candidate, inspects its history, reverifies and approves the lates
     c.userVersion(2),
   ]);
   await versions.selectOption(String(firstVersion.version));
-  await expect(page.getByText(c.viewing(firstVersion.version))).toBeVisible();
+  await expect(page.getByText(c.viewing(c.userVersion(1)))).toBeVisible();
   await expect(page.locator(".chapter-paper")).toContainText(
     "院外传来另一阵车轮声。",
   );

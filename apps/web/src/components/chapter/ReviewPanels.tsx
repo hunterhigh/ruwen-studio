@@ -7,7 +7,12 @@ import {
   roleName,
 } from "../../copy/zh-CN.ts";
 import { SafeMarkdown } from "../SafeMarkdown.tsx";
+import { AnnotationCard } from "./AnnotationCard.tsx";
 import { RoleInputPopover } from "./RoleInputPopover.tsx";
+import {
+  type ReviewAnnotations,
+  showsAnnotation,
+} from "./review-annotations.ts";
 import {
   completedRoleCount,
   type Detail,
@@ -16,8 +21,8 @@ import {
   roleOnDeck,
   roles,
   stopped,
-  verdictFrom,
 } from "./review-data.ts";
+import type { AnnotationReview } from "./useAnnotationReview.ts";
 
 export function RoleChain({
   data,
@@ -227,39 +232,36 @@ export function EditDecision({
 }
 
 export function Verdicts({
-  data,
+  reviews,
+  review,
   area,
   staleBasis,
 }: {
-  data: Detail;
+  reviews: ReviewAnnotations;
+  review: AnnotationReview;
   area: RefObject<HTMLDivElement | null>;
   staleBasis?: string | undefined;
 }) {
-  const plot = verdictFrom(data.reports["qingjie-heyanyuan"]?.output);
-  const reality = verdictFrom(data.reports["xianshi-heyanyuan"]?.output);
-  if (!plot && !reality) return null;
+  if (!reviews.verdicts.some(({ pass }) => pass !== undefined)) return null;
   return (
-    <section className="chapter-checks" aria-label={c.checks}>
+    <section
+      id="chapter-verification"
+      className="chapter-checks"
+      aria-label={c.checks}
+    >
       <h2>{c.checks}</h2>
       <div className="chapter-verdicts" ref={area}>
-        {(
-          [
-            ["qingjie-heyanyuan", plot],
-            ["xianshi-heyanyuan", reality],
-          ] as const
-        ).map(([role, verdict], index) => (
+        {reviews.verdicts.map(({ role, pass, issues }, index) => (
           <article className={`chapter-verdict role-${index + 3}`} key={role}>
             <header>
               <h3>{roleName[role]}</h3>
               <div className="chapter-verdict-meta">
                 <strong
-                  className={
-                    verdict?.pass === false ? "chapter-verdict-fail" : ""
-                  }
+                  className={pass === false ? "chapter-verdict-fail" : ""}
                 >
-                  {verdict?.pass === true
+                  {pass === true
                     ? c.passed
-                    : verdict?.pass === false
+                    : pass === false
                       ? c.failed
                       : c.unchecked}
                 </strong>
@@ -268,41 +270,60 @@ export function Verdicts({
                 )}
               </div>
             </header>
-            {verdict?.issues.map((issue, i) => (
-              <div
-                // biome-ignore lint/suspicious/noArrayIndexKey: Verdict issues are immutable and carry no IDs.
-                key={`${i}-${issue.evidence}`}
-                className="chapter-verdict-issue"
-              >
-                {issue.promise && (
-                  <p>
-                    {c.requiredEvent} ·{" "}
-                    <SafeMarkdown plain inline content={issue.promise} />
-                  </p>
-                )}
-                {issue.problem && (
-                  <strong>
-                    {c.problems[issue.problem as keyof typeof c.problems]}
-                  </strong>
-                )}
-                {issue.category && (
-                  <strong>
-                    {c.categories[issue.category as keyof typeof c.categories]}
-                  </strong>
-                )}
-                {issue.evidence && (
-                  <blockquote>
-                    <SafeMarkdown content={issue.evidence} />
-                  </blockquote>
-                )}
-                {issue.rule_ref && (
-                  <p>
-                    {c.rule} ·{" "}
-                    <SafeMarkdown plain inline content={issue.rule_ref} />
-                  </p>
-                )}
-              </div>
-            ))}
+            {issues
+              .filter(({ annotation }) =>
+                showsAnnotation(annotation, review.filter),
+              )
+              .map(({ finding: issue, annotation }) => {
+                const label = issue.problem
+                  ? c.problems[issue.problem as keyof typeof c.problems]
+                  : c.categories[issue.category as keyof typeof c.categories];
+                return (
+                  <div
+                    key={annotation.id}
+                    className={`chapter-verdict-issue is-${annotation.kind}`}
+                  >
+                    <AnnotationCard
+                      note={annotation}
+                      label={label ?? roleName[role]}
+                      summary={issue.evidence ?? issue.promise ?? ""}
+                      review={review}
+                      onToggle={() =>
+                        review.setActive(
+                          review.active === annotation.id
+                            ? undefined
+                            : annotation.id,
+                        )
+                      }
+                    >
+                      {(issue.promise || issue.rule_ref) && (
+                        <div className="chapter-note-detail">
+                          {issue.promise && (
+                            <p>
+                              {c.requiredEvent} ·{" "}
+                              <SafeMarkdown
+                                plain
+                                inline
+                                content={issue.promise}
+                              />
+                            </p>
+                          )}
+                          {issue.rule_ref && (
+                            <p>
+                              {c.rule} ·{" "}
+                              <SafeMarkdown
+                                plain
+                                inline
+                                content={issue.rule_ref}
+                              />
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </AnnotationCard>
+                  </div>
+                );
+              })}
           </article>
         ))}
       </div>

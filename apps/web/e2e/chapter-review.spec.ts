@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
-import { chapterCopy, runStatus } from "../src/copy/zh-CN.ts";
+import { annotationCopy, chapterCopy, runStatus } from "../src/copy/zh-CN.ts";
 import { captureChapter, startChapter } from "./chapter-review.ts";
 import { createDemo, signIn } from "./helpers.ts";
 
@@ -163,14 +163,14 @@ test("revision highlights unique edits, links notes and keeps invalid positions 
     page.getByText(chapterCopy.missingAnchor, { exact: true }).first(),
   ).toBeVisible();
   await expect(page.locator(".chapter-reader-mark mark")).toHaveText("车轮声");
-  const readerToggle = page.getByRole("button", {
-    name: "读者 3",
-    exact: true,
-  });
-  await readerToggle.click();
+  await page
+    .getByRole("button", { name: annotationCopy.filters.editor, exact: true })
+    .click();
   await expect(page.locator(".chapter-reader-mark mark")).toHaveCount(0);
   await expect(page.locator(".chapter-note.is-reader")).toHaveCount(0);
-  await readerToggle.click();
+  await page
+    .getByRole("button", { name: annotationCopy.filters.all, exact: true })
+    .click();
   await page.locator(".chapter-reader-mark").click();
   await expect(
     page.locator(".chapter-note-toggle[aria-expanded=true]"),

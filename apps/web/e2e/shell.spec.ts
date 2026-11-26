@@ -2,8 +2,10 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
+import { ideationCopy as c } from "../src/copy/zh-CN.ts";
 import { startChapter } from "./chapter-review.ts";
 import { createDemo, signIn } from "./helpers.ts";
+import { createIdeationSession } from "./ideation-review.ts";
 import { captureFrame } from "./redesign-02.ts";
 
 test("global frame: real project decisions, every navigation mode, persistent banner and confirmed sign-out", async ({
@@ -33,17 +35,11 @@ test("global frame: real project decisions, every navigation mode, persistent ba
   );
   await captureFrame(page, "overview-no-decisions");
   await projectNav.getByRole("link", { name: "故事构思", exact: true }).click();
-  await expect(async () => {
-    await page.getByLabel("新会话名称", { exact: true }).fill("驿站的故事");
-    await expect(
-      page.getByRole("button", { name: "新建构思会话", exact: true }),
-    ).toBeEnabled({ timeout: 1000 });
-  }).toPass({ timeout: 15000 });
-  await page.getByRole("button", { name: "新建构思会话", exact: true }).click();
+  await createIdeationSession(page, "驿站的故事");
   await page
     .getByLabel("想和协调员说的话", { exact: true })
     .fill("让主人公在河谷驿站遇到来信的人。");
-  await page.getByRole("button", { name: "发送给协调员", exact: true }).click();
+  await page.getByRole("button", { name: c.send, exact: true }).click();
   await expect(
     page.getByRole("region", { name: "构思预览工作台", exact: true }),
   ).toContainText("创意通讯门");

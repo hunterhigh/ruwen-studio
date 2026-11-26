@@ -4,7 +4,8 @@ import type {
   IdeationMessage,
   IdeationResourceId,
 } from "@ruwen/pipeline";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
+import { ideationCopy as c } from "../../copy/zh-CN.ts";
 import { SafeMarkdown } from "../SafeMarkdown.tsx";
 
 /** A browser selection uses UTF-16; the contract accepts whole Unicode codepoints only. */
@@ -61,6 +62,19 @@ export function VerbatimSelection({
   const [selected, setSelected] =
     useState<ReturnType<typeof codepointSelection>>(null);
   const [target, setTarget] = useState(targets[0]?.id ?? "");
+  const toolbar = useRef<HTMLDivElement>(null);
+  const selectionTop = useRef(0);
+  useLayoutEffect(() => {
+    const tools = toolbar.current;
+    const wrapper = tools?.parentElement;
+    const viewport = wrapper?.closest(".ideation-messages");
+    if (!selected || !tools || !wrapper || !viewport) return;
+    const minimum =
+      viewport.getBoundingClientRect().top +
+      4 -
+      wrapper.getBoundingClientRect().top;
+    tools.style.top = `${Math.max(minimum, selectionTop.current - tools.offsetHeight - 4)}px`;
+  }, [selected]);
   if (message.role !== "user") return null;
   const count = selected ? selected.end - selected.start : 0;
   const choose = (kind: "current_chapter" | "resource_file") => {
@@ -82,60 +96,66 @@ export function VerbatimSelection({
     });
   };
   return (
-    <>
+    <div
+      className="verbatim-selection"
+      onPointerUp={(event) => {
+        if (event.target instanceof HTMLTextAreaElement)
+          selectionTop.current = Math.max(
+            0,
+            event.clientY -
+              event.currentTarget.getBoundingClientRect().top -
+              12,
+          );
+      }}
+    >
       <SafeMarkdown
         plain
         content={message.content}
         selection={{
-          label: "你的消息原文，可选中文字",
+          label: c.verbatimSelection,
           onSelect: (start, end) =>
             setSelected(codepointSelection(message.content, start, end)),
         }}
       />
-      <details className="verbatim-actions" open={!!selected}>
-        <summary>选中文字，逐字保留</summary>
-        <p className="fine-print" aria-live="polite">
-          {count} / 600 字（按码点计，含标点、空白和换行；本章上限）
-        </p>
-        {selected && <SafeMarkdown plain content={selected.text} />}
-        <button
-          type="button"
-          className="button secondary"
-          disabled={!selected || busy || count > 600}
-          onClick={() => choose("current_chapter")}
-        >
-          逐字保留到本章
-        </button>
-        <label>
-          写入目标文件
-          <select
-            aria-label="逐字写入的目标文件"
-            value={target}
-            disabled={busy || !targets.length}
-            onChange={(e) => setTarget(e.target.value)}
+      {selected && (
+        <div ref={toolbar} className="ideation-verbatim-tools">
+          <strong>{c.verbatimToolbar}</strong>
+          <p className="fine-print" aria-live="polite">
+            {c.countForChapter(count)}
+          </p>
+          <button
+            type="button"
+            className="button secondary"
+            disabled={!selected || busy || count > 600}
+            onClick={() => choose("current_chapter")}
           >
-            {targets.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.path}
-              </option>
-            ))}
-          </select>
-        </label>
-        {!targets.length && (
-          <p className="fine-print">当前没有可选的授权文件。</p>
-        )}
-        <button
-          type="button"
-          className="button secondary"
-          disabled={!selected || busy || !target}
-          onClick={() => choose("resource_file")}
-        >
-          逐字写入文件
-        </button>
-        <p className="fine-print">
-          先生成预览，再由你批准；不会调用模型。需要改选区或目标时，拒绝旧预览后重新选择。
-        </p>
-      </details>
-    </>
+            {c.verbatimChapter}
+          </button>
+          <label>
+            {c.verbatimFileTarget}
+            <select
+              aria-label={c.verbatimFileTarget}
+              value={target}
+              disabled={busy || !targets.length}
+              onChange={(e) => setTarget(e.target.value)}
+            >
+              {targets.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.path}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="button secondary"
+            disabled={!selected || busy || !target}
+            onClick={() => choose("resource_file")}
+          >
+            {c.verbatimFile}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

@@ -1,455 +1,572 @@
+"use client";
 import type {
+  IdeationApprovalReceipt,
   IdeationFilePatch,
   IdeationPreviewV1_2 as IdeationPreview,
 } from "@ruwen/pipeline";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
+import {
+  ideationCopy as c,
+  errorCopy,
+  kindNames,
+  previewStatus,
+  roleName,
+} from "../../copy/zh-CN.ts";
+import { ConfirmDialog } from "../../ui/ConfirmDialog.tsx";
+import { KeyValueList } from "../../ui/KeyValueList.tsx";
+import { SealButton } from "../../ui/SealButton.tsx";
+import { TextDiff } from "../diff/TextDiff.tsx";
 import { SafeMarkdown } from "../SafeMarkdown.tsx";
-import { kindNames, previewStatus, roleNames } from "./copy.ts";
 
-export function Structured({ value }: { value: unknown }) {
-  return <SafeMarkdown plain content={JSON.stringify(value, null, 2)} />;
+export function previewKind(preview: IdeationPreview) {
+  return preview.kind === "handoff" ? c.handoff : kindNames[preview.kind];
 }
+
+export function ideationTime(value: string) {
+  const instant = new Date(value);
+  return Number.isFinite(instant.valueOf())
+    ? new Intl.DateTimeFormat("zh-CN", {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(instant)
+    : "";
+}
+
+function Field({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div>
+      <dt>{title}</dt>
+      <dd>{children}</dd>
+    </div>
+  );
+}
+
 function Lines({ items }: { items: readonly string[] }) {
   return (
-    <ul>
-      {items.map((item) => (
-        <li key={item}>
-          <SafeMarkdown content={item} />
+    <ul className="ideation-lines">
+      {items.map((item, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: A preview can repeat a literal line.
+        <li key={index}>
+          <SafeMarkdown inline content={item} />
         </li>
       ))}
     </ul>
   );
 }
-function Patches({ patches }: { patches: readonly IdeationFilePatch[] }) {
+
+function Paths({ items }: { items: readonly string[] }) {
   return (
-    <div className="ideation-patches">
-      {patches.map((patch) => {
-        const path = patch.kind === "create" ? patch.path : patch.resource.path;
-        return (
-          <details key={path} open>
-            <summary>
-              <SafeMarkdown inline plain content={path} /> ·{" "}
-              {patch.kind === "create" ? "新增文件" : "小节替换"}
-            </summary>
-            <div className="file-diff">
-              <section>
-                <h3>当前资料</h3>
-                <SafeMarkdown
-                  plain
-                  content={
-                    patch.kind === "create"
-                      ? "目标文件尚不存在"
-                      : patch.beforeText
-                  }
-                />
-              </section>
-              <section>
-                <h3>批准后预览</h3>
-                <SafeMarkdown
-                  plain
-                  content={
-                    patch.kind === "create" ? patch.content : patch.afterText
-                  }
-                />
-              </section>
-            </div>
-            {patch.kind === "sections" && (
-              <details>
-                <summary>小节与替换内容</summary>
-                <Structured value={patch.sections} />
-              </details>
-            )}
-            <p className="fine-print">
-              目标指纹：
-              <SafeMarkdown plain inline content={patch.afterSha256} />
-            </p>
-          </details>
-        );
-      })}
+    <ul className="ideation-paths">
+      {[...new Set(items)].map((path) => (
+        <li key={path}>
+          <SafeMarkdown plain inline content={path} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Text({ value }: { value: string }) {
+  return (
+    <div className="ideation-paper-text">
+      <SafeMarkdown content={value} />
     </div>
   );
 }
-const approvalLabel = (preview: IdeationPreview) =>
-  preview.kind === "verbatim"
-    ? "批准逐字保留"
-    : preview.kind === "handoff"
-      ? "批准委托"
-      : preview.kind === "learning_plan"
-        ? "批准学习计划"
-        : preview.kind === "expression_candidate"
-          ? preview.approvalStage === "candidate"
-            ? "确认为候选"
-            : "激活表现资源"
-          : preview.kind === "generation_field"
-            ? "批准章节情境"
-            : "批准文件变更";
-const auditNames = {
-  route: "实现路线",
-  fulfillment: "兑现方式",
-  mapping: "映射关系",
-  anchoring: "锚定",
-  density: "密度",
-  proximity: "贴近程度",
-};
+
+function Patches({ items }: { items: readonly IdeationFilePatch[] }) {
+  return items.map((patch) => {
+    const path = patch.kind === "create" ? patch.path : patch.resource.path;
+    return (
+      <details className="ideation-patch" key={path}>
+        <summary>
+          <SafeMarkdown plain inline content={path} />
+          <small>
+            {patch.kind === "create" ? c.newFile : c.sectionReplacement}
+          </small>
+        </summary>
+        <TextDiff
+          before={patch.kind === "create" ? "" : patch.beforeText}
+          after={patch.kind === "create" ? patch.content : patch.afterText}
+        />
+      </details>
+    );
+  });
+}
+
+function PreviewFields({
+  preview,
+  sources,
+  externalSearch,
+}: {
+  preview: IdeationPreview;
+  sources: ReadonlyMap<string, string>;
+  externalSearch: boolean;
+}) {
+  switch (preview.kind) {
+    case "handoff": {
+      const { understanding, handoff } = preview;
+      const paths = handoff.resource_ids.flatMap((id) => {
+        const path = sources.get(id);
+        return path ? [path] : [];
+      });
+      const unresolved = handoff.resource_ids.length - paths.length;
+      const payload =
+        typeof handoff.payload === "string"
+          ? handoff.payload
+          : handoff.kind === "creative_brief"
+            ? {
+                ...handoff.payload,
+                excluded_source: handoff.payload.excluded_source.map(
+                  (key) => c.excluded[key],
+                ),
+              }
+            : handoff.payload;
+      return (
+        <>
+          <p className="ideation-card-help">{c.handoffHelp}</p>
+          <dl className="ideation-fields">
+            <Field title={c.recipient}>
+              <span className="ideation-tag">
+                {roleName[handoff.recipient]}
+              </span>
+            </Field>
+            <Field title={c.creativeValue}>
+              <SafeMarkdown content={understanding.creativeValue} />
+            </Field>
+            <Field title={c.fixedFacts}>
+              <Lines items={understanding.fixedFacts} />
+            </Field>
+            {understanding.openChoices.length > 0 && (
+              <Field title={c.openChoices}>
+                <Lines items={understanding.openChoices} />
+              </Field>
+            )}
+            {understanding.exampleTreatment && (
+              <Field title={c.exampleTreatment}>
+                <SafeMarkdown content={understanding.exampleTreatment} />
+              </Field>
+            )}
+            <Field title={c.destination}>
+              <SafeMarkdown plain inline content={understanding.destination} />
+            </Field>
+            <Field title={c.payload}>
+              {typeof payload === "string" ? (
+                <Text value={payload} />
+              ) : (
+                <div className="ideation-paper-text">
+                  <KeyValueList value={payload} />
+                </div>
+              )}
+            </Field>
+            {handoff.resource_ids.length > 0 && (
+              <Field title={c.resources}>
+                <Paths items={paths} />
+                {unresolved > 0 && <small>{c.resourceCount(unresolved)}</small>}
+              </Field>
+            )}
+          </dl>
+        </>
+      );
+    }
+    case "file_patch":
+      return (
+        <>
+          <p className="ideation-card-help">
+            {c.fileCount(roleName[preview.role], preview.patches.length)}
+          </p>
+          <SafeMarkdown content={preview.explanation} />
+          <Patches items={preview.patches} />
+        </>
+      );
+    case "learning_plan":
+      return (
+        <>
+          {preview.status === "pending" &&
+            preview.sourceMode === "external_search" &&
+            !externalSearch && (
+              <p className="ideation-error">{errorCopy.SEARCH_UNAVAILABLE}</p>
+            )}
+          <p className="ideation-card-help">{c.learningHelp}</p>
+          <dl className="ideation-fields">
+            <Field title={c.known}>
+              <SafeMarkdown content={preview.known} />
+            </Field>
+            <Field title={c.unknown}>
+              <SafeMarkdown content={preview.unknown} />
+            </Field>
+            <Field title={c.plan}>
+              <Lines items={preview.plan} />
+            </Field>
+            <Field title={c.boundary}>
+              <SafeMarkdown content={preview.boundary} />
+            </Field>
+            {preview.potentialConflicts.length > 0 && (
+              <Field title={c.potentialConflicts}>
+                <Lines items={preview.potentialConflicts} />
+              </Field>
+            )}
+            <Field title={c.destination}>
+              <SafeMarkdown plain inline content={preview.destination} />
+            </Field>
+            <Field title={c.sourceMode}>{c.sources[preview.sourceMode]}</Field>
+          </dl>
+        </>
+      );
+    case "expression_candidate": {
+      const activation = preview.approvalStage === "activation";
+      const patch = preview.patches.find((item) =>
+        item.kind === "create"
+          ? item.resourceId === preview.resource.id
+          : item.resource.id === preview.resource.id,
+      );
+      return (
+        <>
+          <p className="ideation-card-help">
+            {activation ? c.activationHelp : c.candidateHelp}
+          </p>
+          {preview.status === "pending" &&
+            preview.closureAudit.status !== "passed" && (
+              <p className="ideation-error">
+                {errorCopy.CLOSURE_AUDIT_REQUIRED}
+              </p>
+            )}
+          {preview.status === "pending" &&
+            activation &&
+            (preview.trial.status !== "passed" || !preview.trial.sample) && (
+              <p className="ideation-error">
+                {errorCopy.NONCANONICAL_TRIAL_REQUIRED}
+              </p>
+            )}
+          <dl className="ideation-fields">
+            {patch && (
+              <Field title={c.expression}>
+                <Text
+                  value={
+                    patch.kind === "create" ? patch.content : patch.afterText
+                  }
+                />
+              </Field>
+            )}
+            <Field title={c.audit}>
+              <strong>{c.result[preview.closureAudit.status]}</strong>
+              <ul className="ideation-audit">
+                {preview.closureAudit.checks.map((check) => (
+                  <li key={check.category} data-pass={check.resolved}>
+                    <strong>
+                      {check.resolved ? "✓" : "✕"}{" "}
+                      {c.auditNames[check.category]}
+                    </strong>
+                    <SafeMarkdown content={check.summary} />
+                  </li>
+                ))}
+              </ul>
+            </Field>
+            {activation && (
+              <Field title={c.trial}>
+                <small>
+                  {c.trialHelp} · {c.result[preview.trial.status]}
+                </small>
+                {preview.trial.sample && <Text value={preview.trial.sample} />}
+              </Field>
+            )}
+          </dl>
+        </>
+      );
+    }
+    case "generation_field":
+      return (
+        <>
+          <p className="ideation-card-help">{c.generationHelp}</p>
+          <dl className="ideation-fields">
+            <Field title={c.chapter}>
+              {c.chapterName(Number(preview.chapter))}
+            </Field>
+            <Field title={c.lockedEvents}>
+              <Lines items={preview.lockedEvents} />
+            </Field>
+            <Field title={c.lockedOrder}>
+              <Lines items={preview.lockedOrder} />
+            </Field>
+            <Field title={c.generationField}>
+              <small>{c.inputCount(preview.characterCount, 2200)}</small>
+              <Text value={preview.generationField} />
+            </Field>
+            <Field title={c.approvedSources}>
+              <Paths items={preview.approvedSources.map(({ path }) => path)} />
+            </Field>
+          </dl>
+        </>
+      );
+    case "verbatim":
+      return (
+        <>
+          <p className="ideation-card-help">{c.verbatimHelp}</p>
+          <dl className="ideation-fields">
+            <Field title={c.verbatimText}>
+              <blockquote className="ideation-paper-text">
+                <SafeMarkdown plain content={preview.text} />
+              </blockquote>
+            </Field>
+            <Field title={c.verbatimTarget}>
+              {preview.target.kind === "current_chapter" ? (
+                <>
+                  {c.chapterName(Number(preview.target.chapter))} ·{" "}
+                  {c.inputCount(
+                    preview.characterCount,
+                    preview.target.maximumCharacters,
+                  )}
+                </>
+              ) : (
+                <>
+                  <SafeMarkdown
+                    plain
+                    inline
+                    content={preview.target.resource.path}
+                  />
+                  <p>{c.verbatimAppend}</p>
+                  {preview.target.separator === "\n" && (
+                    <small>{c.verbatimSeparator}</small>
+                  )}
+                </>
+              )}
+            </Field>
+            <Field title={c.verbatimReaders}>
+              {preview.target.kind === "current_chapter"
+                ? c.chapterReaders
+                : c.fileReaders}
+            </Field>
+          </dl>
+        </>
+      );
+  }
+}
+
 export function PreviewCard({
   preview,
   busy,
-  canRevise = true,
+  canRevise,
+  externalSearch,
+  sources,
+  receipt,
+  startedRole,
+  error,
+  onNewer,
   onAction,
 }: {
   preview: IdeationPreview;
   busy: boolean;
-  canRevise?: boolean;
+  canRevise: boolean;
+  externalSearch: boolean;
+  sources: ReadonlyMap<string, string>;
+  receipt: IdeationApprovalReceipt | undefined;
+  startedRole: string | undefined;
+  error: ReactNode;
+  onNewer: (() => void) | undefined;
   onAction: (
     kind: "approve" | "reject" | "revise",
     text: string,
     trialRead: boolean,
   ) => void;
 }) {
-  const [confirmed, setConfirmed] = useState(false),
-    [trialRead, setTrialRead] = useState(false),
-    [text, setText] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  const [trialRead, setTrialRead] = useState(false);
+  const [revising, setRevising] = useState(false);
+  const [text, setText] = useState("");
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState("");
   const activation =
     preview.kind === "expression_candidate" &&
     preview.approvalStage === "activation";
-  const blocked =
+  const availableTrial =
     preview.kind === "expression_candidate" &&
-    (preview.closureAudit.status !== "passed" ||
-      (activation && (preview.trial.status !== "passed" || !trialRead)));
+    preview.trial.status === "passed" &&
+    Boolean(preview.trial.sample);
+  const blocked =
+    (preview.kind === "expression_candidate" &&
+      preview.closureAudit.status !== "passed") ||
+    (activation && (!availableTrial || !trialRead));
+  const pending = preview.status === "pending";
+  const canRequestRevision =
+    preview.kind !== "verbatim" && (pending || preview.status === "stale");
+  const when = receipt && ideationTime(receipt.createdAt);
   return (
-    <article className="ideation-preview-card" aria-label="预览详情">
-      <header className="ideation-preview-heading">
-        <div>
-          <span className="eyebrow">
-            {kindNames[preview.kind]} · {roleNames[preview.role]}
-          </span>
-          <h2>
-            <SafeMarkdown inline plain content={preview.summary} />
-          </h2>
-        </div>
-        <span className={`preview-state state-${preview.status}`}>
-          {previewStatus[preview.status]}
-        </span>
-      </header>
-      <p className="fine-print">
-        版本 {preview.revision} · 版本指纹{" "}
-        <SafeMarkdown inline plain content={preview.sha256.slice(0, 12)} /> ·
-        批准前不提交
-      </p>
-      {preview.supersedesPreviewId && (
-        <p className="notice">
-          这是独立的新版本，旧版本与原决定保留。请重新阅读。
-        </p>
-      )}
-      {preview.kind === "handoff" && (
-        <>
-          <section className="handoff-understanding">
-            <h3>我理解你想保留的</h3>
-            <SafeMarkdown content={preview.understanding.creativeValue} />
-            <h3>固定事实</h3>
-            <Lines items={preview.understanding.fixedFacts} />
-            <h3>仍然开放的选择</h3>
-            <Lines items={preview.understanding.openChoices} />
-            <SafeMarkdown content={preview.understanding.exampleTreatment} />
-          </section>
-          <section className="clean-handoff">
-            <span className="eyebrow">交给下游的干净委托</span>
-            <p>接收岗位：{roleNames[preview.handoff.recipient]}</p>
-            {preview.handoff.kind === "creative_brief" ? (
-              <>
-                <h3>创作价值</h3>
-                <SafeMarkdown
-                  content={preview.handoff.payload.creative_value}
-                />
-                <h3>固定事实</h3>
-                <Lines items={preview.handoff.payload.fixed} />
-                <h3>未解决的力量</h3>
-                <Lines items={preview.handoff.payload.unresolved_forces} />
-                <h3>开放的实现</h3>
-                <Lines items={preview.handoff.payload.open_realization} />
-                <h3>交付位置</h3>
-                <SafeMarkdown
-                  plain
-                  content={preview.handoff.payload.destination}
-                />
-              </>
-            ) : (
-              <Structured value={preview.handoff.payload} />
-            )}
-            <p>批准只允许分派，不会直接更新正典。</p>
-            <details>
-              <summary>委托范围、资源与独立指纹</summary>
-              <Structured
-                value={{
-                  scope: preview.handoff.scope,
-                  resource_ids: preview.handoff.resource_ids,
-                  payloadSha256: preview.payloadSha256,
-                  approval_ref: preview.handoff.approval_ref,
-                }}
-              />
-            </details>
-          </section>
-        </>
-      )}
-      {preview.kind === "file_patch" && (
-        <>
-          <SafeMarkdown content={preview.explanation} />
-          <Patches patches={preview.patches} />
-          <details>
-            <summary>注册表变更（含前后权限与版本）</summary>
-            <Structured value={preview.registryChanges} />
-          </details>
-        </>
-      )}
-      {preview.kind === "learning_plan" && (
-        <>
-          <div className="ideation-facts">
-            <section>
-              <h3>已知</h3>
-              <SafeMarkdown content={preview.known} />
-            </section>
-            <section>
-              <h3>待了解</h3>
-              <SafeMarkdown content={preview.unknown} />
-            </section>
-          </div>
-          <h3>学习计划</h3>
-          {preview.plan.map((line) => (
-            <SafeMarkdown key={line} content={line} />
-          ))}
-          <h3>搜集边界</h3>
-          <SafeMarkdown content={preview.boundary} />
-          <h3>潜在冲突</h3>
-          <Structured value={preview.potentialConflicts} />
-          <h3>结果归属</h3>
-          <SafeMarkdown plain content={preview.destination} />
-          <p className="notice">
-            {preview.sourceMode === "existing_materials"
-              ? "来源：现有授权资料。批准之后才进入调查，调查结果仍需再次批准。"
-              : "来源：外部搜索。当前未配置搜索服务，计划会保留待批，不切换来源。"}
-          </p>
-          <details>
-            <summary>调查用干净委托</summary>
-            <Structured value={preview.execution} />
-          </details>
-        </>
-      )}
-      {preview.kind === "expression_candidate" && (
-        <>
-          <p className="notice">
-            {activation
-              ? "激活阶段：需审计通过、隔离试写通过，并由你确认已阅读样本。"
-              : "候选阶段：本次批准最多提交 candidate，不会自动成为 active，也不会装入正式作者资料包。"}
-          </p>
-          <p>
-            资源状态：
-            <SafeMarkdown inline plain content={preview.resource.status} /> ·
-            闭合审计：
-            {preview.closureAudit.status === "passed"
-              ? "通过"
-              : preview.closureAudit.status === "failed"
-                ? "未通过"
-                : "待完成"}
-          </p>
-          <ul className="audit-checks">
-            {preview.closureAudit.checks.map((check) => (
-              <li key={check.category}>
-                <strong>{auditNames[check.category]}</strong>
-                <span>
-                  {check.resolved ? "已处理" : "待处理"} ·{" "}
-                  {check.risk === "low"
-                    ? "低风险"
-                    : check.risk === "medium"
-                      ? "中风险"
-                      : "高风险"}
-                </span>
-                <SafeMarkdown content={check.summary} />
-              </li>
-            ))}
-          </ul>
-          <h3>隔离试写 · 非正典</h3>
-          <SafeMarkdown
-            content={
-              preview.trial.sample ??
-              "本阶段尚无试写样本。候选批准不代表已经激活。"
-            }
-          />
-          {activation && (
-            <label className="confirm-check">
-              <input
-                disabled={busy}
-                type="checkbox"
-                checked={trialRead}
-                onChange={(event) => setTrialRead(event.target.checked)}
-              />
-              我已阅读非正典试写样本
-            </label>
-          )}
-          <Patches patches={preview.patches} />
-          <details>
-            <summary>注册表变更及证据引用</summary>
-            <Structured
-              value={{
-                registryChanges: preview.registryChanges,
-                closureAudit: preview.closureAudit.report,
-                trial: preview.trial.report,
-              }}
-            />
-          </details>
-        </>
-      )}
-      {preview.kind === "generation_field" && (
-        <>
-          <p>
-            第 <SafeMarkdown inline plain content={preview.chapter} /> 章 ·{" "}
-            {preview.characterCount} / 2200 字符
-          </p>
-          <div className="generation-field">
-            <SafeMarkdown content={preview.generationField} />
-          </div>
-          <h3>必须发生的事件</h3>
-          <Lines items={preview.lockedEvents} />
-          <h3>锁定顺序</h3>
-          <Lines items={preview.lockedOrder} />
-          <h3>投影目标</h3>
-          <SafeMarkdown plain content={preview.projection.path} />
-          <details>
-            <summary>已批准来源</summary>
-            <Structured value={preview.approvedSources} />
-          </details>
-          <p>只有独立批准后才登记章节投影；批准后才写入项目文件。</p>
-        </>
-      )}
-      {preview.kind === "verbatim" && (
-        <section className="verbatim-preview">
-          <p className="notice">
-            这是你主动选择的原文。批准前不会写入；选中文字不会被改写。
-          </p>
-          <h3>选中的原文 · {preview.characterCount} 字</h3>
-          <SafeMarkdown plain content={preview.text} />
-          <h3>
-            {preview.target.kind === "current_chapter"
-              ? "逐字保留到本章"
-              : "逐字写入文件"}
-          </h3>
-          {preview.target.kind === "current_chapter" ? (
-            <>
-              <p>
-                第{" "}
-                <SafeMarkdown inline plain content={preview.target.chapter} />{" "}
-                章 · {preview.characterCount} / 600 字
-              </p>
-              <p>
-                替换本章逐字文本槽位，随资料包校验预算；章节批准后清除，不带入下一章。
-              </p>
-            </>
+    <article className="ideation-preview-card" aria-label={c.previewDetails}>
+      {receipt ? (
+        <p className="ideation-receipt-heading">
+          {when ? (
+            <time dateTime={receipt.createdAt}>{c.approvedReceipt(when)}</time>
           ) : (
-            <>
-              <SafeMarkdown plain content={preview.target.resource.path} />
-              <p>
-                追加到文件末尾。批准后作为普通项目资料，按既有权限供岗位读取。
-              </p>
-              {preview.target.separator === "\n" && (
-                <p>写入前增加一个分隔换行，选中文字保持原样。</p>
-              )}
-              <p className="fine-print">
-                当前指纹{" "}
-                <SafeMarkdown
-                  plain
-                  inline
-                  content={preview.target.resource.sha256}
-                />
-                ；写入后{" "}
-                <SafeMarkdown
-                  plain
-                  inline
-                  content={preview.target.afterSha256}
-                />
-              </p>
-            </>
+            previewStatus.approved
           )}
-          <details>
-            <summary>来源消息与选区</summary>
-            <Structured value={preview.source} />
-          </details>
+        </p>
+      ) : (
+        !pending && (
+          <small className="ideation-card-status">
+            {previewStatus[preview.status]}
+          </small>
+        )
+      )}
+      <h2>
+        {c.previewTitle(
+          preview.kind === "file_patch" ? c.filePatch : kindNames[preview.kind],
+        )}
+        <SafeMarkdown plain inline content={preview.summary} />
+      </h2>
+      <PreviewFields
+        preview={preview}
+        sources={sources}
+        externalSearch={externalSearch}
+      />
+      {receipt && (
+        <section className="ideation-receipt" aria-label={c.receipt}>
+          <dl className="ideation-fields">
+            {receipt.committedFiles.length > 0 && (
+              <Field title={c.committedFiles}>
+                <Paths items={receipt.committedFiles.map(({ path }) => path)} />
+              </Field>
+            )}
+            {receipt.startedTaskId && (
+              <Field title={c.startedTask}>
+                {startedRole ?? c.downstreamTask}
+              </Field>
+            )}
+          </dl>
+          {receipt.projectionRegistered && <p>{c.projectionRegistered}</p>}
         </section>
       )}
-      <details className="preview-provenance">
-        <summary>作用域与资源指纹</summary>
-        <Structured
-          value={{
-            scope: preview.scope,
-            resources: preview.resources,
-            registrySha256: preview.registrySha256,
-          }}
-        />
-      </details>
-      {(preview.status === "pending" || preview.status === "stale") && (
+      {(pending ||
+        preview.status === "stale" ||
+        preview.status === "superseded") && (
         <section className="ideation-decision">
-          {preview.status === "pending" && (
-            <>
-              <label className="confirm-check">
-                <input
-                  disabled={busy}
-                  type="checkbox"
-                  checked={confirmed}
-                  onChange={(event) => setConfirmed(event.target.checked)}
-                />
-                我已阅读此版本，确认这次批准
-              </label>
-              <button
-                className="button primary"
-                type="button"
-                disabled={!confirmed || busy || blocked}
-                onClick={() => onAction("approve", "", trialRead)}
-              >
-                {approvalLabel(preview)}
-              </button>
-            </>
-          )}
-          {preview.status === "stale" && (
-            <p className="notice">
-              {preview.kind === "verbatim"
-                ? "旧预览不能批准，请重新选择原文生成预览。"
-                : "旧预览不能批准，可把修改意见交回协调员生成新版。"}
+          {error}
+          {!pending && (
+            <p className="ideation-error">
+              {preview.status === "stale"
+                ? preview.kind === "verbatim"
+                  ? c.staleVerbatim
+                  : c.stalePreview
+                : c.supersededPreview}
+              {onNewer && (
+                <button
+                  className="ui-btn ui-btn-ghost"
+                  type="button"
+                  onClick={onNewer}
+                >
+                  {c.newerPreview}
+                </button>
+              )}
             </p>
           )}
-          <label>
-            修改意见或拒绝理由
-            <textarea
-              disabled={busy}
-              rows={3}
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              placeholder="只留在协调员会话，不会直接交给下游。"
-            />
-          </label>
+          {pending && (
+            <>
+              {activation && (
+                <label className="ideation-check">
+                  <input
+                    type="checkbox"
+                    checked={trialRead}
+                    disabled={busy || !availableTrial}
+                    onChange={(event) => setTrialRead(event.target.checked)}
+                  />
+                  {c.trialRead}
+                </label>
+              )}
+              <label className="ideation-check">
+                <input
+                  type="checkbox"
+                  checked={confirmed}
+                  disabled={busy}
+                  onChange={(event) => setConfirmed(event.target.checked)}
+                />
+                {activation ? c.confirmActivation : c.confirm[preview.kind]}
+              </label>
+            </>
+          )}
           <div className="decision-actions">
-            <button
-              type="button"
-              className="button secondary"
-              disabled={
-                busy ||
-                !canRevise ||
-                preview.kind === "verbatim" ||
-                !text.trim()
-              }
-              onClick={() => onAction("revise", text, false)}
-            >
-              交回协调员修改
-            </button>
-            {preview.status === "pending" && (
+            {pending && (
+              <SealButton
+                disabled={busy || !confirmed || blocked}
+                onClick={() => onAction("approve", "", trialRead)}
+              >
+                {activation ? c.activate : c.approve[preview.kind]}
+              </SealButton>
+            )}
+            {canRequestRevision && (
               <button
-                className="text-button danger"
+                className="ui-btn ui-btn-ghost"
+                type="button"
+                disabled={busy || !canRevise}
+                aria-expanded={revising && canRevise}
+                onClick={() => setRevising(!revising)}
+              >
+                {c.openRevision}
+              </button>
+            )}
+            {pending && (
+              <button
+                className="ui-btn ui-btn-danger-text"
                 type="button"
                 disabled={busy}
-                onClick={() => onAction("reject", text, false)}
+                onClick={() => {
+                  setReason("");
+                  setRejecting(true);
+                }}
               >
-                拒绝此预览
+                {c.reject}
               </button>
             )}
           </div>
+          {canRequestRevision && !canRevise && (
+            <small>{c.revisionClosed}</small>
+          )}
+          {canRequestRevision && revising && canRevise && (
+            <form
+              className="ideation-revision"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (text.trim()) onAction("revise", text, false);
+              }}
+            >
+              <label>
+                {c.revisionLabel}
+                <textarea
+                  rows={3}
+                  value={text}
+                  placeholder={c.revisionPlaceholder}
+                  onChange={(event) => setText(event.target.value)}
+                />
+              </label>
+              <button
+                className="ui-btn ui-btn-primary"
+                type="submit"
+                disabled={busy || !text.trim()}
+              >
+                {c.sendRevision}
+              </button>
+            </form>
+          )}
         </section>
+      )}
+      {rejecting && (
+        <ConfirmDialog
+          {...c.rejectConfirmation}
+          onCancel={() => setRejecting(false)}
+          onConfirm={() => {
+            setRejecting(false);
+            onAction("reject", reason, false);
+          }}
+        >
+          <label>
+            {c.rejectReason}
+            <textarea
+              rows={3}
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+            />
+          </label>
+        </ConfirmDialog>
       )}
     </article>
   );

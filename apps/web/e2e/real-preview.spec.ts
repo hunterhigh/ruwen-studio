@@ -4,7 +4,14 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { Database } from "@ruwen/db";
 import { realPreviewCoordinates } from "../../../config/real-preview.ts";
+import { ideationCopy as c } from "../src/copy/zh-CN.ts";
 import { readCandidate, startChapter } from "./chapter-review.ts";
+import {
+  approvePreviewKind,
+  compileIdeationChapter,
+  createIdeationSession,
+  selectPreviewKind,
+} from "./ideation-review.ts";
 import { readMemory } from "./memory-review.ts";
 
 test.use({ baseURL: realPreviewCoordinates().baseURL });
@@ -80,41 +87,27 @@ test("human-started preview rehearsal uses a separate persistent sandbox and can
   await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+$/);
   const project = page.url().split("/").at(-1);
   await page.goto(`/projects/${project}/ideation`);
-  await page.getByLabel("新会话名称", { exact: true }).fill("独立试用会话");
-  await page.getByRole("button", { name: "新建构思会话", exact: true }).click();
+  await createIdeationSession(page, "独立试用会话");
   await page
     .getByLabel("想和协调员说的话", { exact: true })
     .fill("写一场渡口的艰难选择。");
-  await page.getByRole("button", { name: "发送给协调员", exact: true }).click();
+  await page.getByRole("button", { name: c.send, exact: true }).click();
   const card = page.getByRole("article", { name: "预览详情", exact: true });
-  const approve = async (name: string) => {
-    await card
-      .getByRole("checkbox", {
-        name: "我已阅读此版本，确认这次批准",
-        exact: true,
-      })
-      .check();
-    await card.getByRole("button", { name, exact: true }).click();
-  };
+
+  await expect(card.getByText(c.handoffHelp, { exact: true })).toBeVisible();
+  await approvePreviewKind(page, "handoff");
+  await selectPreviewKind(page, "file_patch");
   await expect(
-    card.getByText("交给下游的干净委托", { exact: true }),
+    card.getByRole("button", { name: c.approve.file_patch, exact: true }),
   ).toBeVisible();
-  await approve("批准委托");
-  await page.getByLabel("预览类型", { exact: true }).selectOption("file_patch");
-  await expect(
-    card.getByRole("button", { name: "批准文件变更", exact: true }),
-  ).toBeVisible();
-  await approve("批准文件变更");
-  await page.getByLabel("编译章节", { exact: true }).fill("1");
-  await page.getByRole("button", { name: "编译章节情境", exact: true }).click();
-  await page
-    .getByLabel("预览类型", { exact: true })
-    .selectOption("generation_field");
+  await approvePreviewKind(page, "file_patch");
+  await compileIdeationChapter(page, "1");
+  await selectPreviewKind(page, "generation_field");
   await expect(
     card.getByRole("button", { name: "批准章节情境", exact: true }),
   ).toBeVisible();
-  await approve("批准章节情境");
-  await expect(card.getByText("已批准", { exact: true })).toBeVisible();
+  await approvePreviewKind(page, "generation_field");
+  await expect(card).toContainText("已批准");
   await page.goto(`/projects/${project}/chapters`);
   await startChapter(page);
   await expect(

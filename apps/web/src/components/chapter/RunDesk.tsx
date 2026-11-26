@@ -7,6 +7,7 @@ import {
   memoryCopy,
   runStatus,
   runStatusTone,
+  candidateCopy as v,
 } from "../../copy/zh-CN.ts";
 import { useConfirm } from "../../ui/ConfirmDialog.tsx";
 import { SealButton } from "../../ui/SealButton.tsx";
@@ -20,6 +21,12 @@ import {
 } from "../role-streams.ts";
 import { SafeMarkdown } from "../SafeMarkdown.tsx";
 import { useApi } from "../useApi.ts";
+import {
+  CandidateEditor,
+  CandidateHistory,
+  CandidateVersionNote,
+  verificationBasisVersion,
+} from "./CandidateVersions.tsx";
 import { authorInputsSummary } from "./input-manifest-view.ts";
 import { Manuscript } from "./Manuscript.tsx";
 import { MemoryReview } from "./MemoryReview.tsx";
@@ -36,6 +43,7 @@ import {
   type Usage,
 } from "./review-data.ts";
 import type { RunSummary } from "./runs.ts";
+import { useCandidateActions } from "./useCandidateActions.ts";
 
 function failureCopy(detail: Detail | undefined) {
   const message = detail?.run.error ?? "";
@@ -75,6 +83,7 @@ export function RunDesk({
   const [streams, setStreams] = useState(emptyRoleStreams);
   const [connected, setConnected] = useState(false);
   const [revised, setRevised] = useState(false);
+  const [selectedVersion, setSelectedVersion] = useState<number>();
   const [revisionHint, setRevisionHint] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -83,7 +92,7 @@ export function RunDesk({
   const [returning, setReturning] = useState(false);
   const [sealRequested, setSealRequested] = useState(false);
   const [reading, setReading] = useState({
-    digest: "",
+    key: "",
     end: false,
     verdicts: false,
   });
@@ -98,7 +107,30 @@ export function RunDesk({
   );
   const terminal = stopped.has(status);
   const digest = data?.run.candidateSha256 ?? "";
+  const readingKey = `${digest}:${data?.run.verificationRunId ?? ""}`;
   const waiting = status === "AWAITING_CANDIDATE_APPROVAL";
+  const revision = useCandidateActions(id, data, waiting && !readOnly, refresh);
+  const versions = data?.run.candidateVersions ?? [];
+  const current = versions.find(
+    ({ version }) => version === data?.run.candidateVersion,
+  );
+  const historical = versions.find(
+    ({ version }) =>
+      version === selectedVersion && version !== current?.version,
+  );
+  const previous = (version: number) =>
+    versions.findLast((item) => item.version < version)?.version;
+  const userVersions = versions.filter(({ source }) => source === "user");
+  const revisited = Boolean(revision.draft || historical);
+  const verificationStale = Boolean(
+    digest &&
+      data?.run.verificationBasisSha256 &&
+      data.run.verificationBasisSha256 !== digest,
+  );
+  const staleBasis =
+    verificationStale && data
+      ? v.staleBasis(verificationBasisVersion(data.run, versions))
+      : undefined;
   const decisionPending = waiting || status === "AWAITING_MEMORY_APPROVAL";
   const wasDecisionPending = useRef(false);
   const approvedAt = timeOf(data?.run, "CANDIDATE_APPROVED");
@@ -139,7 +171,7 @@ export function RunDesk({
     );
   const mutable = !readOnly && !terminal && Boolean(data);
   const pending = accepted !== undefined && accepted === status;
-  const locked = busy || pending;
+  const locked = busy || pending || revision.saving || revision.needsRefresh;
 
   useEffect(() => {
     if (wasDecisionPending.current === decisionPending) return;
@@ -189,8 +221,8 @@ export function RunDesk({
   }, [id, terminal, refresh, refreshAccount, onChanged]);
 
   useEffect(() => {
-    setReading({ digest, end: false, verdicts: false });
-    if (!waiting || !digest || readOnly || memory) return;
+    setReading({ key: readingKey, end: false, verdicts: false });
+    if (!waiting || !digest || readOnly || memory || revisited) return;
     const endMarker = end.current;
     const verdictCards = [...(verdicts.current?.children ?? [])];
     const seen = new Set<Element>();
@@ -202,7 +234,7 @@ export function RunDesk({
           observer.unobserve(entry.target);
         }
         setReading({
-          digest,
+          key: readingKey,
           end: Boolean(endMarker && seen.has(endMarker)),
           verdicts:
             verdictCards.length === 2 &&
@@ -214,7 +246,7 @@ export function RunDesk({
     if (endMarker) observer.observe(endMarker);
     for (const card of verdictCards) observer.observe(card);
     return () => observer.disconnect();
-  }, [digest, waiting, readOnly, memory]);
+  }, [digest, readingKey, waiting, readOnly, memory, revisited]);
 
   async function action(kind: string, body: Record<string, unknown> = {}) {
     if (!mutable || locked) return;
@@ -248,7 +280,14 @@ export function RunDesk({
     if (!expectedSha256) return;
     if (
       kind === "candidate" &&
-      !(waiting && reading.digest === digest && reading.end && reading.verdicts)
+      !(
+        waiting &&
+        !revisited &&
+        !revision.checking &&
+        reading.key === readingKey &&
+        reading.end &&
+        reading.verdicts
+      )
     )
       return;
     void action(`approve-${kind}`, {
@@ -282,6 +321,16 @@ export function RunDesk({
     );
   }
   const memoryCount = data?.memoryFiles.length ?? 0;
+  async function showMode(nextRevised: boolean) {
+    if (revision.draft && !(await revision.leave())) return;
+    setSelectedVersion(undefined);
+    setRevised(nextRevised);
+  }
+  async function showVersion(version: number) {
+    if (revision.draft && !(await revision.leave())) return;
+    setRevised(false);
+    setSelectedVersion(version === current?.version ? undefined : version);
+  }
   return (
     <section
       ref={workspace}
@@ -339,16 +388,30 @@ export function RunDesk({
           {error || errorCopy.INTERNAL_ERROR}
         </p>
       )}
+      {revision.needsRefresh && (
+        <div className="chapter-problem chapter-version-banner" role="alert">
+          <span>{v.savedRefreshFailed}</span>
+          <button
+            className="ui-btn ui-btn-ghost"
+            type="button"
+            disabled={revision.saving}
+            onClick={() => void revision.reload()}
+          >
+            {v.refresh}
+          </button>
+        </div>
+      )}
       {status === "RETURNED" && (
         <section className="chapter-problem">
           <h2>{c.next}</h2>
           <p>{c.paused}</p>
-          {data?.run.returnReason && (
-            <>
-              <strong>{c.returned}</strong>
-              <SafeMarkdown content={data.run.returnReason} />
-            </>
-          )}
+          {data?.run.returnReason &&
+            data.run.reverification?.status !== "returned" && (
+              <>
+                <strong>{c.returned}</strong>
+                <SafeMarkdown content={data.run.returnReason} />
+              </>
+            )}
           {!readOnly && (
             <div className="chapter-actions">
               <a
@@ -391,12 +454,35 @@ export function RunDesk({
           )}
         </section>
       )}
-      {data && <RoleChain data={data} credits={credits} approved={approved} />}
+      {data && (
+        <RoleChain
+          data={data}
+          credits={roles.map((role, index) =>
+            data.run.verificationRunId && (index === 3 || index === 4)
+              ? roleCredits(
+                  account?.usage ?? [],
+                  data.run.verificationRunId,
+                  role,
+                )
+              : credits[index],
+          )}
+          approved={approved}
+          reverifying={revision.checking}
+        />
+      )}
       {data && (
         <EditDecision
           data={data}
           edits={edits}
-          showRevision={() => {
+          showRevision={async () => {
+            if (revision.draft && !(await revision.leave())) return;
+            const author = versions.find(({ source }) => source === "author");
+            if (current?.source === "user" && author) {
+              setRevised(false);
+              setSelectedVersion(author.version);
+              return;
+            }
+            setSelectedVersion(undefined);
             setRevised(true);
             setRevisionHint(true);
             requestAnimationFrame(() =>
@@ -407,7 +493,7 @@ export function RunDesk({
           }}
         />
       )}
-      {revisionHint && revised && (
+      {revisionHint && revised && !revisited && (
         <p className="chapter-info">{c.revisionHelp}</p>
       )}
       <Manuscript
@@ -417,6 +503,96 @@ export function RunDesk({
         reactions={reactions}
         revised={revised}
         setRevised={setRevised}
+        currentUserVersion={current?.source === "user"}
+        controls={
+          <div className="chapter-view-controls">
+            <div className="chapter-segment">
+              <button
+                type="button"
+                aria-pressed={!revisited && !revised}
+                onClick={() => void showMode(false)}
+              >
+                {c.clean}
+              </button>
+              <button
+                type="button"
+                aria-pressed={!revisited && revised}
+                disabled={!data?.original && current?.source !== "user"}
+                onClick={() => void showMode(true)}
+              >
+                {c.revised}
+              </button>
+              {mutable && waiting && !historical && (
+                <button
+                  type="button"
+                  aria-pressed={Boolean(revision.draft)}
+                  disabled={locked}
+                  onClick={() => {
+                    if (revision.draft) return;
+                    setSelectedVersion(undefined);
+                    setReturning(false);
+                    setRevised(false);
+                    revision.startEditing();
+                  }}
+                >
+                  {v.modify}
+                </button>
+              )}
+            </div>
+            {current && versions.length > 1 && (
+              <label className="chapter-version-select">
+                <span>{v.version}</span>
+                <select
+                  value={historical?.version ?? current.version}
+                  disabled={revision.saving}
+                  onChange={(event) =>
+                    void showVersion(Number(event.target.value))
+                  }
+                >
+                  {versions.map((item) => (
+                    <option key={item.version} value={item.version}>
+                      {item.source === "author"
+                        ? v.author
+                        : item.source === "editor"
+                          ? v.editorVersion
+                          : v.userVersion(userVersions.indexOf(item) + 1)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+        }
+        note={
+          current?.source === "user" && (
+            <CandidateVersionNote
+              id={id}
+              version={current.version}
+              previous={previous(current.version)}
+              text={prose}
+            />
+          )
+        }
+        alternate={
+          revision.draft ? (
+            <CandidateEditor
+              text={revision.draft.text}
+              disabled={revision.saving}
+              conflict={revision.conflicted}
+              error={revision.draftError}
+              onChange={revision.changeDraft}
+              onReload={() => void revision.reload()}
+            />
+          ) : historical ? (
+            <CandidateHistory
+              key={historical.version}
+              id={id}
+              version={historical.version}
+              previous={previous(historical.version)}
+              onLatest={() => void showMode(false)}
+            />
+          ) : undefined
+        }
         chapter={chapter}
         title={title || chapter}
         candidate={Boolean(digest)}
@@ -427,8 +603,15 @@ export function RunDesk({
         end={end}
         complete={Boolean(digest && prose)}
       />
-      {data && <Verdicts data={data} area={verdicts} />}
-      {mutable && waiting && returning && (
+      {data && !revisited && (
+        <Verdicts data={data} area={verdicts} staleBasis={staleBasis} />
+      )}
+      {revision.checkError && (
+        <p className="chapter-problem" role="alert">
+          {revision.checkError}
+        </p>
+      )}
+      {mutable && waiting && returning && !revisited && (
         <form
           className="chapter-return"
           onSubmit={(event) => {
@@ -467,18 +650,47 @@ export function RunDesk({
           </div>
         </form>
       )}
-      {mutable && waiting ? (
+      {revision.draft ? (
+        <footer className="chapter-dock chapter-edit-dock">
+          <button
+            type="button"
+            className="ui-btn ui-btn-ghost"
+            disabled={revision.saving}
+            onClick={() => void revision.leave()}
+          >
+            {v.discard}
+          </button>
+          <button
+            type="button"
+            className="ui-btn ui-btn-primary"
+            disabled={!revision.dirty || revision.saving || revision.conflicted}
+            onClick={() => void revision.save()}
+          >
+            {revision.saving ? v.saving : v.save}
+          </button>
+        </footer>
+      ) : historical ? null : mutable && waiting ? (
         <footer className="chapter-dock">
           <div>
             <strong>{c.approvalQuestion(chapter)}</strong>
             <small>{pending ? c.approvePending : c.approvalHint}</small>
           </div>
           <ul className="chapter-read-conditions">
-            <li data-read={reading.digest === digest && reading.end}>
+            <li data-read={reading.key === readingKey && reading.end}>
               {c.readingEnd}
             </li>
-            <li data-read={reading.digest === digest && reading.verdicts}>
-              {c.readingVerdicts}
+            <li data-read={reading.key === readingKey && reading.verdicts}>
+              {verificationStale ? v.staleReading : c.readingVerdicts}
+              {verificationStale && (
+                <button
+                  type="button"
+                  className="chapter-reverify"
+                  disabled={locked || revision.checking}
+                  onClick={() => void revision.reverify()}
+                >
+                  {revision.checking ? v.reverifying : v.reverify}
+                </button>
+              )}
             </li>
           </ul>
           <div className="chapter-actions">
@@ -506,8 +718,9 @@ export function RunDesk({
             <SealButton
               disabled={
                 locked ||
+                revision.checking ||
                 !digest ||
-                reading.digest !== digest ||
+                reading.key !== readingKey ||
                 !reading.end ||
                 !reading.verdicts
               }

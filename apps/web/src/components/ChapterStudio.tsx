@@ -1,6 +1,14 @@
 "use client";
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type FormEvent,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { chapterCopy as c, errorCopy, runStatus } from "../copy/zh-CN.ts";
+import { DraftLeaveContext } from "./chapter/draft-navigation.ts";
 import { RunDesk } from "./chapter/RunDesk.tsx";
 import { chapterRuns, type RunSummary } from "./chapter/runs.ts";
 import { ApiError, post } from "./client.ts";
@@ -19,6 +27,7 @@ export function ChapterStudio({
     `/api/projects/${projectId}/runs`,
   );
   const settings = useApi<{ scenarios: string[] }>("/api/settings");
+  const leaveDraft = useContext(DraftLeaveContext);
   const rows = useMemo(() => chapterRuns(data ?? []), [data]);
   const [selected, setSelected] = useState(initialRun);
   const [memory, setMemory] = useState(memoryView);
@@ -39,12 +48,19 @@ export function ChapterStudio({
   const readOnly = Boolean(active && active.id !== history[0]?.id);
   const number =
     history.length - history.findIndex((row) => row.id === active?.id);
-  const select = (run: string) => {
+  const select = async (run: string) => {
+    if (
+      run !== active?.id &&
+      leaveDraft?.current &&
+      !(await leaveDraft.current())
+    )
+      return;
     setSelected(run);
     setMemory(false);
     window.history.replaceState(null, "", `?run=${encodeURIComponent(run)}`);
   };
-  const openWriter = (same = false) => {
+  const openWriter = async (same = false) => {
+    if (leaveDraft?.current && !(await leaveDraft.current())) return;
     const unfinished =
       active && history[0]?.status !== "DONE" ? active.chapter : undefined;
     setNewRun({
@@ -157,7 +173,7 @@ export function ChapterStudio({
           close={() => setNewRun(undefined)}
           created={async (id) => {
             await refresh();
-            select(id);
+            await select(id);
             setNewRun(undefined);
           }}
         />

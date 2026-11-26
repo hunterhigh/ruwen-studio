@@ -161,6 +161,11 @@ function compareParagraphs(before: string[], after: string[]) {
   return blocks;
 }
 
+export function countTextChanges(before: string, after: string) {
+  const { counts } = diffText(before, after);
+  return counts.added + counts.removed + counts.changed;
+}
+
 export function diffText(
   before: string,
   after: string,

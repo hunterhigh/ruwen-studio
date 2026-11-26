@@ -2610,6 +2610,88 @@ textarea {
 .chapter-note-toggles button[aria-pressed="false"] {
   border: 1px dashed var(--rule);
 }
+.chapter-view-controls,
+.chapter-version-select,
+.chapter-version-banner,
+.chapter-verdict-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.chapter-version-select {
+  flex-direction: row;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.chapter-version-select select {
+  padding: 4px 8px;
+  min-width: 8em;
+  background: var(--paper);
+}
+.chapter-version-banner {
+  justify-content: space-between;
+}
+.chapter-alternate {
+  max-width: 760px;
+}
+.chapter-paper.chapter-edit-paper,
+.chapter-paper.chapter-history-paper {
+  padding-block: 32px 36px;
+}
+.chapter-editor {
+  display: block;
+  width: 100%;
+  min-height: 16em;
+  margin-top: 18px;
+  padding: 12px 0 0;
+  border: 0;
+  border-radius: 0;
+  resize: vertical;
+  background: var(--paper);
+  color: var(--ink);
+  font: 18px / 1.9 var(--serif);
+  text-indent: 2em;
+}
+.chapter-editor:focus-visible {
+  outline-offset: 6px;
+}
+@supports (text-indent: 2em each-line) {
+  .chapter-editor {
+    text-indent: 2em each-line;
+  }
+}
+.chapter-version-note {
+  margin: 10px 0 0;
+  color: var(--ink-2);
+  font: 12px / 1.6 var(--sans);
+}
+.chapter-version-text {
+  margin-top: 20px;
+}
+.chapter-version-text pre {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  white-space: pre-wrap;
+  font: 18px / 1.9 var(--serif);
+}
+.chapter-dock.chapter-edit-dock {
+  justify-content: flex-end;
+}
+.chapter-reverify {
+  margin-inline-start: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--plot);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.chapter-reverify:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
 .chapter-reading {
   display: grid;
   grid-template-columns: minmax(0, 760px) minmax(200px, 320px);
@@ -2797,12 +2879,20 @@ textarea {
 .chapter-verdict h3 {
   margin: 0;
 }
-.chapter-verdict header > strong {
+.chapter-verdict-meta strong {
   color: var(--plot);
   font-size: 13px;
 }
-.chapter-verdict header > .chapter-verdict-fail {
+.chapter-verdict-meta .chapter-verdict-fail {
   color: var(--seal-deep);
+}
+.chapter-verdict-basis {
+  color: var(--ink-2);
+  background: var(--desk-2);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font: 12px / 1.5 var(--sans);
+  white-space: nowrap;
 }
 .chapter-verdict blockquote {
   margin: 8px 0;
@@ -3017,6 +3107,9 @@ textarea {
   display: grid;
   gap: 4px;
   min-width: 0;
+}
+.chapter-history-paper .text-diff {
+  margin-top: 20px;
 }
 .text-diff-section h4 {
   margin: 0 0 2px;

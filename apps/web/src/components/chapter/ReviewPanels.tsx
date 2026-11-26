@@ -23,10 +23,12 @@ export function RoleChain({
   data,
   credits,
   approved,
+  reverifying,
 }: {
   data: Detail;
   credits: readonly (bigint | null | undefined)[];
   approved: boolean;
+  reverifying: boolean;
 }) {
   const [open, setOpen] = useState<number>();
   const chain = useRef<HTMLOListElement>(null);
@@ -59,16 +61,19 @@ export function RoleChain({
           !stopped.has(data.run.status) && roleOnDeck[data.run.status] === role;
         const report = data.reports[role];
         const state =
-          row?.status === "failed" ||
-          row?.status === "usage_unknown" ||
-          row?.status === "blocked"
-            ? "failed"
-            : row?.status === "completed" || report || inferred
-              ? "done"
-              : !stopped.has(data.run.status) &&
-                  (row?.status === "running" || current)
-                ? "working"
-                : "waiting";
+          reverifying &&
+          (role === "qingjie-heyanyuan" || role === "xianshi-heyanyuan")
+            ? "working"
+            : row?.status === "failed" ||
+                row?.status === "usage_unknown" ||
+                row?.status === "blocked"
+              ? "failed"
+              : row?.status === "completed" || report || inferred
+                ? "done"
+                : !stopped.has(data.run.status) &&
+                    (row?.status === "running" || current)
+                  ? "working"
+                  : "waiting";
         const points = inferred ? undefined : credits[index];
         const workingLabel = c.roleWorking[index];
         const message =
@@ -224,9 +229,11 @@ export function EditDecision({
 export function Verdicts({
   data,
   area,
+  staleBasis,
 }: {
   data: Detail;
   area: RefObject<HTMLDivElement | null>;
+  staleBasis?: string | undefined;
 }) {
   const plot = verdictFrom(data.reports["qingjie-heyanyuan"]?.output);
   const reality = verdictFrom(data.reports["xianshi-heyanyuan"]?.output);
@@ -244,17 +251,22 @@ export function Verdicts({
           <article className={`chapter-verdict role-${index + 3}`} key={role}>
             <header>
               <h3>{roleName[role]}</h3>
-              <strong
-                className={
-                  verdict?.pass === false ? "chapter-verdict-fail" : ""
-                }
-              >
-                {verdict?.pass === true
-                  ? c.passed
-                  : verdict?.pass === false
-                    ? c.failed
-                    : c.unchecked}
-              </strong>
+              <div className="chapter-verdict-meta">
+                <strong
+                  className={
+                    verdict?.pass === false ? "chapter-verdict-fail" : ""
+                  }
+                >
+                  {verdict?.pass === true
+                    ? c.passed
+                    : verdict?.pass === false
+                      ? c.failed
+                      : c.unchecked}
+                </strong>
+                {staleBasis && (
+                  <small className="chapter-verdict-basis">{staleBasis}</small>
+                )}
+              </div>
             </header>
             {verdict?.issues.map((issue, i) => (
               <div

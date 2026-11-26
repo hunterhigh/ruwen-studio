@@ -92,7 +92,8 @@ async function prepare(page: Page, simulation?: "plot_fail") {
 }
 
 async function capture(page: Page, filename: string, target?: Locator) {
-  if (process.env.FRONTEND_RED03F_SCREENSHOTS !== "1") return;
+  const captureMode = process.env.FRONTEND_RED03F_SCREENSHOTS;
+  if (captureMode !== "1" && captureMode !== filename) return;
   await target?.evaluate((node) =>
     node.scrollIntoView({ block: "center", behavior: "instant" }),
   );
@@ -146,7 +147,7 @@ test("handles chapter opinions, locates anchors, and versions editor undo and re
   const mode = filter(chapterCopy.revised);
   const paper = page.locator(".chapter-paper");
   const revert = editorCard.getByRole("button", { name: c.revert });
-  const basis = page.getByText(v.staleBasis(initial.run.candidateVersion), {
+  const basis = page.getByText(v.staleBasis(v.editorVersion), {
     exact: true,
   });
 

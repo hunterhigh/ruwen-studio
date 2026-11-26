@@ -25,8 +25,11 @@ import {
   CandidateEditor,
   CandidateHistory,
   CandidateVersionNote,
-  verificationBasisVersion,
 } from "./CandidateVersions.tsx";
+import {
+  candidateVersionLabels,
+  verificationBasisVersion,
+} from "./candidate-version-labels.ts";
 import { authorInputsSummary } from "./input-manifest-view.ts";
 import { Manuscript } from "./Manuscript.tsx";
 import { MemoryReview } from "./MemoryReview.tsx";
@@ -127,17 +130,20 @@ export function RunDesk({
   );
   const previous = (version: number) =>
     versions.findLast((item) => item.version < version)?.version;
-  const userVersions = versions.filter(({ source }) => source === "user");
+  const labels = candidateVersionLabels(versions);
   const revisited = Boolean(revision.draft || historical);
   const verificationStale = Boolean(
     digest &&
       data?.run.verificationBasisSha256 &&
       data.run.verificationBasisSha256 !== digest,
   );
-  const staleBasis =
+  const basisVersion =
     verificationStale && data
-      ? v.staleBasis(verificationBasisVersion(data.run, versions))
+      ? verificationBasisVersion(data.run, versions)
       : undefined;
+  const basisLabel =
+    basisVersion === undefined ? undefined : labels.get(basisVersion);
+  const staleBasis = verificationStale ? v.staleBasis(basisLabel) : undefined;
   const decisionPending = waiting || status === "AWAITING_MEMORY_APPROVAL";
   const wasDecisionPending = useRef(false);
   const approvedAt = timeOf(data?.run, "CANDIDATE_APPROVED");
@@ -561,11 +567,7 @@ export function RunDesk({
                 >
                   {versions.map((item) => (
                     <option key={item.version} value={item.version}>
-                      {item.source === "author"
-                        ? v.author
-                        : item.source === "editor"
-                          ? v.editorVersion
-                          : v.userVersion(userVersions.indexOf(item) + 1)}
+                      {labels.get(item.version)}
                     </option>
                   ))}
                 </select>
@@ -577,7 +579,7 @@ export function RunDesk({
           current?.source === "user" && (
             <CandidateVersionNote
               id={id}
-              version={current.version}
+              label={labels.get(current.version) ?? v.version}
               previous={previous(current.version)}
               text={prose}
             />
@@ -598,7 +600,9 @@ export function RunDesk({
               key={historical.version}
               id={id}
               version={historical.version}
+              label={labels.get(historical.version) ?? v.version}
               previous={previous(historical.version)}
+              previousLabel={labels.get(previous(historical.version) ?? 0)}
               onLatest={() => void showMode(false)}
             />
           ) : undefined
@@ -695,7 +699,9 @@ export function RunDesk({
               {c.readingEnd}
             </li>
             <li data-read={reading.key === readingKey && reading.verdicts}>
-              {verificationStale ? v.staleReading : c.readingVerdicts}
+              {verificationStale
+                ? v.staleReading(basisLabel)
+                : c.readingVerdicts}
               {verificationStale && (
                 <button
                   type="button"

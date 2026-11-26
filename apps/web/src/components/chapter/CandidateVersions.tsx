@@ -5,27 +5,6 @@ import { request } from "../client.ts";
 import { TextDiff } from "../diff/TextDiff.tsx";
 import { countTextChanges } from "../diff/text-diff.ts";
 import { SafeMarkdown } from "../SafeMarkdown.tsx";
-import type { Detail } from "./review-data.ts";
-
-export type CandidateVersion = NonNullable<
-  Detail["run"]["candidateVersions"]
->[number];
-
-export function verificationBasisVersion(
-  run: Detail["run"],
-  versions: readonly CandidateVersion[],
-) {
-  const basis = run.verificationBasisSha256;
-  const check = run.reverification;
-  if (check && check.id === run.verificationRunId && check.sha256 === basis)
-    return check.version;
-  const matches = versions.filter((item) => item.sha256 === basis);
-  return run.verificationRunId
-    ? matches.length === 1
-      ? matches[0]?.version
-      : undefined
-    : matches.find(({ source }) => source === "editor")?.version;
-}
 
 function useVersionText(id: string, version: number | undefined) {
   const [snapshot, setSnapshot] = useState<{
@@ -58,12 +37,12 @@ function useVersionText(id: string, version: number | undefined) {
 
 export function CandidateVersionNote({
   id,
-  version,
+  label,
   previous,
   text,
 }: {
   id: string;
-  version: number;
+  label: string;
   previous: number | undefined;
   text: string;
 }) {
@@ -74,7 +53,7 @@ export function CandidateVersionNote({
   );
   return (
     <p className="chapter-version-note">
-      {c.versionNumber(version)}
+      {label}
       {changes !== undefined && ` · ${c.changeCount(changes)}`}
     </p>
   );
@@ -83,12 +62,16 @@ export function CandidateVersionNote({
 export function CandidateHistory({
   id,
   version,
+  label,
   previous,
+  previousLabel,
   onLatest,
 }: {
   id: string;
   version: number;
+  label: string;
   previous: number | undefined;
+  previousLabel: string | undefined;
   onLatest: () => void;
 }) {
   const [compare, setCompare] = useState(false);
@@ -97,7 +80,7 @@ export function CandidateHistory({
   return (
     <>
       <div className="chapter-info chapter-version-banner">
-        <span>{c.viewing(version)}</span>
+        <span>{c.viewing(label)}</span>
         <button
           className="ui-btn ui-btn-ghost"
           type="button"
@@ -110,8 +93,8 @@ export function CandidateHistory({
         <div className="manuscript-meta chapter-paper-meta">
           <span>
             {compare && previous !== undefined
-              ? c.comparisonLabel(previous, version)
-              : c.versionNumber(version)}
+              ? c.comparisonLabel(previousLabel ?? c.previousVersion, label)
+              : label}
           </span>
           {previous !== undefined && current?.text !== undefined && (
             <button

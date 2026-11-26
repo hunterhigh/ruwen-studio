@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import type { RunStatus } from "@ruwen/pipeline";
-import { createDemo, signIn } from "./helpers.ts";
+import { createDemoFromShelf as createDemo, signIn } from "./helpers.ts";
 import { captureMemory, readMemory } from "./memory-review.ts";
 
 const memoryFiles = [

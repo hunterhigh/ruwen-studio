@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { startChapter } from "./chapter-review.ts";
-import { createDemo, signIn } from "./helpers.ts";
+import { createDemoFromShelf as createDemo, signIn } from "./helpers.ts";
 
 test("account daily limit persists, refuses a chapter without accepting a task, resets and fits minimum desktop", async ({
   page,

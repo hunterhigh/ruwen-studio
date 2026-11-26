@@ -13,7 +13,7 @@ import {
 import {
   captureRedesign,
   confirmAction,
-  createDemo,
+  createDemoFromShelf as createDemo,
   signIn,
 } from "./helpers.ts";
 import { captureMemory, readMemory } from "./memory-review.ts";

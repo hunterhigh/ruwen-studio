@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { startChapter } from "./chapter-review.ts";
-import { createDemo, signIn } from "./helpers.ts";
+import { createDemoFromShelf as createDemo, signIn } from "./helpers.ts";
 import { captureFrame } from "./redesign-02.ts";
 
 test("global frame: real project decisions, every navigation mode, persistent banner and confirmed sign-out", async ({

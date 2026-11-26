@@ -3,7 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import type { Annotation } from "@ruwen/db";
-import { createDemo, signIn } from "./helpers.ts";
+import { createDemoFromShelf as createDemo, signIn } from "./helpers.ts";
 
 test("读者意见独立记录，管理后台可以按岗位和日期查看反馈", async ({ page }) => {
   await signIn(page, "preview@ruwen.local");

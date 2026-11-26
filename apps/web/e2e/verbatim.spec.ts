@@ -1,6 +1,10 @@
 import { expect, type Locator, test } from "@playwright/test";
 import { previewConfiguration } from "../../../config/preview.ts";
-import { createDemo, selectMessageRange, signIn } from "./helpers.ts";
+import {
+  createDemoFromShelf as createDemo,
+  selectMessageRange,
+  signIn,
+} from "./helpers.ts";
 import { ideationHttpFixture } from "./ideation-http-fixture.ts";
 
 async function select(source: Locator, start: number, end: number) {

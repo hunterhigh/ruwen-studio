@@ -122,3 +122,19 @@ export async function confirmAction(
   }
   await dialog.getByRole("button", { name: label, exact: true }).click();
 }
+
+export async function createDemoFromShelf(page: Page, title: string) {
+  await page
+    .getByRole("button", { name: "新建项目", exact: true })
+    .first()
+    .click();
+  const dialog = page.getByRole("dialog", { name: "新建项目" });
+  await dialog.getByRole("textbox", { name: "书名", exact: true }).fill(title);
+  await dialog.getByRole("radio", { name: /^演示项目/ }).check();
+  await dialog.getByRole("button", { name: "创建项目", exact: true }).click();
+  await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+$/);
+  await expect(
+    page.getByRole("heading", { name: "项目资料已就绪" }),
+  ).toBeVisible();
+  return page.url().split("/").at(-1) ?? "";
+}

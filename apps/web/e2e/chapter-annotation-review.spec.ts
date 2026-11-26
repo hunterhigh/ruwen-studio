@@ -12,7 +12,7 @@ import {
   candidateCopy as v,
 } from "../src/copy/zh-CN.ts";
 import { readCandidate } from "./chapter-review.ts";
-import { createDemo, signIn } from "./helpers.ts";
+import { createDemoFromShelf as createDemo, signIn } from "./helpers.ts";
 
 const edit = {
   original: "林川把信封塞进内袋里",

@@ -7,15 +7,21 @@ import {
   useRef,
   useState,
 } from "react";
-import { candidateCopy as c, chapterCopy } from "../../copy/zh-CN.ts";
+import {
+  candidateCopy as c,
+  chapterCopy,
+  statusCopy,
+} from "../../copy/zh-CN.ts";
+import { InlineNotice } from "../../ui/InlineNotice.tsx";
+import { PageSkeleton } from "../../ui/Skeleton.tsx";
 import { request } from "../client.ts";
 import { TextDiff } from "../diff/TextDiff.tsx";
 import { countTextChanges } from "../diff/text-diff.ts";
 import { SafeMarkdown } from "../SafeMarkdown.tsx";
 
-function useVersionText(id: string, version: number | undefined) {
+function useVersionText(id: string, version: number | undefined, attempt = 0) {
   const [snapshot, setSnapshot] = useState<{
-    url: string;
+    key: string;
     text?: string;
     error?: boolean;
   }>();
@@ -23,6 +29,7 @@ function useVersionText(id: string, version: number | undefined) {
     version === undefined
       ? ""
       : `/api/runs/${id}/candidate/revisions/${version}`;
+  const key = `${url}:${attempt}`;
   useEffect(() => {
     if (!url) return;
     const abort = new AbortController();
@@ -31,15 +38,15 @@ function useVersionText(id: string, version: number | undefined) {
       signal: abort.signal,
     }).then(
       ({ text }) => {
-        if (!abort.signal.aborted) setSnapshot({ url, text });
+        if (!abort.signal.aborted) setSnapshot({ key, text });
       },
       () => {
-        if (!abort.signal.aborted) setSnapshot({ url, error: true });
+        if (!abort.signal.aborted) setSnapshot({ key, error: true });
       },
     );
     return () => abort.abort();
-  }, [url]);
-  return snapshot?.url === url ? snapshot : undefined;
+  }, [key, url]);
+  return snapshot?.key === key ? snapshot : undefined;
 }
 
 export function CandidateVersionNote({
@@ -82,8 +89,9 @@ export function CandidateHistory({
   onLatest: () => void;
 }) {
   const [compare, setCompare] = useState(false);
-  const current = useVersionText(id, version);
-  const before = useVersionText(id, compare ? previous : undefined);
+  const [attempt, setAttempt] = useState(0);
+  const current = useVersionText(id, version, attempt);
+  const before = useVersionText(id, compare ? previous : undefined, attempt);
   return (
     <>
       <div className="chapter-info chapter-version-banner">
@@ -115,10 +123,13 @@ export function CandidateHistory({
           )}
         </div>
         {current?.error || before?.error ? (
-          <p role="alert">{c.versionFailed}</p>
+          <InlineNotice
+            message={c.versionFailed}
+            onAction={() => setAttempt((value) => value + 1)}
+          />
         ) : current?.text === undefined ||
           (compare && before?.text === undefined) ? (
-          <output>{c.versionLoading}</output>
+          <PageSkeleton page="text" />
         ) : compare && before?.text !== undefined ? (
           <TextDiff before={before.text} after={current.text} />
         ) : (
@@ -181,19 +192,29 @@ export function CandidateEditor({
         <span>{chapterCopy.chars(Array.from(text).length)}</span>
       </div>
       {(conflict || error) && (
-        <div className="chapter-problem chapter-version-banner" role="alert">
-          <span>{conflict ? c.conflict : error}</span>
-          {conflict && (
-            <button
-              className="ui-btn ui-btn-ghost"
-              type="button"
-              disabled={disabled}
-              onClick={onReload}
-            >
-              {c.refresh}
-            </button>
-          )}
-        </div>
+        <InlineNotice
+          message={conflict ? c.conflict : error}
+          action={
+            conflict ? (
+              <button
+                className="ui-btn ui-btn-ghost"
+                type="button"
+                disabled={disabled}
+                onClick={onReload}
+              >
+                {c.refresh}
+              </button>
+            ) : (
+              <button
+                className="ui-btn ui-btn-ghost"
+                type="button"
+                onClick={() => field.current?.focus()}
+              >
+                {statusCopy.adjust}
+              </button>
+            )
+          }
+        />
       )}
       <textarea
         ref={field}

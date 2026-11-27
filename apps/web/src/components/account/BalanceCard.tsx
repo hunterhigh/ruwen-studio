@@ -3,11 +3,12 @@ import {
   cleanupCopy,
   accountCopy as copy,
   errorCopy,
+  statusCopy,
 } from "../../copy/zh-CN.ts";
 import { Button } from "../../ui/Button.tsx";
+import { InlineNotice } from "../../ui/InlineNotice.tsx";
 import { useToast } from "../../ui/Toast.tsx";
 import { post } from "../client.ts";
-import { SafeMarkdown } from "../SafeMarkdown.tsx";
 import {
   type AccountData,
   accountError,
@@ -77,9 +78,11 @@ export function BalanceCard({
   return (
     <section className="account-panel account-balance">
       {warning && (
-        <p className="account-warning" role="alert">
-          {warning}
-        </p>
+        <InlineNotice
+          message={warning}
+          onAction={() => void refresh()}
+          actionLabel={statusCopy.refresh}
+        />
       )}
       <h2>{copy.balance}</h2>
       {banks.map((bank) => {
@@ -151,9 +154,11 @@ export function BalanceCard({
               )}
             </p>
             {invalid && (
-              <p className="account-warning" role="alert">
-                <SafeMarkdown plain inline content={invalid} />
-              </p>
+              <InlineNotice
+                message={invalid}
+                onAction={() => setInvalid("")}
+                actionLabel={statusCopy.dismiss}
+              />
             )}
             <div className="account-actions">
               <Button type="submit" variant="primary" disabled={saving}>

@@ -3,9 +3,11 @@ import {
   confirmation,
   accountCopy as copy,
   errorCopy,
+  statusCopy,
 } from "../../copy/zh-CN.ts";
 import { Button } from "../../ui/Button.tsx";
 import { useConfirm } from "../../ui/ConfirmDialog.tsx";
+import { InlineNotice } from "../../ui/InlineNotice.tsx";
 import { useToast } from "../../ui/Toast.tsx";
 import { ApiError, post } from "../client.ts";
 import { SafeMarkdown, safeLink } from "../SafeMarkdown.tsx";
@@ -156,9 +158,11 @@ export function PurchaseDialog({
     >
       <h2 id={title}>{copy.purchase}</h2>
       {warning && (
-        <p className="account-warning" role="alert">
-          <SafeMarkdown plain inline content={warning} />
-        </p>
+        <InlineNotice
+          message={warning}
+          onAction={blocked ? onDismiss : () => setFailure(undefined)}
+          actionLabel={blocked ? statusCopy.backAccount : statusCopy.dismiss}
+        />
       )}
       {checkout ? (
         <>

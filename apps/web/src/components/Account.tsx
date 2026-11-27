@@ -4,7 +4,11 @@ import { confirmation, accountCopy as copy } from "../copy/zh-CN.ts";
 import { Button } from "../ui/Button.tsx";
 import { useConfirm } from "../ui/ConfirmDialog.tsx";
 import { AccountUsage } from "./account/AccountUsage.tsx";
-import { type AccountData, accountError } from "./account/account-data.ts";
+import {
+  type AccountData,
+  accountError,
+  accountText,
+} from "./account/account-data.ts";
 import { BalanceCard } from "./account/BalanceCard.tsx";
 import { PurchaseDialog } from "./account/PurchaseDialog.tsx";
 import { post } from "./client.ts";
@@ -34,7 +38,18 @@ export function Account() {
   return (
     <main className="page-content account-page">
       <header className="page-heading account-heading">
-        <h1>{copy.heading}</h1>
+        <div>
+          <h1>{copy.heading}</h1>
+          {data && (
+            <p>
+              <SafeMarkdown
+                plain
+                inline
+                content={accountText(data.user.email)}
+              />
+            </p>
+          )}
+        </div>
       </header>
       {error && (
         <p className="account-warning" role="alert">

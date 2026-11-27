@@ -26,7 +26,7 @@ export type AccountData = Pick<
   Projection,
   "bank" | "banks" | "daily" | "frozenAt" | "sandboxEnabled" | "plans"
 > & {
-  user: { id: string };
+  user: { id: string; email: string };
   usage: UsageRow[];
   ledger: LedgerRow[];
   reservations: Pick<

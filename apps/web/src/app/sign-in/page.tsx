@@ -1,3 +1,4 @@
+import { runtimeSettings } from "../../../../../config/settings.ts";
 import { SignIn } from "../../components/SignIn.tsx";
 import { getServices } from "../../server/services.ts";
 export const dynamic = "force-dynamic";
@@ -6,7 +7,11 @@ export default async function SignInPage() {
   return (
     <SignIn
       preview={services.environment.preview}
-      google={Boolean(services.environment.googleClientId)}
+      google={Boolean(
+        services.environment.googleClientId &&
+          services.environment.googleClientSecret,
+      )}
+      linkMinutes={runtimeSettings().security.magicLinkMinutes}
     />
   );
 }

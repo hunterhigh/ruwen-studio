@@ -53,9 +53,9 @@ export async function signIn(
   await resetPreviewLoginFixture(email);
   await page.goto("/sign-in");
   await page.getByLabel("邮箱", { exact: true }).fill(email);
-  await page.getByLabel("如何称呼你").fill("试读者");
+  await page.getByLabel("笔名").fill("试读者");
   await page.getByLabel("邀请码").fill("RUWEN-PREVIEW");
-  await page.getByRole("button", { name: "发送登录链接" }).click();
+  await page.getByRole("button", { name: "发送登录邮件" }).click();
   await page.getByRole("button", { name: "打开本浏览器的预览邮件" }).click();
   await expect(page).toHaveURL(/\/projects$/);
 }

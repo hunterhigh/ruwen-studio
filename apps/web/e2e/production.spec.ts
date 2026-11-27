@@ -1,10 +1,12 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { previewConfiguration } from "../../../config/preview.ts";
 import { signIn } from "./helpers.ts";
 import { captureFrame } from "./redesign-02.ts";
+import { captureSignIn } from "./sign-in-capture.ts";
 
 let server: ChildProcess;
 test.beforeAll(async () => {
@@ -25,6 +27,9 @@ test.beforeAll(async () => {
     REAL_CHARGING_ENABLED: "0",
     P3_GATE_PASSED: "0",
     NEXT_PUBLIC_RUWEN_PREVIEW_BANNER: "0",
+    // Non-secret fixture values only. The test exercises server-rendered availability, never OAuth.
+    GOOGLE_CLIENT_ID: "ui-fixture.apps.googleusercontent.com",
+    GOOGLE_CLIENT_SECRET: "ui-fixture",
   };
   delete env.ANTHROPIC_API_KEY;
   server = spawn(process.execPath, ["apps/web/scripts/server.ts"], {
@@ -78,11 +83,12 @@ test("production build enforces CSP without browser violations and disables prev
   expect(response?.headers()["content-security-policy"]).not.toMatch(
     /unsafe-inline|unsafe-eval/,
   );
+  expect(await response?.text()).not.toMatch(/<[^>]+\sstyle=/i);
   expect(response?.headers()["strict-transport-security"]).toContain(
     "max-age=",
   );
   await expect(
-    page.getByRole("button", { name: "发送登录链接", exact: true }),
+    page.getByRole("button", { name: "发送登录邮件", exact: true }),
   ).toBeEnabled();
   expect(
     (
@@ -114,6 +120,60 @@ test("production build enforces CSP without browser violations and disables prev
   );
   expect(gallery.status()).toBe(404);
   expect(await gallery.text()).not.toContain("设计组件预览");
+});
+
+test("production sign-in shows configured Google and the sent state without a preview inbox", async ({
+  page,
+}) => {
+  await page.goto(`${previewConfiguration().productionUrl}/sign-in`);
+  await expect(
+    page.getByRole("button", { name: "使用 Google 登录", exact: true }),
+  ).toBeEnabled();
+  await captureSignIn(page, "google-configured");
+  // Keep the production page and real server props, replacing only email delivery.
+  await page.route("**/api/login", (route) =>
+    route.fulfill({
+      json: { sent: true, previewMailbox: false },
+    }),
+  );
+  const email = "reader@test.invalid";
+  await page.getByLabel("邮箱", { exact: true }).fill(email);
+  await page.getByRole("button", { name: "发送登录邮件", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText(email);
+  await expect(page.getByRole("status")).toContainText("链接 15 分钟内有效。");
+  await expect(
+    page.getByRole("button", { name: "打开本浏览器的预览邮件" }),
+  ).toHaveCount(0);
+  await captureSignIn(page, "email-sent");
+});
+
+test("every protected studio page redirects signed-out users to standalone sign-in", async ({
+  page,
+}) => {
+  const base = previewConfiguration().productionUrl;
+  const project = `/projects/${randomUUID()}`;
+  for (const route of [
+    "/",
+    "/projects",
+    project,
+    `${project}/chapters`,
+    `${project}/ideation`,
+    `${project}/files`,
+    "/account",
+    "/admin",
+    "/admin/reservations",
+  ]) {
+    await page.goto(new URL(route, base).href, {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(page, route).toHaveURL(/\/sign-in$/);
+    await expect(
+      page.getByRole("heading", { name: "登录如文", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.locator(".sidebar, .project-bar, .studio-main"),
+    ).toHaveCount(0);
+  }
 });
 
 test("production frame keeps the preview banner disabled and emits no inline styles", async ({

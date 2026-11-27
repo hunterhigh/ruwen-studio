@@ -64,10 +64,10 @@ test("disposable mailbox is rejected before invitation redemption or preview-mai
   await page
     .getByLabel("邮箱", { exact: true })
     .fill(`${randomUUID()}@mailinator.com`);
-  await page.getByLabel("如何称呼你").fill("测试");
+  await page.getByLabel("笔名").fill("测试");
   await page.getByLabel("邀请码").fill("RUWEN-PREVIEW");
-  await page.getByRole("button", { name: "发送登录链接", exact: true }).click();
-  await expect(page.locator('.error[role="alert"]')).toContainText(
+  await page.getByRole("button", { name: "发送登录邮件", exact: true }).click();
+  await expect(page.locator("#signin-error-email")).toContainText(
     "暂不支持此邮箱服务",
   );
   await expect(

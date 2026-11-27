@@ -1279,3 +1279,92 @@ export const cleanupCopy = {
   remainingReadiness: (n: number) => `展开其余 ${n} 项`,
   creditUnit: "点",
 } as const;
+
+export const signInCopy = {
+  brand: "如文",
+  motto: "写作由你做最后的决定。",
+  steps: [
+    "和协调员聊出故事方向",
+    "岗位写出候选稿并逐一审读",
+    "你读完、批准，才进入正典",
+  ],
+  heading: "登录如文",
+  intro: "无需密码。我们会发一封登录邮件。新账户需要邀请码。",
+  email: "邮箱",
+  emailPlaceholder: "you@example.com",
+  name: "笔名",
+  optional: "（可选）",
+  namePlaceholder: "写在书架上的名字",
+  invitation: "邀请码",
+  invitationPlaceholder: "已有账户可以留空",
+  submit: "发送登录邮件",
+  submitting: "正在发送…",
+  sentHeading: "登录邮件已发送",
+  sentTo: "收件邮箱",
+  linkInstructions: (minutes: number) =>
+    `打开邮件里的链接即可进入。链接 ${minutes} 分钟内有效。`,
+  changeEmail: "换一个邮箱",
+  previewMail: "打开本浏览器的预览邮件",
+  openingPreview: "正在打开预览邮件…",
+  previewNote: "本地模拟预览。登录邮件只在当前浏览器中打开。",
+  google: "使用 Google 登录",
+  openingGoogle: "正在打开 Google 登录…",
+  alternative: "或",
+  rateLimitedWait: (seconds: number) =>
+    seconds < 60
+      ? `发送过于频繁。请等待 ${seconds} 秒后再试。`
+      : `发送过于频繁。请等待约 ${Math.ceil(seconds / 60)} 分钟后再试。`,
+  errors: {
+    email: { at: "email", text: "请填写完整的邮箱地址。" },
+    unsupportedEmail: {
+      at: "email",
+      text: "暂不支持此邮箱服务。请换用常用邮箱。",
+    },
+    name: { at: "name", text: "笔名最多 80 个字符，请缩短后重试。" },
+    missingInvitation: {
+      at: "invitation",
+      text: "请填写有效的邀请码。已有账户可以留空。",
+    },
+    invalidInvitation: {
+      at: "invitation",
+      text: "此邀请码无效或已用完。请核对后再试。",
+    },
+    badInput: { at: "submit", text: "请核对填写的内容后再发送。" },
+    forbidden: { at: "submit", text: "请刷新登录页后再试。" },
+    wrongOrigin: { at: "submit", text: "请在如文登录页重新发送邮件。" },
+    expiredPage: { at: "submit", text: "登录页的校验已过期。请刷新后重试。" },
+    tooLarge: { at: "submit", text: "填写的内容太长。请缩短后重试。" },
+    rateLimited: { at: "submit", text: "发送过于频繁。请稍后再试。" },
+    sendFailed: { at: "submit", text: "暂时发不出登录邮件。请稍后再试。" },
+    previewUnavailable: {
+      at: "preview",
+      text: "预览邮件已过期或无法打开。请返回表单重新发送。",
+    },
+    previewFailed: { at: "preview", text: "暂时打不开预览邮件。请稍后再试。" },
+    googleFailed: {
+      at: "google",
+      text: "暂时无法使用 Google 登录。请重试或使用邮箱登录。",
+    },
+  },
+  loginMessages: [
+    [400, "请填写有效邮箱。", "email"],
+    [400, "请填写有效内容。", "missingInvitation"],
+    [400, "邀请码无效或已用完。", "invalidInvitation"],
+    [400, "请求正文必须是有效的JSON对象。", "badInput"],
+    [403, "暂不支持此邮箱服务，请使用常用邮箱。", "unsupportedEmail"],
+    [403, "请求来源不被允许，请从工作室页面重试。", "wrongOrigin"],
+    [403, "请求校验已失效，请刷新页面后重试。", "expiredPage"],
+  ],
+  loginStatusErrors: [
+    [400, "badInput"],
+    [403, "forbidden"],
+    [404, "sendFailed"],
+    [413, "tooLarge"],
+    [429, "rateLimited"],
+    [500, "sendFailed"],
+  ],
+  previewStatusErrors: [
+    [404, "previewUnavailable"],
+    [500, "previewFailed"],
+  ],
+} as const;

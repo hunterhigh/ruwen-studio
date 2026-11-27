@@ -65,9 +65,9 @@ test("human-started preview rehearsal uses a separate persistent sandbox and can
   await page
     .getByLabel("邮箱", { exact: true })
     .fill(`${randomUUID()}@test.invalid`);
-  await page.getByLabel("如何称呼你").fill("真实预览演练");
+  await page.getByLabel("笔名").fill("真实预览演练");
   await page.getByLabel("邀请码").fill("RUWEN-PREVIEW");
-  await page.getByRole("button", { name: "发送登录链接", exact: true }).click();
+  await page.getByRole("button", { name: "发送登录邮件", exact: true }).click();
   await page
     .getByRole("button", { name: "打开本浏览器的预览邮件", exact: true })
     .click();

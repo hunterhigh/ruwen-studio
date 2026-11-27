@@ -96,7 +96,11 @@ test("account groups the recent usage by run and keeps billing details in points
   await expect(roles.getByText("文学编辑", { exact: true })).toBeVisible();
   await expect(roles.getByText("1,245 点", { exact: true })).toBeVisible();
   await expect(roles.getByText("385 点", { exact: true })).toBeVisible();
+  await expect(completed.getByText("测试点数", { exact: true })).toHaveCount(1);
+  await expect(roles.getByText("测试点数", { exact: true })).toHaveCount(0);
+  await expect(pending.locator(".account-run-title small")).toHaveCount(0);
   await captureAccount(page, "role-usage");
+  await captureCleanup(page, "12");
 
   await completed.click();
   await pending.click();

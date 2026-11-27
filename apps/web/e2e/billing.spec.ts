@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import { Database } from "@ruwen/db";
 import { previewConfiguration } from "../../../config/preview.ts";
 import { runtimeSettings } from "../../../config/settings.ts";
+import { captureAccount, checkAccountHtml } from "./account-capture.ts";
 import { startChapter } from "./chapter-review.ts";
 import {
   confirmAction,
@@ -19,20 +20,32 @@ test("sandbox purchase records a real ledger entry once and refreshes segregated
   await expect(
     page.getByRole("heading", { name: "余额与预留", exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "购买测试点数 · 测试点数包", exact: true })
-    .click();
-  await expect(
-    page.getByRole("button", { name: "完成模拟支付", exact: true }),
-  ).toBeVisible();
-  await confirmAction(
-    page,
-    page.getByRole("button", { name: "完成模拟支付", exact: true }),
-    "完成模拟支付",
-    "account-payment",
+  await page.getByRole("button", { name: "购买点数", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "购买点数" });
+  await expect(dialog.getByText("沙箱付款：不会产生真实扣款。")).toBeVisible();
+  await dialog.getByRole("button", { name: "创建沙箱结账" }).click();
+  const finish = dialog.getByRole("button", { name: "完成沙箱付款" });
+  await expect(finish).toBeVisible();
+  const prepared = await (await page.request.get("/api/account")).json();
+  expect(prepared.banks).toEqual(before.banks);
+  expect(prepared.ledger).toEqual(before.ledger);
+  const checkout = prepared.checkouts.find(
+    (row: { status: string }) => row.status === "pending",
   );
+  expect(checkout).toMatchObject({ provider: "mock" });
+  await captureAccount(page, "purchase-sandbox");
+  const confirmation = page.getByRole("dialog", { name: "完成模拟支付？" });
+  await finish.click();
+  await expect(confirmation).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(confirmation).toHaveCount(0);
+  await expect(finish).toBeFocused();
+  await finish.click();
+  await confirmation
+    .getByRole("button", { name: "完成模拟支付", exact: true })
+    .click();
   await expect(page.getByRole("status")).toContainText(
-    "模拟支付已记入沙箱点数账本",
+    /已加入 [\d,]+ 沙箱点数。/,
   );
   const after = await (await page.request.get("/api/account")).json();
   expect(BigInt(after.banks.sandbox.balance)).toBe(
@@ -46,6 +59,8 @@ test("sandbox purchase records a real ledger entry once and refreshes segregated
     ),
   ).toHaveLength(1);
   expect(after.release.realChargingEnabled).toBe(false);
+  await expect(dialog).toHaveCount(0);
+  await checkAccountHtml(page);
   await page.screenshot({
     path: testInfo.outputPath("billing-account.png"),
     fullPage: true,
@@ -96,6 +111,11 @@ test("frozen run refuses without a task, and an audited administrator can unfree
         )
       ).rowCount,
     ).toBe(0);
+    await page.goto("/account");
+    await expect(
+      page.locator(".account-balance").getByRole("alert"),
+    ).toHaveText("账户运行已冻结，等待人工复核。你仍可阅读已有内容。");
+    await captureAccount(page, "frozen");
     const admin = await adminContext.newPage();
     await signIn(admin, "preview@ruwen.local");
     await admin.goto("/admin");
@@ -176,7 +196,15 @@ test("admin reviews uncertain cost with a reason and the account shows the audit
       ],
     );
     await page.goto("/account");
-    await expect(page.getByText(/预留折算约 USD/)).toBeVisible();
+    const pending = page.locator(".account-review-alert");
+    const summary = pending.locator("summary");
+    await expect(summary).toHaveText(
+      /有 1 次运行的结果未知，预留的 [\d,]+ 点在人工核对后才会结算或释放。/,
+    );
+    await summary.click();
+    await expect(pending.getByText("《费用人工核对测试》")).toBeVisible();
+    await expect(pending.locator("time")).toHaveCount(0);
+    await captureAccount(page, "pending-review");
     await page.goto("/admin/reservations");
     await expect(
       page.getByRole("heading", { name: "这一页不在这里。", exact: true }),
@@ -208,6 +236,7 @@ test("admin reviews uncertain cost with a reason and the account shows the audit
     await expect(
       page.getByText("已按服务商测试账单核对总实际费用。", { exact: true }),
     ).toBeVisible();
+    await checkAccountHtml(page);
     expect(
       (
         await db.pool.query(

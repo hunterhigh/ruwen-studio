@@ -1,5 +1,9 @@
 import { type FormEvent, useState } from "react";
-import { accountCopy as copy, errorCopy } from "../../copy/zh-CN.ts";
+import {
+  cleanupCopy,
+  accountCopy as copy,
+  errorCopy,
+} from "../../copy/zh-CN.ts";
 import { Button } from "../../ui/Button.tsx";
 import { useToast } from "../../ui/Toast.tsx";
 import { post } from "../client.ts";
@@ -93,7 +97,8 @@ export function BalanceCard({
             </h3>
             <p className="account-balance-label">{copy.available}</p>
             <p className="account-balance-value">
-              {formatCredits(balance.available)} <small>{copy.credits}</small>
+              {formatCredits(balance.available)}{" "}
+              <small>{cleanupCopy.creditUnit}</small>
             </p>
             <dl>
               <div>

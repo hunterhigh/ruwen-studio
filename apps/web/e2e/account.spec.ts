@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import { Database } from "@ruwen/db";
 import { previewConfiguration } from "../../../config/preview.ts";
 import { captureAccount } from "./account-capture.ts";
+import { captureCleanup } from "./cleanup-11a.ts";
 import { createDemoFromShelf, signIn } from "./helpers.ts";
 
 test("account groups the recent usage by run and keeps billing details in points", async ({
@@ -82,7 +83,12 @@ test("account groups the recent usage by run and keeps billing details in points
     first.toISOString(),
   );
   await expect(table).not.toContainText(/第[二三23]章|失败/);
+  await expect(page.locator(".account-balance-value > small")).toHaveText([
+    "点",
+    "点",
+  ]);
   await captureAccount(page, "account");
+  await captureCleanup(page, "11");
 
   await completed.click();
   const roles = table.locator("details[open] .account-roles");

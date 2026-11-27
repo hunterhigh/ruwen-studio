@@ -1012,6 +1012,197 @@ export const filesCopy = {
   } satisfies Record<string, string>,
 };
 
+export const overviewCopy = {
+  title: "项目概览",
+  beforeFirstChapter: "第一章之前",
+  chapter: (chapter: number | string) => `第 ${chapter} 章`,
+  journeyTitle: (chapter: number | string) => `第 ${chapter} 章走到哪一步了`,
+  chapterWithTitle: (chapter: number | string, title: string) =>
+    `第 ${chapter} 章 · ${title}`,
+  openWriting: "进入章节写作",
+  loading: "正在读取项目进度…",
+  loadFailed: "暂时读不到部分项目进度，请刷新页面再试。",
+  steps: [
+    {
+      title: "构思资料",
+      description: "先整理人物、世界和故事资料，再决定哪些内容写入项目。",
+      done: "写作前的项目资料已备好。",
+    },
+    {
+      title: "章节情境",
+      description: "编译并批准本章情境，确定这章必须发生的事。",
+      done: "已进入本章的写作流程。",
+    },
+    {
+      title: "写作与审读",
+      description: "小说作者写出候选稿，随后由读者、编辑和核验员审读。",
+      done: "候选稿已通过审读与核验。",
+    },
+    {
+      title: "批准正文",
+      description: "候选稿在你批准之前不会进入正典。",
+      done: "正文已获批准。",
+    },
+    {
+      title: "提交资料变更",
+      description: "记忆维护员会提出资料变更，由你单独批准。",
+      done: "本章的流程已完成。",
+    },
+  ],
+  actions: {
+    ideation: "去故事构思",
+    compile: "去编译章节情境",
+    progress: "查看进度",
+    review: "去审稿",
+    memory: "阅读资料变更",
+    reason: "查看原因",
+    next: "写下一章",
+  },
+  readinessHeading: "写作前的资料",
+  ready: "写作前的资料已就绪",
+  missing: (count: number) => `还差 ${count} 项`,
+  unresolved: "资料尚未就绪",
+  readinessHint: "就绪只说明资料齐全、都已批准，不评价文学质量。",
+  otherChecks: "其他检查信息",
+  fill: "去补上",
+  decisions: "待你决定",
+  decisionLoading: "正在读取待决定的内容…",
+  emptyDecisions: "现在没有需要你决定的事。",
+  candidate: {
+    title: "候选稿",
+    description: "审读与核验已完成，等你阅读并批准正文。",
+  },
+  chapterMemory: {
+    title: "资料变更（章节）",
+    description: "正文已批准，等你阅读并提交本章的资料变更。",
+  },
+  previews: {
+    handoff: {
+      title: "通讯门",
+      description: "确认后，协调员会把这份委托交给指定岗位。",
+    },
+    file_patch: {
+      title: "资料变更",
+      description: "逐项阅读变更，批准后才会写入项目。",
+    },
+    generation_field: {
+      title: "章节情境",
+      description: "核对情境正文和锁定事件，批准后才会登记。",
+    },
+    learning_plan: {
+      title: "学习计划",
+      description: "核对计划和调查边界，批准后才开始调查。",
+    },
+    expression_candidate: {
+      title: "表现候选",
+      description: "阅读表现资源和审计结果，再决定是否批准。",
+    },
+    verbatim: {
+      title: "逐字保留",
+      description: "确认选区和写入目标，批准后按原文保留。",
+    },
+  },
+  chapters: "章节",
+  lastRun: "最近一次运行",
+  status: "状态",
+  emptyRuns: "还没有章节运行。",
+  allRuns: "显示全部运行",
+  olderRuns: "较早的章节运行",
+  names: {
+    "AGENTS.md": "项目路线规则",
+    "项目/项目章程.md": "项目章程",
+    "人物/主角档案.md": "主角档案",
+    "世界/世界总表.md": "世界总表",
+    "世界/当前态势.md": "当前态势",
+    "表现/项目声音.md": "项目声音",
+    "治理/资源注册表.json": "资源注册表",
+    "治理/审计账本.jsonl": "审计账本",
+    "治理/文学问题账本.jsonl": "文学问题账本",
+    "xiangmu-luyou-guize": "项目路线规则",
+    "xiangmu-zhangcheng": "项目章程",
+    "zhujue-dangan": "主角档案",
+    "zhujue-pov-jingtou": "主角视角镜头",
+    "shijie-zongbiao": "世界总表",
+    "shijie-dangqian-taishi": "当前态势",
+    "gushi-dangqian-hu": "当前故事弧",
+    "biaoxian-xiangmu-shengyin": "项目声音",
+    "xiaoyan-yingsheding": "硬设定规则",
+    客观存在模型: "主角的外在身份和处境",
+    内在组织模型: "主角的动机和内在矛盾",
+    叙述接口模型: "主角视角能知道和表达什么",
+    时代与空间: "时代与空间",
+    物质与技术边界: "物质与技术边界",
+    系统索引: "世界系统索引",
+  } as Readonly<Record<string, string>>,
+  readinessRules: [
+    {
+      pattern: /^缺少必需文件：(.+)$/,
+      message: "missingFile",
+      destination: "ideation",
+    },
+    {
+      pattern: /^必需资料仍含初始化占位：(.+)$/,
+      message: "placeholder",
+      destination: "ideation",
+    },
+    {
+      pattern: /^主角档案未完成：(.+)$/,
+      message: "character",
+      destination: "ideation",
+    },
+    {
+      pattern: /^世界总表未完成：(.+)$/,
+      message: "world",
+      destination: "ideation",
+    },
+    {
+      pattern: /^必需资源尚未批准并激活：(.+)$/,
+      message: "approval",
+      destination: "ideation",
+    },
+    {
+      pattern: /^至少需要一个已批准并激活的正式世界系统$/,
+      message: "system",
+      destination: "ideation",
+    },
+    {
+      pattern: /^世界系统仍含初始化占位：.+$/,
+      message: "systemPlaceholder",
+      destination: "ideation",
+    },
+    {
+      pattern: /^项目声音尚未批准并激活$/,
+      message: "voice",
+      destination: "ideation",
+    },
+    {
+      pattern:
+        /^(?:不支持的注册表schema|重复资源ID|同一路径被多个资源拥有)：|(?:的来源哈希不匹配|未批准却处于active)$/,
+      message: "registry",
+      destination: "ideation",
+    },
+    {
+      pattern: /章节情境|\bprojection\b|\bgeneration field\b/i,
+      message: "projection",
+      destination: "compile",
+    },
+  ],
+  readinessMessages: {
+    missingFile: (name?: string) => `缺少${name ?? "一份必需资料"}。`,
+    placeholder: (name?: string) =>
+      `${name ?? "一份必需资料"}仍有待补写的占位内容。`,
+    character: (name?: string) => `主角档案还需补写${name ?? "一部分内容"}。`,
+    world: (name?: string) => `世界总表还需补写${name ?? "一部分设定"}。`,
+    approval: (name?: string) =>
+      `${name ?? "一份必需资源"}还在等你批准并启用。`,
+    system: () => "至少需要一份已批准并启用的正式世界系统资料。",
+    systemPlaceholder: () => "已启用的世界系统仍有待补写的内容。",
+    voice: () => "项目声音还在等你批准并启用。",
+    registry: () => "有一项资源登记需要核对。",
+    projection: () => "本章的章节情境还需要编译或确认。",
+  },
+} as const;
+
 export const accountCopy = {
   heading: "账户与用量",
   loading: "正在读取账户…",

@@ -69,7 +69,7 @@ export async function createDemo(page: Page, title: string) {
   await page.getByRole("button", { name: "创建项目", exact: true }).click();
   await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+$/);
   await expect(
-    page.getByRole("heading", { name: "项目资料已就绪" }),
+    page.getByText("写作前的资料已就绪", { exact: true }),
   ).toBeVisible();
   return page.url().split("/").at(-1) ?? "";
 }
@@ -134,7 +134,7 @@ export async function createDemoFromShelf(page: Page, title: string) {
   await dialog.getByRole("button", { name: "创建项目", exact: true }).click();
   await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+$/);
   await expect(
-    page.getByRole("heading", { name: "项目资料已就绪" }),
+    page.getByText("写作前的资料已就绪", { exact: true }),
   ).toBeVisible();
   return page.url().split("/").at(-1) ?? "";
 }

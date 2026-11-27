@@ -88,15 +88,17 @@ test("global frame: real project decisions, every navigation mode, persistent ba
       .evaluate((node) => node.getBoundingClientRect().width),
   ).toBe(184);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(page.locator(".quiet-link")).toHaveAttribute(
-    "href",
-    `/api/projects/${id}/export`,
-  );
-  const [download] = await Promise.all([
+  const [download, exportResponse] = await Promise.all([
     page.waitForEvent("download"),
-    page.locator(".quiet-link").click(),
+    page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === `/api/projects/${id}/export` &&
+        response.request().method() === "GET",
+    ),
+    page.getByRole("button", { name: "导出 ZIP", exact: true }).click(),
   ]);
-  expect(download.suggestedFilename()).toMatch(/\.zip$/i);
+  expect(exportResponse.ok()).toBe(true);
+  expect(download.suggestedFilename()).toBe(`ruwen-${id}.zip`);
   await mainNav.getByRole("link", { name: "账户与用量", exact: true }).click();
   await expect(page.locator(".page-heading")).toContainText("@mail.test");
   await expect(

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   type AnnotationView,
   annotationCounts,
+  layoutMarkerCenters,
   markerFraction,
   reviewAnnotations,
   showsAnnotation,
@@ -49,6 +50,17 @@ describe("chapter annotations", () => {
     expect(markerFraction(undefined, 100)).toBeUndefined();
     expect(markerFraction(Number.NaN, 100)).toBeUndefined();
     expect(markerFraction(0, 0)).toBeUndefined();
+  });
+
+  it("keeps each marker clickable when anchors overlap or reach the rail edge", () => {
+    expect(layoutMarkerCenters([1, 0, 1, 0, 0.5], 100)).toEqual({
+      centers: [83, 5, 95, 17, 50],
+      hitHeight: 10,
+    });
+    expect(layoutMarkerCenters([0, 0, 0], 18)).toEqual({
+      centers: [3, 9, 15],
+      hitHeight: 6,
+    });
   });
 
   it("counts decisions independently of ratings and matches each filter", () => {

@@ -1,7 +1,10 @@
 "use client";
 import { type RefObject, useLayoutEffect, useRef } from "react";
 import { annotationCopy as c } from "../../copy/zh-CN.ts";
-import type { AnnotationView } from "./review-annotations.ts";
+import {
+  type AnnotationView,
+  layoutMarkerCenters,
+} from "./review-annotations.ts";
 
 export interface AnnotationMarker {
   annotation: AnnotationView;
@@ -29,6 +32,8 @@ export function AnnotationRail({
     const dock = surface
       .closest(".chapter-workspace")
       ?.querySelector(".chapter-dock");
+    const fractions = markers.map(({ fraction }) => fraction);
+    const buttons = rail.querySelectorAll<HTMLButtonElement>("button");
     let frame = 0;
     function place() {
       if (!surface || !rail) return;
@@ -43,9 +48,15 @@ export function AnnotationRail({
         dock?.getBoundingClientRect().top ?? window.innerHeight,
         window.innerHeight,
       );
-      rail.hidden = bottom <= top;
+      const height = Math.max(0, bottom - top);
+      rail.hidden = height === 0;
       rail.style.top = `${top - rect.top}px`;
-      rail.style.height = `${Math.max(0, bottom - top)}px`;
+      rail.style.height = `${height}px`;
+      const { centers, hitHeight } = layoutMarkerCenters(fractions, height);
+      buttons.forEach((button, index) => {
+        button.style.top = `${centers[index]}px`;
+        button.style.height = `${hitHeight}px`;
+      });
     }
     function schedule() {
       cancelAnimationFrame(frame);
@@ -67,15 +78,7 @@ export function AnnotationRail({
       window.removeEventListener("scroll", schedule, true);
       window.removeEventListener("resize", schedule);
     };
-  }, [paper]);
-  useLayoutEffect(() => {
-    track.current
-      ?.querySelectorAll<HTMLButtonElement>("button")
-      .forEach((button, index) => {
-        const marker = markers[index];
-        if (marker) button.style.top = `${marker.fraction * 100}%`;
-      });
-  }, [markers]);
+  }, [paper, markers]);
   return (
     <fieldset
       ref={track}

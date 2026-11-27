@@ -1,5 +1,12 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { candidateCopy as c, chapterCopy } from "../../copy/zh-CN.ts";
 import { request } from "../client.ts";
 import { TextDiff } from "../diff/TextDiff.tsx";
@@ -140,6 +147,30 @@ export function CandidateEditor({
   onReload: () => void;
 }) {
   const field = useRef<HTMLTextAreaElement>(null);
+  const fitEditor = useCallback(() => {
+    const editor = field.current;
+    if (!editor) return;
+    editor.style.height = "auto";
+    editor.style.height = `${editor.scrollHeight}px`;
+  }, []);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: A new value changes the DOM height.
+  useLayoutEffect(fitEditor, [fitEditor, text]);
+  useLayoutEffect(() => {
+    const editor = field.current;
+    if (!editor) return;
+    let width = editor.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (editor.clientWidth === width) return;
+      width = editor.clientWidth;
+      fitEditor();
+    });
+    observer.observe(editor);
+    document.fonts.addEventListener("loadingdone", fitEditor);
+    return () => {
+      observer.disconnect();
+      document.fonts.removeEventListener("loadingdone", fitEditor);
+    };
+  }, [fitEditor]);
   useEffect(() => {
     field.current?.focus({ preventScroll: true });
   }, []);

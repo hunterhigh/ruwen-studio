@@ -11,6 +11,7 @@ export interface ProjectFile {
 
 export interface ResourceEntry {
   id: string;
+  title?: string;
   path: string;
   status: string;
   scope?: Record<string, unknown>;
@@ -53,10 +54,12 @@ export function parseRegistry(text: string | undefined) {
     ) {
       return undefined;
     }
+    const title = typeof item.title === "string" ? item.title.trim() : "";
     const scope = record(item.scope);
     const readers = stringList(item.readers);
     entries.set(item.path, {
       id: item.id,
+      ...(title && { title }),
       path: item.path,
       status: typeof item.status === "string" ? item.status : "",
       ...(scope && { scope }),

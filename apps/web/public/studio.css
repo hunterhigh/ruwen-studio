@@ -4711,3 +4711,10 @@ textarea {
   padding-inline-start: 6px;
   border-inline-start: 2px solid var(--seal-deep);
 }
+
+.files-registry-technical {
+  margin-top: 5px;
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: normal;
+}

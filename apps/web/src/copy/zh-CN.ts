@@ -1275,4 +1275,5 @@ export const cleanupCopy = {
   emptyMemoryQuestion: (chapter: string) => `确认${chapter}无需资料变更？`,
   emptyMemoryHint: "确认后结束本章流程，项目资料保持原样。",
   systemRecord: "系统记录，不供岗位读取",
+  resourceId: "资源 ID",
 } as const;

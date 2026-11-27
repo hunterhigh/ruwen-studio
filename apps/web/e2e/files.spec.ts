@@ -36,6 +36,7 @@ async function seedReadingFiles(projectId: string) {
       const registry = JSON.parse(await fs.readText(registryPath));
       registry.resources.push({
         id: "dukou-research",
+        title: "冬季渡口调查",
         path: researchPath,
         type: "evidence",
         status: "candidate",
@@ -190,9 +191,17 @@ test("项目资料按目录浏览，从注册表显示元数据，结构化渲�
     "状态",
     "可读取的岗位",
   ]);
+  const resource = table.getByRole("row", { name: /冬季渡口调查/ });
+  await expect(resource).toContainText("候选");
   await expect(
-    table.getByRole("row", { name: /dukou-research/ }),
-  ).toContainText("候选");
+    table.getByRole("rowheader", { name: /^主角档案\.md/ }),
+  ).toBeVisible();
+  const resourceId = resource.getByText("dukou-research", { exact: true });
+  await expect(resourceId).toBeHidden();
+  await resource.getByText("技术信息", { exact: true }).click();
+  await expect(resourceId).toBeVisible();
+  await captureCleanup(page, "07");
+  await resource.getByText("技术信息", { exact: true }).click();
   await expect(reader).not.toContainText('"resources"');
   await capture(page, "registry-table");
 

@@ -4,6 +4,7 @@ import { Database } from "@ruwen/db";
 import { previewConfiguration } from "../../../config/preview.ts";
 import { runtimeSettings } from "../../../config/settings.ts";
 import { captureAccount, checkAccountHtml } from "./account-capture.ts";
+import { captureAdmin } from "./admin-capture.ts";
 import { startChapter } from "./chapter-review.ts";
 import {
   confirmAction,
@@ -184,10 +185,13 @@ test("admin reviews uncertain cost with a reason and the account shows the audit
       "INSERT INTO prompts(sha256,content) VALUES($1,$2) ON CONFLICT DO NOTHING",
       [promptHash, prompt],
     );
-    await db.pool.query(
-      "INSERT INTO role_runs(run_id,role_id,status,model,prompt_sha256,input_sha256,usage_unknown) VALUES($1,'xiaoshuo-zuozhe','failed','faux/uncertain',$2,$2,true)",
-      [run, promptHash],
-    );
+    const failedRole = (
+      await db.pool.query<{ id: string }>(
+        "INSERT INTO role_runs(run_id,role_id,status,model,prompt_sha256,input_sha256,usage_unknown) VALUES($1,'xiaoshuo-zuozhe','failed','faux/uncertain',$2,$2,true) RETURNING id",
+        [run, promptHash],
+      )
+    ).rows[0]?.id;
+    if (!failedRole) throw new Error("Missing failed-role fixture");
     await db.pool.query(
       "INSERT INTO credit_reservations(user_id,run_id,bank,amount,remaining,status,cost_markup,credits_per_usd) VALUES($1,$2,'sandbox',$3,$3,'review',$4,$5)",
       [
@@ -210,25 +214,52 @@ test("admin reviews uncertain cost with a reason and the account shows the audit
     await captureAccount(page, "pending-review");
     await page.goto("/admin/reservations");
     await expect(
-      page.getByRole("heading", { name: "这一页不在这里。", exact: true }),
+      page.getByRole("heading", { name: "这一页不存在", exact: true }),
     ).toBeVisible();
     const admin = await context.newPage();
     await signIn(admin, "preview@ruwen.local");
     await admin.goto("/admin");
+    const failed = admin
+      .getByRole("table", { name: "失败任务" })
+      .getByRole("row")
+      .filter({ hasText: failedRole });
+    await expect(failed).toContainText("小说作者");
+    await expect(failed.locator("time")).toHaveCSS(
+      "font-variant-numeric",
+      "tabular-nums",
+    );
+    const gate = admin.getByRole("table", { name: "上线闸门" });
+    await expect(gate.getByRole("row", { name: /真实收费/ })).toContainText(
+      "已关闭",
+    );
+    await expect(
+      admin.getByRole("table", { name: "意见反馈统计" }),
+    ).toBeVisible();
+    await captureAdmin(admin, "admin-overview");
     await admin.getByRole("link", { name: "处理待核对预留" }).click();
     const card = admin.locator("section").filter({
       has: admin.getByRole("heading", { name: email, exact: true }),
     });
+    const held = card.getByText(/^USD\s+[\d,]+\.\d{2}$/);
+    await expect(held).toBeVisible();
+    await expect(held).toHaveCSS("text-align", "right");
+    await expect(held).toHaveCSS("font-variant-numeric", "tabular-nums");
+    await captureAdmin(admin, "admin-reservations");
     await card.getByLabel("运行总实际费用 USD", { exact: true }).fill("0.125");
     await card
       .getByLabel("核对理由（必填，对用户可见）")
       .fill("已按服务商测试账单核对总实际费用。");
-    await confirmAction(
-      admin,
-      card.getByRole("button", { name: "确认核对并记入审计" }),
-      "确认核对",
-      "admin-reservation",
-    );
+    const trigger = card.getByRole("button", { name: "确认核对并记入审计" });
+    if (process.env.FRONTEND_RED11C_SCREENSHOTS === "1") {
+      await trigger.click();
+      await expect(
+        admin.getByRole("dialog", { name: "确认费用核对？" }),
+      ).toBeVisible();
+      await captureAdmin(admin, "admin-confirm");
+      await admin.keyboard.press("Escape");
+      await expect(trigger).toBeFocused();
+    }
+    await confirmAction(admin, trigger, "确认核对", "admin-reservation");
     await expect(
       admin.getByText("核对已完成，账本和处理理由已保存。"),
     ).toBeVisible();

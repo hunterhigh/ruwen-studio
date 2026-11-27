@@ -8,6 +8,7 @@ import {
   readCandidate,
   startChapter,
 } from "./chapter-review.ts";
+import { captureCleanup } from "./cleanup-11a.ts";
 import { createDemoFromShelf, signIn } from "./helpers.ts";
 import { ideationHttpFixture } from "./ideation-http-fixture.ts";
 import { readMemory } from "./memory-review.ts";
@@ -59,6 +60,27 @@ test("overview explains missing materials, filters the chapter table and opens c
   await capture(page, "blank-project");
 
   const root = new URL(page.url()).pathname;
+  const materials = page.getByRole("region", { name: c.readinessHeading });
+  const readiness = (await (await page.request.get(`/api${root}`)).json()) as {
+    readiness: { errors: string[] };
+  };
+  expect(readiness.readiness.errors.length).toBeGreaterThan(5);
+  const firstChecks = materials.locator(":scope > .overview-checks > li");
+  await expect(firstChecks).toHaveCount(5);
+  const extra = materials.locator("details").filter({
+    has: page.getByText(
+      `展开其余 ${readiness.readiness.errors.length - 5} 项`,
+      {
+        exact: true,
+      },
+    ),
+  });
+  await expect(extra.locator("summary").first()).toBeVisible();
+  await expect(extra.locator("li").first()).toBeHidden();
+  await materials.scrollIntoViewIfNeeded();
+  await captureCleanup(page, "09");
+  await extra.locator("summary").first().click();
+  await expect(extra.locator("li").first()).toBeVisible();
   let errors = [
     "必需资料仍含初始化占位：项目/项目章程.md",
     "必需资源尚未批准并激活：zhujue-pov-jingtou",
@@ -92,7 +114,6 @@ test("overview explains missing materials, filters the chapter table and opens c
   );
   await page.reload();
   await expect(currentStep(page)).toContainText(c.steps[0].title);
-  const materials = page.getByRole("region", { name: c.readinessHeading });
   await expect(materials).toContainText("项目章程仍有待补写的占位内容。");
   await expect(materials).toContainText("主角视角镜头还在等你批准并启用。");
   const diagnostic = materials.getByText(errors[2] ?? "", { exact: true });

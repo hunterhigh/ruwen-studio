@@ -1277,4 +1277,5 @@ export const cleanupCopy = {
   systemRecord: "系统记录，不供岗位读取",
   resourceId: "资源 ID",
   authorWithheld: "按如文规则，小说作者不看以下材料",
+  remainingReadiness: (n: number) => `展开其余 ${n} 项`,
 } as const;

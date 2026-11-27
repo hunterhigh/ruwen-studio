@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { overviewCopy as c } from "../copy/zh-CN.ts";
+import { overviewCopy as c, cleanupCopy } from "../copy/zh-CN.ts";
 import { StatusBadge } from "../ui/StatusBadge.tsx";
 import { OverviewChapters } from "./overview/OverviewChapters.tsx";
 import { OverviewStartChapter } from "./overview/OverviewStartChapter.tsx";
@@ -240,13 +240,9 @@ function OverviewReadiness({
   ideation: string;
   compile: string;
 }) {
-  const issues = (readiness?.errors ?? []).flatMap((error) => {
-    const known = explainReadiness(error);
-    return known ? [{ error, ...known }] : [];
-  });
-  const other = (readiness?.errors ?? []).filter(
-    (error) => !explainReadiness(error),
-  );
+  const errors = readiness?.errors ?? [];
+  const first = errors.slice(0, 5);
+  const remaining = errors.slice(first.length);
   return (
     <section className="overview-panel" aria-labelledby="overview-readiness">
       <header className="overview-panel-heading">
@@ -263,35 +259,74 @@ function OverviewReadiness({
       </header>
       {readiness && !readiness.ready && (
         <>
-          {issues.length > 0 && (
-            <ul className="overview-checks">
-              {issues.map(({ error, message, destination }, index) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: The readiness API can emit the same reason more than once.
-                <li key={`${index}-${error}`}>
-                  <span>{message}</span>
-                  <a href={destination === "compile" ? compile : ideation}>
-                    {c.fill}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
-          {other.length > 0 && (
+          <ReadinessChecks
+            errors={first}
+            ideation={ideation}
+            compile={compile}
+          />
+          {remaining.length > 0 && (
             <details className="overview-details">
-              <summary>{c.otherChecks}</summary>
-              <ul>
-                {other.map((message, index) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: Diagnostic messages may be repeated.
-                  <li key={`${index}-${message}`}>
-                    <SafeMarkdown plain inline content={message} />
-                  </li>
-                ))}
-              </ul>
+              <summary>
+                {cleanupCopy.remainingReadiness(remaining.length)}
+              </summary>
+              <ReadinessChecks
+                errors={remaining}
+                ideation={ideation}
+                compile={compile}
+              />
             </details>
           )}
         </>
       )}
       <p className="overview-muted">{c.readinessHint}</p>
     </section>
+  );
+}
+
+function ReadinessChecks({
+  errors,
+  ideation,
+  compile,
+}: {
+  errors: readonly string[];
+  ideation: string;
+  compile: string;
+}) {
+  const issues = [];
+  const other = [];
+  for (const error of errors) {
+    const issue = explainReadiness(error);
+    if (issue) issues.push({ error, ...issue });
+    else other.push(error);
+  }
+  return (
+    <>
+      {issues.length > 0 && (
+        <ul className="overview-checks">
+          {issues.map(({ error, message, destination }, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: The readiness API can emit the same reason more than once.
+            <li key={`${index}-${error}`}>
+              <span>{message}</span>
+              <a href={destination === "compile" ? compile : ideation}>
+                {c.fill}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+      {other.length > 0 && (
+        <details className="overview-details">
+          <summary>{c.otherChecks}</summary>
+          <ul>
+            {other.map((message, index) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: Diagnostic messages may be repeated.
+              <li key={`${index}-${message}`}>
+                <SafeMarkdown plain inline content={message} />
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </>
   );
 }

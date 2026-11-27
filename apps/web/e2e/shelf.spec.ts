@@ -233,6 +233,6 @@ test("ZIP 导入显示进度和服务端错误，重新选择同名 ZIP 后导�
   await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+$/);
   expect(page.url()).not.toContain(original);
   await expect(
-    page.getByRole("heading", { name: "项目资料已就绪" }),
+    page.getByText("写作前的资料已就绪", { exact: true }),
   ).toBeVisible();
 });

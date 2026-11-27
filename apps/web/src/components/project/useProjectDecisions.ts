@@ -3,7 +3,7 @@ import type {
   IdeationPreviewV1_2 as IdeationPreview,
   IdeationSession,
 } from "@ruwen/pipeline";
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { request } from "../client.ts";
 import { allIdeationPages, createIdeationClient } from "../ideation/client.ts";
 
@@ -56,11 +56,69 @@ export async function loadIdeationDecisions(projectId: string) {
   }
 }
 
-/** Read-only aggregation shared by the project bar and the later overview block. */
+type Visibility = Pick<
+  EventTarget,
+  "addEventListener" | "removeEventListener"
+> & {
+  readonly visibilityState: DocumentVisibilityState;
+};
+type BrowserClock = Pick<
+  EventTarget,
+  "addEventListener" | "removeEventListener"
+> & {
+  setInterval: (callback: () => void, delayMs: number) => number;
+  clearInterval: (timer: number) => void;
+};
+
+/** Keep one foreground timer, with an immediate refresh when the page becomes visible. */
+export function observeDecisionPolling(
+  screen: Visibility,
+  browser: BrowserClock,
+  refresh: () => void,
+  isReading: () => boolean,
+) {
+  let timer: number | undefined;
+  const clear = () => {
+    if (timer === undefined) return;
+    browser.clearInterval(timer);
+    timer = undefined;
+  };
+  const refreshIfIdle = () => {
+    if (screen.visibilityState === "visible" && !isReading()) refresh();
+  };
+  const schedule = () => {
+    timer = browser.setInterval(refreshIfIdle, 60_000);
+  };
+  const visibilityChanged = () => {
+    if (screen.visibilityState !== "visible") {
+      clear();
+    } else if (timer === undefined) {
+      refresh();
+      schedule();
+    }
+  };
+  if (screen.visibilityState === "visible") schedule();
+  screen.addEventListener("visibilitychange", visibilityChanged);
+  browser.addEventListener("focus", refreshIfIdle);
+  return () => {
+    clear();
+    screen.removeEventListener("visibilitychange", visibilityChanged);
+    browser.removeEventListener("focus", refreshIfIdle);
+  };
+}
+
+/** Read-only aggregation shared by the project bar and the overview. */
 export function useProjectDecisions(projectId: string) {
-  const [revision, refresh] = useReducer((value: number) => value + 1, 0);
+  const [revision, requestRefresh] = useReducer(
+    (value: number) => value + 1,
+    0,
+  );
   const [loading, setLoading] = useState(true);
   const reading = useRef(true);
+  const refresh = useCallback(() => {
+    reading.current = true;
+    requestRefresh();
+  }, []);
   const [snapshot, setSnapshot] = useState<{
     projectId: string;
     project: DecisionProject | undefined;
@@ -103,19 +161,11 @@ export function useProjectDecisions(projectId: string) {
       active = false;
     };
   }, [projectId, revision]);
-  useEffect(() => {
-    const visibleRefresh = () => {
-      if (document.visibilityState === "visible" && !reading.current) refresh();
-    };
-    const interval = window.setInterval(visibleRefresh, 15000);
-    window.addEventListener("focus", visibleRefresh);
-    document.addEventListener("visibilitychange", visibleRefresh);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", visibleRefresh);
-      document.removeEventListener("visibilitychange", visibleRefresh);
-    };
-  }, []);
+  useEffect(
+    () =>
+      observeDecisionPolling(document, window, refresh, () => reading.current),
+    [refresh],
+  );
   const project =
     snapshot.projectId === projectId ? snapshot.project : undefined;
   const previews = snapshot.projectId === projectId ? snapshot.previews : [];
@@ -127,5 +177,6 @@ export function useProjectDecisions(projectId: string) {
     count: chapterPending + previews.length,
     loading: loading || snapshot.projectId !== projectId,
     refresh,
+    revision,
   };
 }

@@ -34,6 +34,7 @@ test("global frame: real project decisions, every navigation mode, persistent ba
     0,
   );
   await captureFrame(page, "overview-no-decisions");
+  await page.clock.install();
   await projectNav.getByRole("link", { name: "故事构思", exact: true }).click();
   await createIdeationSession(page, "驿站的故事");
   await page
@@ -43,6 +44,11 @@ test("global frame: real project decisions, every navigation mode, persistent ba
   await expect(
     page.getByRole("region", { name: "构思预览工作台", exact: true }),
   ).toContainText("创意通讯门");
+  await expect(page.locator(".project-bar")).toHaveAttribute(
+    "aria-busy",
+    "false",
+  );
+  await page.clock.runFor(60_000);
   await expect(page.locator(".decision-chip .badge-count")).toHaveText("1");
   await expect(
     projectNav.getByRole("link", { name: "故事构思", exact: true }),
@@ -52,7 +58,7 @@ test("global frame: real project decisions, every navigation mode, persistent ba
   await expect(page).toHaveURL(new RegExp(`${id}#decisions$`));
   await expect(page.locator("#decisions")).toBeInViewport();
   await expect(
-    page.getByRole("heading", { name: "项目资料已就绪", exact: true }),
+    page.getByText("写作前的资料已就绪", { exact: true }),
   ).toBeVisible();
   await expect(page.locator(".decision-chip .badge-count")).toHaveText("1");
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -259,7 +265,7 @@ test("slow decision reads finish before polling starts another aggregation", asy
   // Development Strict Mode can start two initial effects. Measure subsequent polls.
   await page.clock.runFor(1000);
   const initialReads = reads;
-  await page.clock.runFor(45000);
+  await page.clock.runFor(130000);
   expect(reads).toBe(initialReads);
   release();
   await expect(page.locator(".project-bar")).toHaveAttribute(
@@ -267,7 +273,7 @@ test("slow decision reads finish before polling starts another aggregation", asy
     "false",
   );
   const completedReads = reads;
-  await page.clock.runFor(15000);
+  await page.clock.runFor(60000);
   await expect.poll(() => reads).toBeGreaterThan(completedReads);
 });
 

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   memoryCopy as c,
   chapterCopy,
+  cleanupCopy,
   diffCopy,
   runStatus,
   runStatusTone,
@@ -303,12 +304,14 @@ export function MemoryReview({
         canDecide && (
           <footer className="chapter-dock memory-dock">
             <div>
-              {items.length > 0 && (
-                <>
-                  <strong>{c.question(items.length)}</strong>
-                  <small>{c.atomic}</small>
-                </>
-              )}
+              <strong>
+                {items.length
+                  ? c.question(items.length)
+                  : cleanupCopy.emptyMemoryQuestion(chapter)}
+              </strong>
+              <small>
+                {items.length ? c.atomic : cleanupCopy.emptyMemoryHint}
+              </small>
             </div>
             {items.length > 0 && (
               <ul className="chapter-read-conditions">

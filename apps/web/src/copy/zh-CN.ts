@@ -1270,3 +1270,8 @@ export const accountCopy = {
   alreadyPaid: "这笔测试支付已经完成。",
   close: "关闭",
 };
+
+export const cleanupCopy = {
+  emptyMemoryQuestion: (chapter: string) => `确认${chapter}无需资料变更？`,
+  emptyMemoryHint: "确认后结束本章流程，项目资料保持原样。",
+} as const;

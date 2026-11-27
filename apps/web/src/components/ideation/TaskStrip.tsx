@@ -3,10 +3,12 @@ import type { IdeationPreviewId, IdeationTask } from "@ruwen/pipeline";
 import { useEffect, useRef, useState } from "react";
 import {
   ideationCopy as c,
-  errorCopy,
   roleName,
+  statusCopy,
   taskStatus,
 } from "../../copy/zh-CN.ts";
+import { displayError } from "../../ui/error-text.ts";
+import { InlineNotice } from "../../ui/InlineNotice.tsx";
 
 export function TaskStrip({
   tasks,
@@ -69,7 +71,13 @@ export function TaskStrip({
         <article className="ideation-task-popover">
           <strong>{roleName[selected.role]}</strong>
           <span>{taskStatus[selected.status]}</span>
-          {selected.error && <p>{errorCopy[selected.error.code]}</p>}
+          {selected.error && (
+            <InlineNotice
+              message={displayError(selected.error.code)}
+              onAction={() => setOpen(undefined)}
+              actionLabel={statusCopy.dismiss}
+            />
+          )}
           <div className="decision-actions">
             {previews.map((id, index) => (
               <button

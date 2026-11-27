@@ -1,6 +1,12 @@
 "use client";
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { chapterCopy as c, errorCopy, overviewCopy } from "../../copy/zh-CN.ts";
+import {
+  chapterCopy as c,
+  overviewCopy,
+  statusCopy,
+} from "../../copy/zh-CN.ts";
+import { displayError } from "../../ui/error-text.ts";
+import { InlineNotice } from "../../ui/InlineNotice.tsx";
 import { ApiError, post } from "../client.ts";
 import { useApi } from "../useApi.ts";
 import { runHref } from "./overview-data.ts";
@@ -15,9 +21,11 @@ export function OverviewStartChapter({
   close: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const { data, error: settingsError } = useApi<{ scenarios: string[] }>(
-    "/api/settings",
-  );
+  const {
+    data,
+    error: settingsError,
+    refresh,
+  } = useApi<{ scenarios: string[] }>("/api/settings");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const scenarios = data?.scenarios ?? [];
@@ -88,25 +96,33 @@ export function OverviewStartChapter({
             </select>
           </label>
         )}
+        {settingsError && (
+          <InlineNotice
+            message={statusCopy.settingsFailed}
+            onAction={() => void refresh()}
+          />
+        )}
         {error && (
-          <div className="chapter-problem" role="alert">
-            <p>
-              {error === "FAILED_PRECONDITION"
+          <InlineNotice
+            message={
+              error === "FAILED_PRECONDITION"
                 ? c.notReady
                 : error === "INSUFFICIENT_CREDITS"
                   ? c.insufficient
-                  : (errorCopy[error as keyof typeof errorCopy] ??
-                    errorCopy.INTERNAL_ERROR)}
-            </p>
-            {error === "FAILED_PRECONDITION" && (
-              <a href={`${root}/ideation?compile=1`}>
-                {overviewCopy.actions.compile}
-              </a>
-            )}
-            {error === "INSUFFICIENT_CREDITS" && (
-              <a href="/account">{c.account}</a>
-            )}
-          </div>
+                  : displayError(error)
+            }
+            action={
+              error === "FAILED_PRECONDITION" ? (
+                <a href={`${root}/ideation?compile=1`}>
+                  {overviewCopy.actions.compile}
+                </a>
+              ) : error === "INSUFFICIENT_CREDITS" ? (
+                <a href="/account">{c.account}</a>
+              ) : undefined
+            }
+            onAction={() => setError("")}
+            actionLabel={statusCopy.dismiss}
+          />
         )}
         <div className="ui-dialog-actions">
           <button

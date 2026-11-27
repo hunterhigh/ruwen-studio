@@ -1,8 +1,9 @@
 "use client";
 import { usePathname } from "next/navigation.js";
 import { type ReactNode, useRef, useState } from "react";
-import { frameCopy } from "../copy/zh-CN.ts";
+import { frameCopy, statusCopy } from "../copy/zh-CN.ts";
 import { useConfirm } from "../ui/ConfirmDialog.tsx";
+import { InlineNotice } from "../ui/InlineNotice.tsx";
 import { DraftLeaveContext } from "./chapter/draft-navigation.ts";
 import { post } from "./client.ts";
 import { PreviewBanner } from "./PreviewBanner.tsx";
@@ -87,7 +88,13 @@ export function Shell({
             >
               {signingOut ? frameCopy.signingOut : frameCopy.signOut}
             </button>
-            {error && <p role="alert">{error}</p>}
+            {error && (
+              <InlineNotice
+                message={error}
+                onAction={() => setError("")}
+                actionLabel={statusCopy.dismiss}
+              />
+            )}
           </div>
         </aside>
         <DraftLeaveContext.Provider value={leaveDraft}>

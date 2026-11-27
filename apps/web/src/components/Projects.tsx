@@ -7,8 +7,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { shelfCopy as copy } from "../copy/zh-CN.ts";
+import { shelfCopy as copy, statusCopy } from "../copy/zh-CN.ts";
 import { Button } from "../ui/Button.tsx";
+import { InlineNotice } from "../ui/InlineNotice.tsx";
+import { PageSkeleton } from "../ui/Skeleton.tsx";
 import { BookCover } from "./BookCover.tsx";
 import { ApiError, post, request } from "./client.ts";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
@@ -82,8 +84,9 @@ function CreateProjectDialog({ onDismiss }: { onDismiss: () => void }) {
       window.location.assign(`/projects/${id}`);
     } catch (error) {
       setError(
-        error instanceof ApiError && error.message
-          ? error.message
+        error instanceof ApiError &&
+          error.message === statusCopy.projectTitleInvalid
+          ? statusCopy.projectTitleInvalid
           : copy.createError,
       );
       setBusy(false);
@@ -120,9 +123,11 @@ function CreateProjectDialog({ onDismiss }: { onDismiss: () => void }) {
           </label>
         </fieldset>
         {error && (
-          <p className="shelf-dialog-error" role="alert">
-            <SafeMarkdown plain inline content={error} />
-          </p>
+          <InlineNotice
+            message={error}
+            actionLabel={statusCopy.adjust}
+            onAction={() => document.getElementById(titleId)?.focus()}
+          />
         )}
         <div className="ui-dialog-actions">
           <Button variant="ghost" disabled={busy} onClick={onDismiss}>
@@ -138,7 +143,11 @@ function CreateProjectDialog({ onDismiss }: { onDismiss: () => void }) {
 }
 
 export function Projects() {
-  const { data, error: loadError } = useApi<Project[]>("/api/projects");
+  const {
+    data,
+    error: loadError,
+    refresh,
+  } = useApi<Project[]>("/api/projects");
   const [query, setQuery] = useState("");
   const [pendingOnly, setPendingOnly] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -173,7 +182,7 @@ export function Projects() {
       setZip({
         name: file.name,
         error:
-          typeof message === "string" && message.trim()
+          typeof message === "string" && /\p{Script=Han}/u.test(message)
             ? message
             : copy.importError,
       });
@@ -219,11 +228,12 @@ export function Projects() {
       </header>
 
       {loadError && (
-        <div role="alert" className="error">
-          <SafeMarkdown plain content={loadError} />
-        </div>
+        <InlineNotice
+          message={statusCopy.shelfFailed}
+          onAction={() => void refresh()}
+        />
       )}
-      {!data && !loadError && <output>{copy.loading}</output>}
+      {!data && !loadError && <PageSkeleton page="shelf" />}
 
       {firstPending && (
         <section className="shelf-pending">

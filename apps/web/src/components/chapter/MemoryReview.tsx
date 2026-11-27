@@ -8,6 +8,7 @@ import {
   runStatus,
   runStatusTone,
 } from "../../copy/zh-CN.ts";
+import { InlineNotice } from "../../ui/InlineNotice.tsx";
 import { SealButton } from "../../ui/SealButton.tsx";
 import { StatusBadge } from "../../ui/StatusBadge.tsx";
 import { TextDiff } from "../diff/TextDiff.tsx";
@@ -73,6 +74,8 @@ export function MemoryReview({
   readOnly,
   busy,
   error,
+  onErrorAction,
+  errorActionLabel,
   onApprove,
   onAbandon,
 }: {
@@ -83,6 +86,8 @@ export function MemoryReview({
   readOnly: boolean;
   busy: boolean;
   error: string;
+  onErrorAction: () => void;
+  errorActionLabel: string;
   onApprove: () => void;
   onAbandon: () => void;
 }) {
@@ -173,9 +178,11 @@ export function MemoryReview({
         </a>
       </header>
       {error && (
-        <p className="chapter-problem" role="alert">
-          {error}
-        </p>
+        <InlineNotice
+          message={error}
+          onAction={onErrorAction}
+          actionLabel={errorActionLabel}
+        />
       )}
       {pending && activeReading.updated && (
         <output className="chapter-info memory-update">{c.updated}</output>

@@ -7,7 +7,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { chapterCopy as c, errorCopy, runStatus } from "../copy/zh-CN.ts";
+import { chapterCopy as c, runStatus, statusCopy } from "../copy/zh-CN.ts";
+import { displayError } from "../ui/error-text.ts";
+import { InlineNotice } from "../ui/InlineNotice.tsx";
+import { PageSkeleton } from "../ui/Skeleton.tsx";
 import { DraftLeaveContext } from "./chapter/draft-navigation.ts";
 import { RunDesk } from "./chapter/RunDesk.tsx";
 import { chapterRuns, type RunSummary } from "./chapter/runs.ts";
@@ -139,9 +142,16 @@ export function ChapterStudio({
   return (
     <main className="chapter-page chapter-redesign">
       {error && (
-        <p className="chapter-problem" role="alert">
-          {errorCopy.INTERNAL_ERROR}
-        </p>
+        <InlineNotice
+          message={statusCopy.runsFailed}
+          onAction={() => void refresh()}
+        />
+      )}
+      {settings.error && data && (
+        <InlineNotice
+          message={statusCopy.settingsFailed}
+          onAction={() => void settings.refresh()}
+        />
       )}
       {active ? (
         <RunDesk
@@ -162,9 +172,9 @@ export function ChapterStudio({
           <p>{c.emptyGuide}</p>
           {newButton}
         </section>
-      ) : (
-        <p>{c.loading}</p>
-      )}
+      ) : !error ? (
+        <PageSkeleton page={memoryView ? "memory" : "chapter"} />
+      ) : null}
       {newRun && (
         <StartChapter
           projectId={projectId}
@@ -272,22 +282,24 @@ function StartChapter({
           </label>
         )}
         {error && (
-          <div className="chapter-problem" role="alert">
-            <p>
-              {error === "FAILED_PRECONDITION"
+          <InlineNotice
+            message={
+              error === "FAILED_PRECONDITION"
                 ? c.notReady
                 : error === "INSUFFICIENT_CREDITS"
                   ? c.insufficient
-                  : (errorCopy[error as keyof typeof errorCopy] ??
-                    errorCopy.INTERNAL_ERROR)}
-            </p>
-            {error === "FAILED_PRECONDITION" && (
-              <a href={`/projects/${projectId}`}>{c.overview}</a>
-            )}
-            {error === "INSUFFICIENT_CREDITS" && (
-              <a href="/account">{c.account}</a>
-            )}
-          </div>
+                  : displayError(error)
+            }
+            action={
+              error === "FAILED_PRECONDITION" ? (
+                <a href={`/projects/${projectId}`}>{c.overview}</a>
+              ) : error === "INSUFFICIENT_CREDITS" ? (
+                <a href="/account">{c.account}</a>
+              ) : undefined
+            }
+            onAction={() => setError(undefined)}
+            actionLabel={statusCopy.dismiss}
+          />
         )}
         <div className="ui-dialog-actions">
           <button

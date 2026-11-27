@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { cleanupCopy, filesCopy as copy } from "../copy/zh-CN.ts";
+import { cleanupCopy, filesCopy as copy, statusCopy } from "../copy/zh-CN.ts";
+import { InlineNotice } from "../ui/InlineNotice.tsx";
+import { PageSkeleton } from "../ui/Skeleton.tsx";
 import { request } from "./client.ts";
 import {
   FileDocument,
@@ -24,7 +26,7 @@ import { useApi } from "./useApi.ts";
 type Selection =
   | { path: string; status: "loading" }
   | { path: string; status: "loaded"; file: ProjectFile }
-  | { path: string; status: "failed"; message: string };
+  | { path: string; status: "failed" };
 
 function FileHeader({
   file,
@@ -78,7 +80,7 @@ function FileHeader({
 
 function ProjectFiles({ id }: { id: string }) {
   const base = `/api/projects/${id}/files`;
-  const { data, error: loadError } = useApi<{ paths: string[] }>(base);
+  const { data, error: loadError, refresh } = useApi<{ paths: string[] }>(base);
   const registryFile = useApi<ProjectFile>(fileUrl(base, registryPath));
   const [selection, setSelection] = useState<Selection>();
   const pending = useRef<AbortController>(null);
@@ -89,7 +91,7 @@ function ProjectFiles({ id }: { id: string }) {
   const registry = useMemo(() => parseRegistry(registryText), [registryText]);
   const metadataMessage = registry
     ? copy.unregistered
-    : registryText !== undefined || registryFile.error
+    : registryText !== undefined
       ? copy.registryUnavailable
       : "";
 
@@ -110,14 +112,8 @@ function ProjectFiles({ id }: { id: string }) {
             });
       if (!controller.signal.aborted)
         setSelection({ path, status: "loaded", file: received });
-    } catch (error) {
-      if (!controller.signal.aborted) {
-        setSelection({
-          path,
-          status: "failed",
-          message: error instanceof Error ? error.message : copy.loadFileError,
-        });
-      }
+    } catch {
+      if (!controller.signal.aborted) setSelection({ path, status: "failed" });
     }
   }
 
@@ -129,56 +125,74 @@ function ProjectFiles({ id }: { id: string }) {
           <p>{copy.readOnly}</p>
         </div>
       </header>
-      <div className="file-browser files-browser">
-        <FileTree
-          paths={data?.paths}
-          loadError={loadError}
-          registry={registry}
-          selected={selection?.path}
-          onSelect={(path) => void open(path)}
+      {loadError && (
+        <InlineNotice
+          message={statusCopy.filesFailed}
+          onAction={() => void refresh()}
         />
-        <article
-          ref={reader}
-          className="file-content files-reader"
-          aria-label={copy.reader}
-          aria-busy={selection?.status === "loading"}
-        >
-          {!selection && <p className="files-empty">{copy.emptySelection}</p>}
-          {selection?.status === "loading" && (
-            <output>{copy.loadingFile}</output>
-          )}
-          {selection?.status === "failed" && (
-            <p role="alert">
-              <SafeMarkdown plain inline content={selection.message} />
-            </p>
-          )}
-          {file && (
-            <div className="files-document" key={file.path}>
-              <FileHeader
-                file={file}
-                resource={registry?.get(file.path)}
-                metadataMessage={
-                  isSystemRecord(file.path)
-                    ? cleanupCopy.systemRecord
-                    : metadataMessage
-                }
+      )}
+      {!data && !loadError && <PageSkeleton page="files" />}
+      {data && (
+        <div className="file-browser files-browser">
+          <FileTree
+            paths={data.paths}
+            registry={registry}
+            selected={selection?.path}
+            onSelect={(path) => void open(path)}
+          />
+          <article
+            ref={reader}
+            className="file-content files-reader"
+            aria-label={copy.reader}
+            aria-busy={selection?.status === "loading"}
+          >
+            {!selection && <p className="files-empty">{copy.emptySelection}</p>}
+            {selection?.status === "loading" && (
+              <PageSkeleton key={selection.path} page="text" />
+            )}
+            {selection?.status === "failed" && (
+              <InlineNotice
+                message={copy.loadFileError}
+                onAction={() => void open(selection.path)}
               />
-              <FileDocument file={file} registry={registry} />
-              <details className="files-technical">
-                <summary>{copy.technical}</summary>
-                <dl>
-                  <dt>{copy.sha256}</dt>
-                  <dd>
-                    <code>
-                      <SafeMarkdown plain inline content={file.sha256} />
-                    </code>
-                  </dd>
-                </dl>
-              </details>
-            </div>
-          )}
-        </article>
-      </div>
+            )}
+            {file && (
+              <div className="files-document" key={file.path}>
+                <FileHeader
+                  file={file}
+                  resource={registry?.get(file.path)}
+                  metadataMessage={
+                    isSystemRecord(file.path)
+                      ? cleanupCopy.systemRecord
+                      : metadataMessage
+                  }
+                />
+                {!registry &&
+                  registryFile.error &&
+                  file.path !== registryPath &&
+                  !isSystemRecord(file.path) && (
+                    <InlineNotice
+                      message={statusCopy.registryFailed}
+                      onAction={() => void registryFile.refresh()}
+                    />
+                  )}
+                <FileDocument file={file} registry={registry} />
+                <details className="files-technical">
+                  <summary>{copy.technical}</summary>
+                  <dl>
+                    <dt>{copy.sha256}</dt>
+                    <dd>
+                      <code>
+                        <SafeMarkdown plain inline content={file.sha256} />
+                      </code>
+                    </dd>
+                  </dl>
+                </details>
+              </div>
+            )}
+          </article>
+        </div>
+      )}
     </main>
   );
 }

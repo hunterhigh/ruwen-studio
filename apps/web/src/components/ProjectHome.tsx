@@ -86,7 +86,7 @@ export function ProjectHome({ id }: { id: string }) {
                           className="overview-step-number"
                           aria-hidden="true"
                         >
-                          {step}
+                          {state === "done" ? "✓" : step}
                         </span>
                         <div>
                           <h3>{title}</h3>

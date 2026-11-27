@@ -186,7 +186,15 @@ test("overview links a real chapter from candidate approval through memory submi
   await expect(
     page.getByRole("region", { name: c.chapters, exact: true }),
   ).toContainText("等你阅读与批准");
+  await expect(page.locator(".overview-step-number")).toHaveText([
+    "✓",
+    "✓",
+    "✓",
+    "4",
+    "5",
+  ]);
   await capture(page, "candidate-approval");
+  await captureCleanup(page, "10");
   await candidate.click();
   await readCandidate(page);
   const candidateRefresh = decisionRefreshAfter(page, "approve-candidate");

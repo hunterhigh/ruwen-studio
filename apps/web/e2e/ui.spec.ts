@@ -1,13 +1,63 @@
-import { spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
+import {
+  previewConfiguration,
+  productionBrowserTests,
+} from "../../../config/preview.ts";
 import { captureRedesign } from "./helpers.ts";
+
+let galleryServer: ChildProcess | undefined;
+let galleryUrl = "/dev/ui";
+
+test.beforeAll(async () => {
+  if (!productionBrowserTests()) return;
+  // The production acceptance test independently verifies that this route is unavailable there.
+  const port = previewConfiguration().productionPort + 1;
+  const origin = `https://localhost:${port}`;
+  galleryUrl = origin + galleryUrl;
+  galleryServer = spawn(
+    process.execPath,
+    ["apps/web/scripts/server.ts", "--dev"],
+    {
+      cwd: fileURLToPath(new URL("../../../", import.meta.url)),
+      env: { ...process.env, PORT: String(port), RUWEN_SKIP_ENV_FILE: "1" },
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  let startupError = "";
+  galleryServer.stderr?.on("data", (message: Buffer) => {
+    startupError = (startupError + message.toString()).slice(-1200);
+  });
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("Development gallery did not start")),
+      30000,
+    );
+    galleryServer?.stdout?.on("data", (message: Buffer) => {
+      if (message.toString().includes(origin)) {
+        clearTimeout(timer);
+        resolve();
+      }
+    });
+    galleryServer?.once("exit", (code) => {
+      clearTimeout(timer);
+      reject(
+        new Error(`Development gallery exited with ${code}\n${startupError}`),
+      );
+    });
+  });
+});
+test.afterAll(() => {
+  galleryServer?.kill("SIGTERM");
+});
 
 test("development gallery: native focus, keyboard confirmation, toast expiry and recursive fields", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  const response = await page.goto("/dev/ui");
+  const response = await page.goto(galleryUrl);
   expect(response?.status()).toBe(200);
   await expect(
     page.getByRole("heading", { name: "设计组件预览", exact: true }),

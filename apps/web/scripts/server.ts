@@ -36,7 +36,7 @@ const port = Number(process.env.PORT ?? 3000),
     process.env.TLS_KEY_FILE ?? path.join(directory, "localhost-key.pem"),
   certFile =
     process.env.TLS_CERT_FILE ?? path.join(directory, "localhost-cert.pem");
-if (development) {
+if (!proxy && (development || process.argv.includes("--preview-tls"))) {
   await mkdir(directory, { recursive: true });
   try {
     await readFile(keyFile);

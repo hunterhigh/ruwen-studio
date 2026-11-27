@@ -22,6 +22,7 @@ try {
   if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
 }
 const preview = previewConfiguration();
+const production = process.argv.includes("--production");
 const port = String(preview.port);
 const environment: NodeJS.ProcessEnv = {
   ...process.env,
@@ -42,6 +43,7 @@ const environment: NodeJS.ProcessEnv = {
   PAYMENT_PROVIDER: "mock",
   NEXT_TELEMETRY_DISABLED: "1",
   ADMIN_EMAILS: process.env.ADMIN_EMAILS ?? "preview@ruwen.local",
+  ...(production && { NEXT_PUBLIC_RUWEN_PREVIEW_BANNER: "1" }),
 };
 delete environment.ANTHROPIC_API_KEY;
 const children: ChildProcess[] = [];
@@ -87,7 +89,8 @@ if (!running) {
   });
 }
 child("apps/worker/src/main.ts");
-child("apps/web/scripts/server.ts", ["--dev"]);
+if (production) child("apps/web/e2e/production-preview.ts", ["--preview-tls"]);
+else child("apps/web/scripts/server.ts", ["--dev"]);
 let stopping = false;
 const stop = () => {
   if (stopping) return;

@@ -1,0 +1,890 @@
+[
+  {
+    "file": "components/files/FileTree.tsx",
+    "text": "项目",
+    "count": 1,
+    "reason": "上游项目资料的实际一级目录名，用作树形分组查找键。"
+  },
+  {
+    "file": "components/files/FileTree.tsx",
+    "text": "人物",
+    "count": 1,
+    "reason": "上游项目资料的实际一级目录名，用作树形分组查找键。"
+  },
+  {
+    "file": "components/files/FileTree.tsx",
+    "text": "世界",
+    "count": 1,
+    "reason": "上游项目资料的实际一级目录名，用作树形分组查找键。"
+  },
+  {
+    "file": "components/files/FileTree.tsx",
+    "text": "故事",
+    "count": 1,
+    "reason": "上游项目资料的实际一级目录名，用作树形分组查找键。"
+  },
+  {
+    "file": "components/files/FileTree.tsx",
+    "text": "表现",
+    "count": 1,
+    "reason": "上游项目资料的实际一级目录名，用作树形分组查找键。"
+  },
+  {
+    "file": "components/files/FileTree.tsx",
+    "text": "研究",
+    "count": 1,
+    "reason": "上游项目资料的实际一级目录名，用作树形分组查找键。"
+  },
+  {
+    "file": "components/files/FileTree.tsx",
+    "text": "校验",
+    "count": 1,
+    "reason": "上游项目资料的实际一级目录名，用作树形分组查找键。"
+  },
+  {
+    "file": "components/files/FileTree.tsx",
+    "text": "治理",
+    "count": 1,
+    "reason": "上游项目资料的实际一级目录名，用作树形分组查找键。"
+  },
+  {
+    "file": "components/files/file-data.ts",
+    "text": "治理/资源注册表.json",
+    "count": 1,
+    "reason": "注册表路径或系统记录根目录，用于匹配项目文件与岗位读取规则。"
+  },
+  {
+    "file": "components/files/file-data.ts",
+    "text": "治理",
+    "count": 1,
+    "reason": "注册表路径或系统记录根目录，用于匹配项目文件与岗位读取规则。"
+  },
+  {
+    "file": "components/ideation/demo.ts",
+    "text": "北岸冬信",
+    "count": 1,
+    "reason": "固定的本地演示会话数据或演示资料路径，保留构思流程样例的数据形状。"
+  },
+  {
+    "file": "components/ideation/demo.ts",
+    "text": "渡河之前",
+    "count": 1,
+    "reason": "固定的本地演示会话数据或演示资料路径，保留构思流程样例的数据形状。"
+  },
+  {
+    "file": "components/ideation/demo.ts",
+    "text": "我们可以从北岸的来信开始。你想保留什么，又想把哪些选择留给人物？",
+    "count": 1,
+    "reason": "固定的本地演示会话数据或演示资料路径，保留构思流程样例的数据形状。"
+  },
+  {
+    "file": "components/ideation/demo.ts",
+    "text": "我会把固定事实和仍然开放的选择分开。请先阅读右侧的理解与干净委托，再决定是否交给下游。",
+    "count": 1,
+    "reason": "固定的本地演示会话数据或演示资料路径，保留构思流程样例的数据形状。"
+  },
+  {
+    "file": "components/ideation/demo.ts",
+    "text": "校验/隔离试写.md",
+    "count": 1,
+    "reason": "固定的本地演示会话数据或演示资料路径，保留构思流程样例的数据形状。"
+  },
+  {
+    "file": "components/ideation/demo.ts",
+    "text": "林砚把信翻到背面。纸上没有别的话。他用拇指压平折痕，才问驿卒：河边还有船吗？",
+    "count": 1,
+    "reason": "固定的本地演示会话数据或演示资料路径，保留构思流程样例的数据形状。"
+  },
+  {
+    "file": "components/ideation/demo.ts",
+    "text": "新的构思",
+    "count": 1,
+    "reason": "固定的本地演示会话数据或演示资料路径，保留构思流程样例的数据形状。"
+  },
+  {
+    "file": "components/ideation/demo.ts",
+    "text": "第",
+    "count": 1,
+    "reason": "固定的本地演示会话数据或演示资料路径，保留构思流程样例的数据形状。"
+  },
+  {
+    "file": "components/ideation/demo.ts",
+    "text": "章：河岸来信",
+    "count": 1,
+    "reason": "固定的本地演示会话数据或演示资料路径，保留构思流程样例的数据形状。"
+  },
+  {
+    "file": "components/ideation/demo.ts",
+    "text": "故事/章节情境/第",
+    "count": 1,
+    "reason": "固定的本地演示会话数据或演示资料路径，保留构思流程样例的数据形状。"
+  },
+  {
+    "file": "components/ideation/demo.ts",
+    "text": "章.md",
+    "count": 1,
+    "reason": "固定的本地演示会话数据或演示资料路径，保留构思流程样例的数据形状。"
+  },
+  {
+    "file": "components/ideation/demo.ts",
+    "text": "尚未完成的旧尝试。",
+    "count": 1,
+    "reason": "固定的本地演示会话数据或演示资料路径，保留构思流程样例的数据形状。"
+  },
+  {
+    "file": "components/ideation/demo.ts",
+    "text": "这部分属于平台内部设置，我没法提供。我们继续聊你的故事吧。",
+    "count": 1,
+    "reason": "固定的本地演示会话数据或演示资料路径，保留构思流程样例的数据形状。"
+  },
+  {
+    "file": "components/ideation/demo.ts",
+    "text": "更正后的思路：让渡河的决定留在人物手中。",
+    "count": 1,
+    "reason": "固定的本地演示会话数据或演示资料路径，保留构思流程样例的数据形状。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "北岸",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "抉择",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "林砚",
+    "count": 2,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "故事/当前态势.md",
+    "count": 3,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "世界/渡口制度.md",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "## 当前态势",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "北岸封冻，驿卒带来南岸的求援。林砚尚未决定是否渡河。",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "# 当前态势\n\n## 当前态势\n北岸封冻，驿卒未归。",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "# 当前态势\n\n## 当前态势\n北岸封冻，驿卒带来南岸的求援。林砚尚未决定是否渡河。",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "表现/抉择的动作.md",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "把选择留给渡河的人",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "补记北岸当前态势",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "封冻河道的渡运条件",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "用动作承载犹豫",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "第2章：河岸来信",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "· 修订",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "义务与自保互相牵扯，让人物自己承担选择。",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "河面封冻",
+    "count": 2,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "南岸有人等待援助",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "林砚是否渡河",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "他如何回应求援",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "示例只用于理解感受，不复制措辞或具体桥段。",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "让风险和牵挂同时成立",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "自保与援助的冲突",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "具体行动由构思师探索",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "只更新当前态势，不提前替人物决定渡河。",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "世界/渡口备忘.md",
+    "count": 2,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "# 渡口备忘\n\n封冻期暂停常规渡运。此为待批准的演示资料。",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "北岸进入封冻期。",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "渡船、绳索与冰况会怎样影响通行？",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "核对现有世界资料中的渡运制度。",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "区分已有证据与尚待调查的推断。",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "只提供条件与风险证据，不决定剧情、人物选择或项目声音。",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "现实通行条件可能与已设定制度不一致，需交还用户决定。",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "研究/渡运条件.md",
+    "count": 3,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "北岸封冻",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "封冻期渡运的限制",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "形成条件对照",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "不决定剧情",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "现有已授权世界资料",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "# 抉择的动作\n\n用动作承载犹豫，让人物在具体选择中承担代价。",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "校验/闭合审计.md",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "演示检查已闭合，仍需独立的非正典试写和阅读。",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "林砚在北岸等到驿卒。南岸的求援信被放在桌上，封冻的河面仍横在两人之间。林砚必须在日落前给出答复，选择的代价留在行动里。",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "驿卒抵达",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "求援信交到林砚手中",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "先抵达，后交信",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "故事/章节情境/第2章.md",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "封冻期渡运：条件与未确认事项",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "只提交待批准的证据候选，不替用户决定正典、剧情或声音。",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "components/ideation/fixtures.ts",
+    "text": "# 渡运条件\n\n## 已知\n封冻期暂停常规渡运。\n\n## 尚未确认\n冰况与绳索条件需进一步核对。",
+    "count": 1,
+    "reason": "构思演示的原创样本内容或示例路径，属于数据夹具。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "接口不存在。",
+    "count": 2,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "文件或请求正文过大。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "请求正文必须是有效的JSON对象。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "请填写有效内容。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "请提供有效的意见状态或评价。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "请提供候选稿正文，或撤销、恢复的意见编号。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "请提供有效的起止日期。",
+    "count": 2,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "请先登录。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "运行不存在。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "原版本不可用，请核对历史记录。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "连接已结束，请刷新查看已保存结果。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "支付通知验证失败。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "请填写有效邮箱。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "暂不支持此邮箱服务，请使用常用邮箱。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "读者",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "资源不存在。",
+    "count": 2,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "只接受每日点数上限。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "导入项目",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "导入资料的项目身份不一致。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "文件不存在。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "章节号需要1–4位数字。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "模拟场景仅在本地预览中使用。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "更新意见过于频繁，请稍后再试。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "意见不存在。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "版本读取过于频繁，请稍后再试。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "候选版本不存在。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "保存过于频繁，请稍后再试。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "请提供候选稿哈希和正文。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "核验请求过于频繁，请稍后再试。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "请提供待核验的候选稿哈希。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "当前没有等待退回的候选稿，请刷新核对状态。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "运行尚未生成待批准内容，请稍后查看。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "当前运行不在等待这项批准，请刷新核对状态。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "需要明确批准当前预览。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "内容已改变，请重新阅读后批准。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "测试支付尚未开放，真实收费保持关闭。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "结账参数不被允许。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "需要明确确认已完成人工复核。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "请明确确认核对方式和理由。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "开始日期不能晚于结束日期。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/api.ts",
+    "text": "操作未完成，请刷新核对当前状态后重试。",
+    "count": 1,
+    "reason": "现有 API 兼容字段、错误消息或既有数据默认值，保持服务端协议与持久化语义。"
+  },
+  {
+    "file": "server/auth-request.ts",
+    "text": "登录请求未完成。",
+    "count": 1,
+    "reason": "登录错误的服务端响应契约，按既有客户端映射保留。"
+  },
+  {
+    "file": "server/auth.ts",
+    "text": "暂不支持此邮箱服务，请使用常用邮箱。",
+    "count": 1,
+    "reason": "服务端鉴权错误、邮件的既有模板文字或认证服务名称，前端改版不改邮件与认证协议。"
+  },
+  {
+    "file": "server/auth.ts",
+    "text": "如文工作室",
+    "count": 1,
+    "reason": "服务端鉴权错误、邮件的既有模板文字或认证服务名称，前端改版不改邮件与认证协议。"
+  },
+  {
+    "file": "server/auth.ts",
+    "text": "注册需要有效的邀请码。",
+    "count": 1,
+    "reason": "服务端鉴权错误、邮件的既有模板文字或认证服务名称，前端改版不改邮件与认证协议。"
+  },
+  {
+    "file": "server/auth.ts",
+    "text": "邮件服务尚未配置",
+    "count": 1,
+    "reason": "服务端鉴权错误、邮件的既有模板文字或认证服务名称，前端改版不改邮件与认证协议。"
+  },
+  {
+    "file": "server/auth.ts",
+    "text": "如文工作室 <noreply@localhost>",
+    "count": 1,
+    "reason": "服务端鉴权错误、邮件的既有模板文字或认证服务名称，前端改版不改邮件与认证协议。"
+  },
+  {
+    "file": "server/auth.ts",
+    "text": "登录如文工作室",
+    "count": 1,
+    "reason": "服务端鉴权错误、邮件的既有模板文字或认证服务名称，前端改版不改邮件与认证协议。"
+  },
+  {
+    "file": "server/auth.ts",
+    "text": "请打开此链接登录，有效期",
+    "count": 1,
+    "reason": "服务端鉴权错误、邮件的既有模板文字或认证服务名称，前端改版不改邮件与认证协议。"
+  },
+  {
+    "file": "server/auth.ts",
+    "text": "分钟：",
+    "count": 1,
+    "reason": "服务端鉴权错误、邮件的既有模板文字或认证服务名称，前端改版不改邮件与认证协议。"
+  },
+  {
+    "file": "server/auth.ts",
+    "text": "若非本人操作，请忽略。",
+    "count": 1,
+    "reason": "服务端鉴权错误、邮件的既有模板文字或认证服务名称，前端改版不改邮件与认证协议。"
+  },
+  {
+    "file": "server/auth.ts",
+    "text": "邀请码无效或已用完。",
+    "count": 1,
+    "reason": "服务端鉴权错误、邮件的既有模板文字或认证服务名称，前端改版不改邮件与认证协议。"
+  },
+  {
+    "file": "server/auth.ts",
+    "text": "资源不存在。",
+    "count": 1,
+    "reason": "服务端鉴权错误、邮件的既有模板文字或认证服务名称，前端改版不改邮件与认证协议。"
+  },
+  {
+    "file": "server/auth.ts",
+    "text": "登录邮件尚未到达或已过期。",
+    "count": 1,
+    "reason": "服务端鉴权错误、邮件的既有模板文字或认证服务名称，前端改版不改邮件与认证协议。"
+  },
+  {
+    "file": "server/ideation-api.ts",
+    "text": "构思操作未完成，请核对状态后重试。",
+    "count": 1,
+    "reason": "构思 API 的现有中文失败响应，前端另行映射面向用户的动作。"
+  },
+  {
+    "file": "server/ownership.ts",
+    "text": "资源不存在。",
+    "count": 9,
+    "reason": "租户归属失败的通用服务端响应，在全部资源类型间保持一致。"
+  },
+  {
+    "file": "server/security.ts",
+    "text": "请求来源不被允许，请从工作室页面重试。",
+    "count": 1,
+    "reason": "CSRF 与限流的现有服务端失败响应，保持原有客户端契约。"
+  },
+  {
+    "file": "server/security.ts",
+    "text": "请求校验已失效，请刷新页面后重试。",
+    "count": 1,
+    "reason": "CSRF 与限流的现有服务端失败响应，保持原有客户端契约。"
+  },
+  {
+    "file": "server/security.ts",
+    "text": "登录请求过多，请稍后再试。",
+    "count": 1,
+    "reason": "CSRF 与限流的现有服务端失败响应，保持原有客户端契约。"
+  },
+  {
+    "file": "server/verbatim-targets.ts",
+    "text": "项目/",
+    "count": 1,
+    "reason": "上游项目的实际资料目录或受保护的文件路径，必须逐字匹配来判断逐字写入资格。"
+  },
+  {
+    "file": "server/verbatim-targets.ts",
+    "text": "治理/",
+    "count": 1,
+    "reason": "上游项目的实际资料目录或受保护的文件路径，必须逐字匹配来判断逐字写入资格。"
+  },
+  {
+    "file": "server/verbatim-targets.ts",
+    "text": "人物/",
+    "count": 1,
+    "reason": "上游项目的实际资料目录或受保护的文件路径，必须逐字匹配来判断逐字写入资格。"
+  },
+  {
+    "file": "server/verbatim-targets.ts",
+    "text": "世界/",
+    "count": 1,
+    "reason": "上游项目的实际资料目录或受保护的文件路径，必须逐字匹配来判断逐字写入资格。"
+  },
+  {
+    "file": "server/verbatim-targets.ts",
+    "text": "故事/",
+    "count": 1,
+    "reason": "上游项目的实际资料目录或受保护的文件路径，必须逐字匹配来判断逐字写入资格。"
+  },
+  {
+    "file": "server/verbatim-targets.ts",
+    "text": "研究/",
+    "count": 1,
+    "reason": "上游项目的实际资料目录或受保护的文件路径，必须逐字匹配来判断逐字写入资格。"
+  },
+  {
+    "file": "server/verbatim-targets.ts",
+    "text": "校验/",
+    "count": 1,
+    "reason": "上游项目的实际资料目录或受保护的文件路径，必须逐字匹配来判断逐字写入资格。"
+  },
+  {
+    "file": "server/verbatim-targets.ts",
+    "text": "表现/",
+    "count": 1,
+    "reason": "上游项目的实际资料目录或受保护的文件路径，必须逐字匹配来判断逐字写入资格。"
+  },
+  {
+    "file": "server/verbatim-targets.ts",
+    "text": "治理/审批/",
+    "count": 1,
+    "reason": "上游项目的实际资料目录或受保护的文件路径，必须逐字匹配来判断逐字写入资格。"
+  },
+  {
+    "file": "server/verbatim-targets.ts",
+    "text": "治理/交接/",
+    "count": 1,
+    "reason": "上游项目的实际资料目录或受保护的文件路径，必须逐字匹配来判断逐字写入资格。"
+  },
+  {
+    "file": "server/verbatim-targets.ts",
+    "text": "治理/构思决定/",
+    "count": 1,
+    "reason": "上游项目的实际资料目录或受保护的文件路径，必须逐字匹配来判断逐字写入资格。"
+  },
+  {
+    "file": "server/verbatim-targets.ts",
+    "text": "治理/资源注册表.json",
+    "count": 1,
+    "reason": "上游项目的实际资料目录或受保护的文件路径，必须逐字匹配来判断逐字写入资格。"
+  },
+  {
+    "file": "server/verbatim-targets.ts",
+    "text": "治理/审计账本.jsonl",
+    "count": 1,
+    "reason": "上游项目的实际资料目录或受保护的文件路径，必须逐字匹配来判断逐字写入资格。"
+  },
+  {
+    "file": "server/verbatim-targets.ts",
+    "text": "治理/文学问题账本.jsonl",
+    "count": 1,
+    "reason": "上游项目的实际资料目录或受保护的文件路径，必须逐字匹配来判断逐字写入资格。"
+  }
+]

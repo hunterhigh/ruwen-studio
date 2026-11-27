@@ -1,7 +1,11 @@
 import { defineConfig } from "@playwright/test";
-import { previewConfiguration } from "./config/preview.ts";
+import {
+  previewConfiguration,
+  productionBrowserTests,
+} from "./config/preview.ts";
 
 const preview = previewConfiguration();
+const production = productionBrowserTests();
 export default defineConfig({
   testDir: "./apps",
   testMatch: "**/e2e/**/*.spec.ts",
@@ -20,10 +24,12 @@ export default defineConfig({
       : {},
   },
   webServer: {
-    command: "node scripts/preview.ts",
+    command: production
+      ? "node scripts/preview.ts --production"
+      : "node scripts/preview.ts",
     url: `${preview.baseUrl}/api/health`,
     ignoreHTTPSErrors: true,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !production && !process.env.CI,
     timeout: 120000,
   },
 });

@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { previewConfiguration } from "../../../config/preview.ts";
+import { auditStudioPages } from "./frontend-acceptance.ts";
 import { signIn } from "./helpers.ts";
 import { captureFrame } from "./redesign-02.ts";
 import { captureSignIn } from "./sign-in-capture.ts";
@@ -11,6 +12,7 @@ import { captureSignIn } from "./sign-in-capture.ts";
 let server: ChildProcess;
 test.beforeAll(async () => {
   const root = fileURLToPath(new URL("../../../", import.meta.url));
+  const preview = previewConfiguration();
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     NODE_ENV: "production",
@@ -19,7 +21,10 @@ test.beforeAll(async () => {
     BETTER_AUTH_SECRET: (
       await readFile(`${root}/.local/preview-auth-secret`, "utf8")
     ).trim(),
-    DATABASE_URL: previewConfiguration().databaseUrl,
+    DATABASE_URL: preview.databaseUrl,
+    ADMIN_EMAILS: "preview@ruwen.local",
+    RUWEN_COOKIE_PREFIX:
+      preview.port === 3000 ? "ruwen" : `ruwen-preview-${preview.port}`,
     MODEL_MODE: "faux",
     LOCAL_PREVIEW: "0",
     RUWEN_SKIP_ENV_FILE: "1",
@@ -190,4 +195,11 @@ test("production frame keeps the preview banner disabled and emits no inline sty
   await expect(page.locator(".preview-banner")).toHaveCount(0);
   expect(await response?.text()).not.toMatch(/<[^>]+\sstyle=/i);
   await captureFrame(page, "shelf-production-banner-disabled");
+});
+
+test("all production surfaces keep SSR, type and CSP constraints", async ({
+  page,
+}) => {
+  test.setTimeout(180000);
+  await auditStudioPages(page);
 });

@@ -9,6 +9,9 @@ export function previewDataDirectory(
     throw new Error("Invalid preview instance");
   return path.join(root, ".local", env.PREVIEW_INSTANCE);
 }
+export function productionBrowserTests(env: NodeJS.ProcessEnv = process.env) {
+  return env.npm_lifecycle_event === "test:e2e" || env.CI === "true";
+}
 export function previewConfiguration(env: NodeJS.ProcessEnv = process.env) {
   const port = Number(env.PORT ?? 3000);
   const databasePort = Number(env.PREVIEW_DATABASE_PORT ?? 54329);

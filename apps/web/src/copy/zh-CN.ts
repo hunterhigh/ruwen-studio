@@ -1371,6 +1371,7 @@ export const signInCopy = {
 
 export const statusCopy = {
   genericError: "这次操作未完成，请稍后重试。",
+  requestFailed: "请求未完成，请重试。",
   slow: "加载得比平时慢，可以刷新重试",
   refresh: "刷新",
   retry: "重试",

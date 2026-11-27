@@ -1697,10 +1697,8 @@ textarea {
 .ideation-preview-list {
   display: grid;
   gap: 5px;
-  max-height: 230px;
-  overflow: auto;
 }
-.ideation-preview-list > button {
+.ideation-preview-entry > button {
   display: grid;
   gap: 3px;
   width: 100%;
@@ -1712,19 +1710,19 @@ textarea {
   color: var(--ink);
   overflow-wrap: anywhere;
 }
-.ideation-preview-list > button > span:first-child {
+.ideation-preview-entry > button > span:first-child {
   color: var(--seal-deep);
   font-size: 11px;
 }
-.ideation-preview-list > button small,
-.ideation-preview-list > button[data-handled="true"] {
+.ideation-preview-entry > button small,
+.ideation-preview-entry > button[data-handled="true"] {
   color: var(--ink-2);
 }
-.ideation-preview-list > button[data-handled="true"] > span:first-child {
+.ideation-preview-entry > button[data-handled="true"] > span:first-child {
   color: inherit;
 }
-.ideation-preview-list > button[aria-current="true"] {
-  border-color: var(--rule);
+.ideation-preview-entry > button[aria-current="true"] {
+  border-color: var(--seal-deep);
   background: var(--paper);
 }
 .ideation-compile {
@@ -4703,4 +4701,11 @@ textarea {
   padding-top: 4px;
   margin-top: 10px;
   border-top: 1px solid var(--rule-soft);
+}
+
+/* 块 11a 收尾待办 */
+.ideation-card-wrap:not([hidden]) {
+  margin: 4px 0 10px 8px;
+  padding-inline-start: 6px;
+  border-inline-start: 2px solid var(--seal-deep);
 }

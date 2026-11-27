@@ -30,6 +30,19 @@ test("task cancellation waits for the shared confirmation and preserves the orig
   try {
     await page.goto(`/projects/${projectId}/ideation`);
     const strip = page.getByRole("region", { name: c.tasks, exact: true });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const pills = strip.locator(".ideation-task-pills");
+    await expect(pills.getByRole("button").last()).toBeVisible();
+    await expect(pills).toHaveCSS("flex-wrap", "wrap");
+    const layout = await pills.evaluate((row) => ({
+      lines: new Set(
+        Array.from(row.children, (pill) => pill.getBoundingClientRect().top),
+      ).size,
+      fits: row.scrollWidth <= row.clientWidth,
+    }));
+    expect(layout.lines).toBeGreaterThan(1);
+    expect(layout.fits).toBe(true);
+    await captureCleanup(page, "04");
     await strip.getByRole("button").first().click();
     const card = strip.locator("article");
     await captureIdeation05(page, "task-popover");

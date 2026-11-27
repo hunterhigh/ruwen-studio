@@ -6,6 +6,7 @@ import {
   type ResourceEntry,
   statusLabel,
   statusTone,
+  systemFolders,
 } from "./file-data.ts";
 
 const folders = [
@@ -20,7 +21,6 @@ const folders = [
   "chapters",
   "authoring-ruwen-v5",
 ];
-const systemFolders = new Set(["治理", "authoring-ruwen-v5"]);
 
 export function FileTree({
   paths,

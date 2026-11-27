@@ -59,9 +59,33 @@ describe("chapter role input records", () => {
     );
     expect(view).toMatchObject({
       withheld: [
-        { label: "故事大纲", reason: "按如文规则，小说作者不看故事大纲。" },
-        { label: "其他受限材料", reason: "按岗位规则隔离这类材料。" },
-        { label: "检查表", reason: "按岗位规则隔离这类材料。" },
+        { labels: ["故事大纲"], reason: "按如文规则，小说作者不看故事大纲。" },
+        {
+          labels: ["其他受限材料", "检查表"],
+          reason: "按岗位规则隔离这类材料。",
+        },
+      ],
+    });
+  });
+
+  it("groups author exclusions once and deduplicates materials under the same rule", () => {
+    expect(
+      roleInputsView(
+        {
+          ...manifest,
+          withheld: [
+            ...manifest.withheld,
+            { category: "research", ruleRef: "I4" },
+          ],
+        },
+        true,
+      ),
+    ).toMatchObject({
+      withheld: [
+        {
+          labels: ["人物全档", "研究资料", "故事大纲"],
+          reason: "按如文规则，小说作者不看以下材料",
+        },
       ],
     });
   });

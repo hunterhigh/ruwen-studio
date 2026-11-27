@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import { Database } from "@ruwen/db";
 import { previewConfiguration } from "../../../config/preview.ts";
 import { captureAccount } from "./account-capture.ts";
+import { captureCleanup } from "./cleanup-11a.ts";
 import { createDemoFromShelf, signIn } from "./helpers.ts";
 
 test("account groups the recent usage by run and keeps billing details in points", async ({
@@ -82,7 +83,12 @@ test("account groups the recent usage by run and keeps billing details in points
     first.toISOString(),
   );
   await expect(table).not.toContainText(/第[二三23]章|失败/);
+  await expect(page.locator(".account-balance-value > small")).toHaveText([
+    "点",
+    "点",
+  ]);
   await captureAccount(page, "account");
+  await captureCleanup(page, "11");
 
   await completed.click();
   const roles = table.locator("details[open] .account-roles");
@@ -90,7 +96,11 @@ test("account groups the recent usage by run and keeps billing details in points
   await expect(roles.getByText("文学编辑", { exact: true })).toBeVisible();
   await expect(roles.getByText("1,245 点", { exact: true })).toBeVisible();
   await expect(roles.getByText("385 点", { exact: true })).toBeVisible();
+  await expect(completed.getByText("测试点数", { exact: true })).toHaveCount(1);
+  await expect(roles.getByText("测试点数", { exact: true })).toHaveCount(0);
+  await expect(pending.locator(".account-run-title small")).toHaveCount(0);
   await captureAccount(page, "role-usage");
+  await captureCleanup(page, "12");
 
   await completed.click();
   await pending.click();

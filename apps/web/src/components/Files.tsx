@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { filesCopy as copy } from "../copy/zh-CN.ts";
+import { cleanupCopy, filesCopy as copy } from "../copy/zh-CN.ts";
 import { request } from "./client.ts";
 import {
   FileDocument,
@@ -11,6 +11,7 @@ import { FileTree } from "./files/FileTree.tsx";
 import {
   fileName,
   fileUrl,
+  isSystemRecord,
   type ProjectFile,
   parseRegistry,
   type ResourceEntry,
@@ -156,7 +157,11 @@ function ProjectFiles({ id }: { id: string }) {
               <FileHeader
                 file={file}
                 resource={registry?.get(file.path)}
-                metadataMessage={metadataMessage}
+                metadataMessage={
+                  isSystemRecord(file.path)
+                    ? cleanupCopy.systemRecord
+                    : metadataMessage
+                }
               />
               <FileDocument file={file} registry={registry} />
               <details className="files-technical">

@@ -38,12 +38,14 @@ export async function selectPreviewKind(
     name: processed ? c.processed : /^待你决定 /,
   });
   if ((await tab.getAttribute("aria-pressed")) !== "true") await tab.click();
-  await inbox(page)
+  const entry = inbox(page)
     .getByRole("region", { name: c.previewList, exact: true })
-    .getByRole("button")
-    .and(page.locator(`[data-kind="${kind}"]`))
-    .first()
-    .click();
+    .locator(`button[data-kind="${kind}"]`)
+    .first();
+  await expect(entry).toBeVisible();
+  if ((await entry.getAttribute("aria-expanded")) !== "true")
+    await entry.click();
+  return entry;
 }
 export async function approvePreviewKind(page: Page, kind: Preview["kind"]) {
   const card = previewCard(page);

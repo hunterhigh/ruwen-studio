@@ -8,6 +8,7 @@ import {
   frameCopy,
 } from "../src/copy/zh-CN.ts";
 import { readCandidate } from "./chapter-review.ts";
+import { captureCleanup } from "./cleanup-11a.ts";
 import { createDemoFromShelf as createDemo, signIn } from "./helpers.ts";
 
 async function prepare(page: Page) {
@@ -90,6 +91,25 @@ test("edits a candidate, inspects its history, reverifies and approves the lates
   await field.fill(first);
   await expect(approve).toHaveCount(0);
   await capture(page, "editing");
+  await captureCleanup(page, "02");
+  const shortHeight = await field.evaluate((editor) => editor.clientHeight);
+  const long = `${first}${"\n\n院外传来另一阵车轮声。".repeat(80)}`;
+  await field.fill(long);
+  await expect(field).toHaveValue(long);
+  await expect(field).toHaveCSS("overflow-y", "hidden");
+  await expect(field).toHaveCSS("text-indent", /^36px(?: each-line)?$/);
+  expect(
+    await field.evaluate(
+      (editor) => editor.clientHeight >= editor.scrollHeight,
+    ),
+  ).toBe(true);
+  expect(await field.evaluate((editor) => editor.clientHeight)).toBeGreaterThan(
+    shortHeight,
+  );
+  await field.fill(first);
+  await expect
+    .poll(() => field.evaluate((editor) => editor.clientHeight))
+    .toBe(shortHeight);
 
   let savedResponse = postResponse(page, `${api}/candidate/revisions`);
   await save.click();

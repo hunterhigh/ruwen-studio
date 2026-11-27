@@ -1,6 +1,7 @@
 import { fieldName, filesCopy, uiCopy } from "../../copy/zh-CN.ts";
 
 export const registryPath = "治理/资源注册表.json";
+export const systemFolders = new Set(["治理", "authoring-ruwen-v5"]);
 
 export interface ProjectFile {
   path: string;
@@ -10,6 +11,7 @@ export interface ProjectFile {
 
 export interface ResourceEntry {
   id: string;
+  title?: string;
   path: string;
   status: string;
   scope?: Record<string, unknown>;
@@ -52,10 +54,12 @@ export function parseRegistry(text: string | undefined) {
     ) {
       return undefined;
     }
+    const title = typeof item.title === "string" ? item.title.trim() : "";
     const scope = record(item.scope);
     const readers = stringList(item.readers);
     entries.set(item.path, {
       id: item.id,
+      ...(title && { title }),
       path: item.path,
       status: typeof item.status === "string" ? item.status : "",
       ...(scope && { scope }),
@@ -77,6 +81,11 @@ export function statusTone(status: string) {
   if (status === "active") return "active";
   if (status === "candidate" || status === "proposed") return "pending";
   return "neutral";
+}
+
+export function isSystemRecord(path: string) {
+  const separator = path.indexOf("/");
+  return separator > 0 && systemFolders.has(path.slice(0, separator));
 }
 
 export function fileName(path: string) {

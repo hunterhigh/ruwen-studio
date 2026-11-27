@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { previewConfiguration } from "../../../config/preview.ts";
 import { ideationCopy as c } from "../src/copy/zh-CN.ts";
+import { captureCleanup } from "./cleanup-11a.ts";
 import {
   confirmAction,
   createDemoFromShelf as createDemo,
@@ -29,6 +30,19 @@ test("task cancellation waits for the shared confirmation and preserves the orig
   try {
     await page.goto(`/projects/${projectId}/ideation`);
     const strip = page.getByRole("region", { name: c.tasks, exact: true });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const pills = strip.locator(".ideation-task-pills");
+    await expect(pills.getByRole("button").last()).toBeVisible();
+    await expect(pills).toHaveCSS("flex-wrap", "wrap");
+    const layout = await pills.evaluate((row) => ({
+      lines: new Set(
+        Array.from(row.children, (pill) => pill.getBoundingClientRect().top),
+      ).size,
+      fits: row.scrollWidth <= row.clientWidth,
+    }));
+    expect(layout.lines).toBeGreaterThan(1);
+    expect(layout.fits).toBe(true);
+    await captureCleanup(page, "04");
     await strip.getByRole("button").first().click();
     const card = strip.locator("article");
     await captureIdeation05(page, "task-popover");
@@ -55,6 +69,12 @@ test("persisted conversations: switching, clean handoff, safe user Markdown, clo
   });
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(`/projects/${projectId}/ideation`);
+  const newSession = page.getByRole("button", {
+    name: c.newSession,
+    exact: true,
+  });
+  await expect(newSession).toHaveClass(/\bui-btn-secondary\b/);
+  await captureCleanup(page, "05");
   await createIdeationSession(page, "北岸冬信");
   await captureIdeation05(page, "empty-session");
   const raw =
@@ -173,7 +193,25 @@ test("preview cards preserve field mapping, revisions, rejection, trial gates an
     await expect(card).toContainText(c.fixedFacts);
     await captureIdeation05(page, "handoff", "card");
 
-    await selectPreviewKind(page, "file_patch");
+    const patchEntry = await selectPreviewKind(page, "file_patch");
+    await expect(patchEntry).toHaveAttribute("aria-current", "true");
+    const patchCardId = await patchEntry.getAttribute("aria-controls");
+    const expandedCard = review
+      .locator(`button + [id="${patchCardId}"]`)
+      .getByRole("article", {
+        name: c.previewDetails,
+        exact: true,
+      });
+    await expect(expandedCard).toBeVisible();
+    const patchLink = page.url();
+    await patchEntry.click();
+    await expect(patchEntry).toHaveAttribute("aria-expanded", "false");
+    await expect(card).toHaveCount(0);
+    await expect(page).not.toHaveURL(/preview=/);
+    await page.goto(patchLink);
+    await expect(patchEntry).toBeInViewport();
+    await expect(expandedCard).toBeVisible();
+    await captureCleanup(page, "03");
     const summaries = card.locator(".ideation-patch > summary");
     await expect(summaries).toHaveCount(2);
     for (const trigger of await summaries.all()) await trigger.click();
@@ -218,11 +256,13 @@ test("preview cards preserve field mapping, revisions, rejection, trial gates an
     await captureIdeation05(page, "expression-candidate", "card");
     await approvePreviewKind(page, "expression_candidate");
     await review.getByRole("button", { name: /^待你决定 / }).click();
-    await review
+    const activationEntry = review
       .getByRole("region", { name: c.previewList })
-      .getByRole("button")
-      .filter({ hasText: c.activationStage })
-      .click();
+      .locator('button[data-kind="expression_candidate"]')
+      .filter({ hasText: c.activationStage });
+    await expect(activationEntry).toBeVisible();
+    if ((await activationEntry.getAttribute("aria-expanded")) !== "true")
+      await activationEntry.click();
     const activation = card.getByRole("checkbox", {
       name: c.confirmActivation,
       exact: true,
@@ -259,7 +299,13 @@ test("preview cards preserve field mapping, revisions, rejection, trial gates an
     ).toHaveAttribute("aria-pressed", "true");
 
     await selectPreviewKind(page, "generation_field");
-    const target = new URL(page.url()).searchParams.get("preview");
+    const generation = await fixture.demo.api.listPreviews({
+      sessionId: fixture.demo.initialSessionId,
+    });
+    if (!generation.ok) throw new Error("Expected fixture previews");
+    const target = generation.value.items.find(
+      ({ kind, status }) => kind === "generation_field" && status === "pending",
+    )?.id;
     expect(target).toBeTruthy();
     await page.goto(`${root}?preview=${target}&compile=1`);
     await expect(card).toContainText("2200 字");

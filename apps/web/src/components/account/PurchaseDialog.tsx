@@ -209,9 +209,7 @@ export function PurchaseDialog({
                         content={accountText(option.name)}
                       />
                     </strong>
-                    <span>
-                      {copy.testCredits(formatCredits(option.credits))}
-                    </span>
+                    <span>{copy.points(formatCredits(option.credits))}</span>
                     {!option.priceMinor && <small>{copy.pricePending}</small>}
                   </span>
                 </label>
@@ -226,7 +224,7 @@ export function PurchaseDialog({
                 .filter((row) => row.status === "pending")
                 .map((row) => (
                   <li key={row.id}>
-                    <span>{copy.testCredits(formatCredits(row.credits))}</span>
+                    <span>{copy.points(formatCredits(row.credits))}</span>
                     {row.prepared_at ? (
                       <Button
                         variant="ghost"

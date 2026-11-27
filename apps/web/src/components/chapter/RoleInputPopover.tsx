@@ -74,10 +74,22 @@ export function RoleInputPopover({
         <h3>{c.withheld}</h3>
         {view.withheld.length ? (
           <ul>
-            {view.withheld.map(({ label, reason }, index) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: Unknown categories share a localized name.
-              <li key={`${label}-${index}`}>
-                <strong>{label}</strong>——{reason}
+            {view.withheld.map(({ labels, reason }) => (
+              <li key={`${reason}:${labels.join("/")}`}>
+                {labels.length > 1 ? (
+                  <>
+                    <p>{reason}</p>
+                    <ul className="chapter-manifest-tags">
+                      {labels.map((label) => (
+                        <li key={label}>{label}</li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <>
+                    <strong>{labels[0]}</strong>——{reason}
+                  </>
+                )}
               </li>
             ))}
           </ul>

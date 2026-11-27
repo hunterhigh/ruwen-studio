@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import type { RunStatus } from "@ruwen/pipeline";
+import { captureCleanup } from "./cleanup-11a.ts";
 import { createDemoFromShelf as createDemo, signIn } from "./helpers.ts";
 import { captureMemory, readMemory } from "./memory-review.ts";
 
@@ -51,11 +52,11 @@ test("a new memory hash resets reads and an empty preview accepts explicit confi
         reports: {
           "jiyi-weihuyuan": {
             output: {
-              new_facts: ["粮车已走。"],
+              new_facts: files.length ? ["粮车已走。"] : [],
               state_changes: [],
               invalidated: [],
-              scope_changes: ["故事弧推进。"],
-              next_chapter_state: "林川仍在候马。",
+              scope_changes: files.length ? ["故事弧推进。"] : [],
+              next_chapter_state: files.length ? "林川仍在候马。" : "",
             },
           },
         },
@@ -130,7 +131,13 @@ test("a new memory hash resets reads and an empty preview accepts explicit confi
   ).toHaveCount(0);
   const confirm = page.getByRole("button", { name: "确认，无需变更" });
   await expect(confirm).toBeEnabled();
+  const dock = page.locator(".memory-dock");
+  await expect(dock.locator("strong")).toHaveText("确认第 1 章无需资料变更？");
+  await expect(dock.locator("small")).toHaveText(
+    "确认后结束本章流程，项目资料保持原样。",
+  );
   await captureMemory(page, "empty");
+  await captureCleanup(page, "01");
   await confirm.click();
   await expect(page.getByTestId("run-status")).toHaveText("已完成");
 });

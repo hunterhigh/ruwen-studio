@@ -118,6 +118,9 @@ export function AccountUsage({ data }: { data: AccountData }) {
                   );
                 }
                 const { run } = item;
+                const pools = new Set(
+                  run.roles.map(({ bank }) => bankLabel(bank)).filter(Boolean),
+                );
                 return (
                   <tr key={run.id} className="account-run-row">
                     <td colSpan={2}>
@@ -139,6 +142,9 @@ export function AccountUsage({ data }: { data: AccountData }) {
                                 <Time value={run.timestamp} />
                               </>
                             )}
+                            {pools.size > 0 && (
+                              <small>{[...pools].join(copy.separator)}</small>
+                            )}
                           </span>
                           <span className="account-amount">
                             <Amount value={run.total} />
@@ -147,12 +153,7 @@ export function AccountUsage({ data }: { data: AccountData }) {
                         <ul className="account-roles">
                           {run.roles.map((role) => (
                             <li key={role.id}>
-                              <span>
-                                <RoleTag role={role.role_id} />
-                                {bankLabel(role.bank) && (
-                                  <small>{bankLabel(role.bank)}</small>
-                                )}
-                              </span>
+                              <RoleTag role={role.role_id} />
                               <span className="account-amount">
                                 <Amount value={role.charged_credits} />
                               </span>

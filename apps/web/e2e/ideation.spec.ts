@@ -380,7 +380,8 @@ test("pending billing/freeze errors give safe guidance and the minimum desktop r
       await expect(
         page
           .getByRole("main")
-          .getByRole("alert")
+          .getByTestId("inline-notice")
+          .filter({ hasText: message })
           .getByRole("link", { name: "查看账户与点数 →", exact: true }),
       ).toHaveAttribute("href", "/account");
     if (code === "INSUFFICIENT_CREDITS") await captureIdeation05(page, "error");

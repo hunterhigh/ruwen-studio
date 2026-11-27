@@ -7,10 +7,13 @@ import {
   memoryCopy,
   runStatus,
   runStatusTone,
+  statusCopy,
   candidateCopy as v,
 } from "../../copy/zh-CN.ts";
 import { useConfirm } from "../../ui/ConfirmDialog.tsx";
+import { InlineNotice } from "../../ui/InlineNotice.tsx";
 import { SealButton } from "../../ui/SealButton.tsx";
+import { PageSkeleton } from "../../ui/Skeleton.tsx";
 import { StatusBadge } from "../../ui/StatusBadge.tsx";
 import { ApiError, post } from "../client.ts";
 import { useProjectDecisionContext } from "../project/ProjectDecisions.tsx";
@@ -314,7 +317,20 @@ export function RunDesk({
     if (await confirm(confirmation.cancelRun)) await action("cancel");
   };
   const reviewUrl = `/projects/${projectId}/chapters?run=${encodeURIComponent(id)}`;
-  if (memory && data?.run.memoryPreviewSha256) {
+  const detailFailure = memory
+    ? statusCopy.memoryFailed
+    : statusCopy.chapterFailed;
+  const dismissOrRefresh = loadError
+    ? () => void refresh()
+    : () => setError("");
+  if (!data) {
+    return loadError ? (
+      <InlineNotice message={detailFailure} onAction={() => void refresh()} />
+    ) : (
+      <PageSkeleton page={memory ? "memory" : "chapter"} />
+    );
+  }
+  if (memory && data.run.memoryPreviewSha256) {
     return (
       <MemoryReview
         data={data}
@@ -323,7 +339,9 @@ export function RunDesk({
         overviewUrl={`/projects/${projectId}`}
         readOnly={readOnly}
         busy={locked}
-        error={error || (loadError ? errorCopy.INTERNAL_ERROR : "")}
+        error={loadError ? detailFailure : error}
+        onErrorAction={dismissOrRefresh}
+        errorActionLabel={loadError ? statusCopy.retry : statusCopy.dismiss}
         onApprove={() => approve("memory")}
         onAbandon={async () => {
           if (await confirm(memoryCopy.abandonConfirmation))
@@ -404,22 +422,26 @@ export function RunDesk({
         </p>
       )}
       {(error || loadError) && (
-        <p className="chapter-problem" role="alert">
-          {error || errorCopy.INTERNAL_ERROR}
-        </p>
+        <InlineNotice
+          message={loadError ? detailFailure : error}
+          onAction={dismissOrRefresh}
+          actionLabel={loadError ? statusCopy.retry : statusCopy.dismiss}
+        />
       )}
       {revision.needsRefresh && (
-        <div className="chapter-problem chapter-version-banner" role="alert">
-          <span>{v.savedRefreshFailed}</span>
-          <button
-            className="ui-btn ui-btn-ghost"
-            type="button"
-            disabled={revision.saving}
-            onClick={() => void revision.reload()}
-          >
-            {v.refresh}
-          </button>
-        </div>
+        <InlineNotice
+          message={v.savedRefreshFailed}
+          action={
+            <button
+              className="ui-btn ui-btn-ghost"
+              type="button"
+              disabled={revision.saving}
+              onClick={() => void revision.reload()}
+            >
+              {v.refresh}
+            </button>
+          }
+        />
       )}
       {status === "RETURNED" && (
         <section className="chapter-problem">
@@ -452,27 +474,24 @@ export function RunDesk({
         </section>
       )}
       {(status === "FAILED" || status === "FAILED_PRECONDITION") && (
-        <section className="chapter-problem" role="alert">
-          <h2>
-            {status === "FAILED_PRECONDITION" ? c.notReady : runStatus.FAILED}
-          </h2>
-          {status === "FAILED_PRECONDITION" ? (
-            <a href={`/projects/${projectId}`}>{c.overview}</a>
-          ) : (
-            <>
-              <p>{failureCopy(data)}</p>
-              {!readOnly && (
-                <button
-                  className="ui-btn ui-btn-primary"
-                  type="button"
-                  onClick={onNewAttempt}
-                >
-                  {c.newAttempt}
-                </button>
-              )}
-            </>
-          )}
-        </section>
+        <InlineNotice
+          message={
+            status === "FAILED_PRECONDITION" ? c.notReady : failureCopy(data)
+          }
+          action={
+            status === "FAILED_PRECONDITION" || readOnly ? (
+              <a href={`/projects/${projectId}`}>{c.overview}</a>
+            ) : (
+              <button
+                className="ui-btn ui-btn-ghost"
+                type="button"
+                onClick={onNewAttempt}
+              >
+                {c.newAttempt}
+              </button>
+            )
+          }
+        />
       )}
       {data && (
         <RoleChain
@@ -626,9 +645,11 @@ export function RunDesk({
         />
       )}
       {revision.checkError && (
-        <p className="chapter-problem" role="alert">
-          {revision.checkError}
-        </p>
+        <InlineNotice
+          message={revision.checkError}
+          onAction={() => void refresh()}
+          actionLabel={statusCopy.refresh}
+        />
       )}
       {mutable && waiting && returning && !revisited && (
         <form

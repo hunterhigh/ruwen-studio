@@ -1,6 +1,11 @@
 "use client";
 import { type ReactNode, useLayoutEffect, useRef } from "react";
-import { annotationCopy as c, candidateCopy as v } from "../../copy/zh-CN.ts";
+import {
+  annotationCopy as c,
+  statusCopy,
+  candidateCopy as v,
+} from "../../copy/zh-CN.ts";
+import { InlineNotice } from "../../ui/InlineNotice.tsx";
 import { SafeMarkdown } from "../SafeMarkdown.tsx";
 import {
   type AnnotationFilter,
@@ -190,38 +195,39 @@ export function AnnotationCard({
             )
           )}
           {failure && (
-            <div className="chapter-annotation-error" role="alert">
-              <span>
+            <InlineNotice
+              message={
                 {
-                  {
-                    unlocated: c.missingAnchor,
-                    conflict: v.conflict,
-                    refresh: c.refreshFailed,
-                    update: c.updateFailed,
-                    rate: v.rateLimited,
-                  }[failure]
-                }
-              </span>
-              {failure === "unlocated" && canEdit && onEdit && (
-                <button
-                  className="ui-btn ui-btn-ghost"
-                  type="button"
-                  onClick={onEdit}
-                >
-                  {c.openEditor}
-                </button>
-              )}
-              {(failure === "conflict" || failure === "refresh") && (
-                <button
-                  className="ui-btn ui-btn-ghost"
-                  type="button"
-                  disabled={review.pending}
-                  onClick={() => void review.reload(note.id)}
-                >
-                  {v.refresh}
-                </button>
-              )}
-            </div>
+                  unlocated: c.missingAnchor,
+                  conflict: v.conflict,
+                  refresh: c.refreshFailed,
+                  update: c.updateFailed,
+                  rate: v.rateLimited,
+                }[failure]
+              }
+              action={
+                failure === "unlocated" && canEdit && onEdit ? (
+                  <button
+                    className="ui-btn ui-btn-ghost"
+                    type="button"
+                    onClick={onEdit}
+                  >
+                    {c.openEditor}
+                  </button>
+                ) : failure === "conflict" || failure === "refresh" ? (
+                  <button
+                    className="ui-btn ui-btn-ghost"
+                    type="button"
+                    disabled={review.pending}
+                    onClick={() => void review.reload(note.id)}
+                  >
+                    {v.refresh}
+                  </button>
+                ) : undefined
+              }
+              onAction={review.clearFailure}
+              actionLabel={statusCopy.dismiss}
+            />
           )}
         </>
       )}

@@ -24,13 +24,11 @@ const folders = [
 
 export function FileTree({
   paths,
-  loadError,
   registry,
   selected,
   onSelect,
 }: {
-  paths: string[] | undefined;
-  loadError: string;
+  paths: string[];
   registry: Map<string, ResourceEntry> | undefined;
   selected: string | undefined;
   onSelect: (path: string) => void;
@@ -40,7 +38,7 @@ export function FileTree({
   const search = query.trim().toLowerCase();
   const groups = new Map<string, string[]>();
   const loose = [];
-  for (const path of paths ?? []) {
+  for (const path of paths) {
     if (!path.toLowerCase().includes(search)) continue;
     const slash = path.indexOf("/");
     if (slash < 0) {
@@ -94,14 +92,7 @@ export function FileTree({
           onChange={(event) => setQuery(event.currentTarget.value)}
         />
       </div>
-      {loadError ? (
-        <p className="files-index-message" role="alert">
-          <SafeMarkdown plain inline content={loadError} />
-        </p>
-      ) : (
-        !paths && <p className="files-index-message">{copy.loadingPaths}</p>
-      )}
-      {paths && !groups.size && !loose.length && (
+      {!groups.size && !loose.length && (
         <p className="files-index-message">
           {search ? copy.noMatches : copy.noFiles}
         </p>

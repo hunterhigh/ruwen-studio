@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { statusCopy } from "../copy/zh-CN.ts";
 import { request } from "./client.ts";
 export function useApi<T>(url: string) {
   const [data, setData] = useState<T>(),
@@ -11,7 +12,11 @@ export function useApi<T>(url: string) {
       setError("");
       return next;
     } catch (error) {
-      setError((error as Error).message);
+      setError(
+        error instanceof Error && error.message
+          ? error.message
+          : statusCopy.genericError,
+      );
       return undefined;
     }
   }, [url]);

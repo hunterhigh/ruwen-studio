@@ -1,8 +1,10 @@
 "use client";
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { signInCopy as copy } from "../copy/zh-CN.ts";
+import { signInCopy as copy, statusCopy } from "../copy/zh-CN.ts";
 import { Button } from "../ui/Button.tsx";
+import { InlineNotice } from "../ui/InlineNotice.tsx";
+import { PageSkeleton } from "../ui/Skeleton.tsx";
 import { BookCover } from "./BookCover.tsx";
 import { ApiError, post, request } from "./client.ts";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
@@ -42,14 +44,19 @@ const fields = [
 function SignInNotice({
   problem,
   at,
+  onDismiss,
 }: {
   problem: SignInProblem | undefined;
   at: SignInProblem["at"];
+  onDismiss: () => void;
 }) {
   return problem?.at === at ? (
-    <p id={`signin-error-${at}`} className="signin-error" role="alert">
-      {problem.text}
-    </p>
+    <InlineNotice
+      id={`signin-error-${at}`}
+      message={at === "google" ? statusCopy.googleFailed : problem.text}
+      onAction={onDismiss}
+      actionLabel={statusCopy.dismiss}
+    />
   ) : null;
 }
 
@@ -87,6 +94,15 @@ export function SignIn({
       form.current
         ?.querySelector<HTMLInputElement>(`#signin-${field.at}`)
         ?.focus();
+  }
+
+  function dismissProblem() {
+    const field = fields.find(({ at }) => problem?.at === at);
+    if (field)
+      form.current
+        ?.querySelector<HTMLInputElement>(`#signin-${field.at}`)
+        ?.focus();
+    setProblem(undefined);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -190,12 +206,14 @@ export function SignIn({
                     disabled={Boolean(pending)}
                     onClick={() => void openPreview()}
                   >
-                    {pending === "preview"
-                      ? copy.openingPreview
-                      : copy.previewMail}
+                    {copy.previewMail}
                   </Button>
                 )}
-                <SignInNotice problem={problem} at="preview" />
+                <SignInNotice
+                  problem={problem}
+                  at="preview"
+                  onDismiss={dismissProblem}
+                />
                 <Button
                   variant="ghost"
                   className="signin-text-button"
@@ -251,7 +269,11 @@ export function SignIn({
                           if (invalid) setProblem(undefined);
                         }}
                       />
-                      <SignInNotice problem={problem} at={field.at} />
+                      <SignInNotice
+                        problem={problem}
+                        at={field.at}
+                        onDismiss={dismissProblem}
+                      />
                     </div>
                   );
                 })}
@@ -261,9 +283,13 @@ export function SignIn({
                     variant="primary"
                     disabled={!ready || Boolean(pending)}
                   >
-                    {pending === "send" ? copy.submitting : copy.submit}
+                    {copy.submit}
                   </Button>
-                  <SignInNotice problem={problem} at="submit" />
+                  <SignInNotice
+                    problem={problem}
+                    at="submit"
+                    onDismiss={dismissProblem}
+                  />
                 </div>
               </form>
               {google && (
@@ -273,13 +299,18 @@ export function SignIn({
                     disabled={!ready || Boolean(pending)}
                     onClick={() => void googleLogin()}
                   >
-                    {pending === "google" ? copy.openingGoogle : copy.google}
+                    {copy.google}
                   </Button>
-                  <SignInNotice problem={problem} at="google" />
+                  <SignInNotice
+                    problem={problem}
+                    at="google"
+                    onDismiss={dismissProblem}
+                  />
                 </div>
               )}
             </>
           )}
+          {pending && <PageSkeleton key={pending} page="signIn" />}
           {preview && <p className="signin-preview-note">{copy.previewNote}</p>}
         </div>
       </section>

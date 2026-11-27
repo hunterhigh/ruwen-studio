@@ -1,6 +1,9 @@
 "use client";
 import { useState } from "react";
-import { overviewCopy as c, cleanupCopy } from "../copy/zh-CN.ts";
+import { overviewCopy as c, cleanupCopy, statusCopy } from "../copy/zh-CN.ts";
+import { cleanErrorText } from "../ui/error-text.ts";
+import { InlineNotice } from "../ui/InlineNotice.tsx";
+import { PageSkeleton, Skeleton } from "../ui/Skeleton.tsx";
 import { StatusBadge } from "../ui/StatusBadge.tsx";
 import { OverviewChapters } from "./overview/OverviewChapters.tsx";
 import { OverviewStartChapter } from "./overview/OverviewStartChapter.tsx";
@@ -18,7 +21,7 @@ import { useProjectDecisionContext } from "./project/ProjectDecisions.tsx";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
 
 export function ProjectHome({ id }: { id: string }) {
-  const { previews, loading, revision } = useProjectDecisionContext();
+  const { previews, loading, refresh, revision } = useProjectDecisionContext();
   const { readiness, runs, heading, error } = useOverviewData(id, revision);
   const groups = groupChapterRuns(runs ?? []);
   const latest = groups[0]?.[0];
@@ -47,12 +50,24 @@ export function ProjectHome({ id }: { id: string }) {
         status === "AWAITING_CANDIDATE_APPROVAL" ||
         status === "AWAITING_MEMORY_APPROVAL",
     );
+  if (!readiness && !runs) {
+    return (
+      <main className="page-content overview-page" aria-label={c.title}>
+        {error ? (
+          <InlineNotice
+            message={statusCopy.overviewFailed}
+            onAction={refresh}
+          />
+        ) : (
+          <PageSkeleton page="overview" />
+        )}
+      </main>
+    );
+  }
   return (
     <main className="page-content overview-page" aria-label={c.title}>
       {error && (
-        <p role="alert" className="overview-error">
-          {c.loadFailed}
-        </p>
+        <InlineNotice message={statusCopy.overviewFailed} onAction={refresh} />
       )}
       <div className="overview-columns">
         <div className="overview-column">
@@ -114,9 +129,7 @@ export function ProjectHome({ id }: { id: string }) {
                   </button>
                 )}
               </>
-            ) : (
-              !error && <p className="overview-muted">{c.loading}</p>
-            )}
+            ) : null}
           </section>
           <OverviewReadiness
             readiness={readiness}
@@ -169,13 +182,11 @@ export function ProjectHome({ id }: { id: string }) {
                   );
                 })}
               </ul>
+            ) : waitingForDecisions ? (
+              <Skeleton />
             ) : (
               <p className="overview-muted">
-                {waitingForDecisions
-                  ? c.decisionLoading
-                  : !runs
-                    ? c.loadFailed
-                    : c.emptyDecisions}
+                {!runs ? c.loadFailed : c.emptyDecisions}
               </p>
             )}
           </section>
@@ -321,7 +332,7 @@ function ReadinessChecks({
             {other.map((message, index) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: Diagnostic messages may be repeated.
               <li key={`${index}-${message}`}>
-                <SafeMarkdown plain inline content={message} />
+                <SafeMarkdown plain inline content={cleanErrorText(message)} />
               </li>
             ))}
           </ul>

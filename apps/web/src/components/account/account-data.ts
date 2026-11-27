@@ -1,5 +1,6 @@
-import { accountCopy as copy, errorCopy } from "../../copy/zh-CN.ts";
+import { accountCopy as copy } from "../../copy/zh-CN.ts";
 import type { billingAccount } from "../../server/billing-account.ts";
+import { displayError } from "../../ui/error-text.ts";
 import { ApiError } from "../client.ts";
 
 type Projection = Awaited<ReturnType<typeof billingAccount>>;
@@ -57,15 +58,10 @@ export function accountText(value: string) {
 }
 
 export function accountError(error: unknown) {
-  if (!(error instanceof ApiError)) return copy.requestFailed;
-  switch (error.code) {
-    case "ACCOUNT_FROZEN":
-    case "INSUFFICIENT_CREDITS":
-    case "BILLING_DISABLED":
-      return errorCopy[error.code];
-    default:
-      return error.message ? accountText(error.message) : copy.requestFailed;
-  }
+  return displayError(
+    error instanceof ApiError ? error.code : undefined,
+    copy.requestFailed,
+  );
 }
 
 export function timeLabel(value: string | undefined) {

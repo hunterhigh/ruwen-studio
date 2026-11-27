@@ -1,8 +1,14 @@
 "use client";
 import { useState } from "react";
-import { confirmation, accountCopy as copy } from "../copy/zh-CN.ts";
+import {
+  confirmation,
+  accountCopy as copy,
+  statusCopy,
+} from "../copy/zh-CN.ts";
 import { Button } from "../ui/Button.tsx";
 import { useConfirm } from "../ui/ConfirmDialog.tsx";
+import { InlineNotice } from "../ui/InlineNotice.tsx";
+import { PageSkeleton } from "../ui/Skeleton.tsx";
 import { AccountUsage } from "./account/AccountUsage.tsx";
 import {
   type AccountData,
@@ -52,11 +58,12 @@ export function Account() {
         </div>
       </header>
       {error && (
-        <p className="account-warning" role="alert">
-          {copy.loadError}
-        </p>
+        <InlineNotice
+          message={copy.loadError}
+          onAction={() => void refresh()}
+        />
       )}
-      {!data && !error && <output>{copy.loading}</output>}
+      {!data && !error && <PageSkeleton page="account" />}
       {data && (
         <div className="account-grid">
           <div className="account-side">
@@ -69,9 +76,11 @@ export function Account() {
               <h2>{copy.devices}</h2>
               <p>{copy.activeBrowser}</p>
               {sessionError && (
-                <p className="account-warning" role="alert">
-                  <SafeMarkdown plain inline content={sessionError} />
-                </p>
+                <InlineNotice
+                  message={sessionError}
+                  onAction={() => setSessionError("")}
+                  actionLabel={statusCopy.dismiss}
+                />
               )}
               <Button disabled={revoking} onClick={() => void signOutAll()}>
                 {revoking ? copy.revoking : copy.signOutAll}

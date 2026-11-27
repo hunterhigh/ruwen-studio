@@ -24,14 +24,17 @@ import {
 import {
   ideationCopy as c,
   confirmation,
-  errorCopy,
   frameCopy,
   type IdeationUiErrorCode,
   previewStatus,
   roleName,
+  statusCopy,
 } from "../copy/zh-CN.ts";
 import { Button } from "../ui/Button.tsx";
 import { useConfirm } from "../ui/ConfirmDialog.tsx";
+import { displayError } from "../ui/error-text.ts";
+import { InlineNotice } from "../ui/InlineNotice.tsx";
+import { PageSkeleton } from "../ui/Skeleton.tsx";
 import { useToast } from "../ui/Toast.tsx";
 import {
   allIdeationPages,
@@ -85,13 +88,28 @@ function writeQuery(fields: Record<string, string | null>) {
   window.history.replaceState(window.history.state, "", url);
 }
 
-export function IdeationErrorNotice({ code }: { code: IdeationUiErrorCode }) {
+export function IdeationErrorNotice({
+  code,
+  onAction,
+  initial = false,
+}: {
+  code: IdeationUiErrorCode;
+  onAction?: () => void;
+  initial?: boolean;
+}) {
   return (
-    <div className="ideation-error" role="alert">
-      <p>{errorCopy[code]}</p>
-      {code === "INSUFFICIENT_CREDITS" && <a href="/account">{c.account}</a>}
-      {code === "UNAUTHENTICATED" && <a href="/sign-in">{c.login}</a>}
-    </div>
+    <InlineNotice
+      message={displayError(code)}
+      action={
+        code === "INSUFFICIENT_CREDITS" ? (
+          <a href="/account">{c.account}</a>
+        ) : code === "UNAUTHENTICATED" ? (
+          <a href="/sign-in">{c.login}</a>
+        ) : undefined
+      }
+      onAction={onAction}
+      actionLabel={initial ? statusCopy.retry : statusCopy.dismiss}
+    />
   );
 }
 
@@ -115,6 +133,7 @@ export function IdeationStudio({
   const router = useRouter();
   const { refresh: refreshDecisions } = useProjectDecisionContext();
   const [adapter] = useState(() => createIdeationClient(projectId));
+  const [initialReady, setInitialReady] = useState(false);
   const [selected, setSelected] = useState<IdeationSessionId>();
   const [sessions, setSessions] = useState<readonly IdeationSession[]>([]);
   const [view, setView] = useState<View>();
@@ -184,6 +203,7 @@ export function IdeationStudio({
         }
         const current = session ?? listed[0];
         if (current) selectSession(current.id, true);
+        else setInitialReady(true);
         return;
       }
       const [session, messages, previews, tasks] = await Promise.all([
@@ -204,13 +224,15 @@ export function IdeationStudio({
           }),
         ),
       ]);
-      if (version === sequence.current)
+      if (version === sequence.current) {
         setView({
           session: unwrap(session),
           messages: unwrap(messages),
           previews: unwrap(previews),
           tasks: unwrap(tasks),
         });
+        setInitialReady(true);
+      }
     } catch (caught) {
       if (version === sequence.current)
         setError({
@@ -490,6 +512,27 @@ export function IdeationStudio({
     );
   }
 
+  if (!initialReady) {
+    return (
+      <main className="ideation-page" aria-label={frameCopy.ideation}>
+        {error ? (
+          <div className="ui-ideation-initial-error">
+            <IdeationErrorNotice
+              code={error.code}
+              initial
+              onAction={() => {
+                setError(undefined);
+                void refresh();
+              }}
+            />
+          </div>
+        ) : (
+          <PageSkeleton page="ideation" />
+        )}
+      </main>
+    );
+  }
+
   return (
     <main
       className="ideation-page ideation-desk"
@@ -525,7 +568,10 @@ export function IdeationStudio({
         </ul>
         <div className="ideation-new-session">
           {error?.area === "sessions" && (
-            <IdeationErrorNotice code={error.code} />
+            <IdeationErrorNotice
+              code={error.code}
+              onAction={() => setError(undefined)}
+            />
           )}
           {creating ? (
             <form
@@ -671,7 +717,10 @@ export function IdeationStudio({
           }}
         />
         {error?.area === "conversation" && (
-          <IdeationErrorNotice code={error.code} />
+          <IdeationErrorNotice
+            code={error.code}
+            onAction={() => setError(undefined)}
+          />
         )}
         {closed ? (
           <p className="ideation-closed">{c.closedComposer}</p>
@@ -749,7 +798,12 @@ export function IdeationStudio({
             {c.compile}
           </button>
         </header>
-        {error?.area === "inbox" && <IdeationErrorNotice code={error.code} />}
+        {error?.area === "inbox" && (
+          <IdeationErrorNotice
+            code={error.code}
+            onAction={() => setError(undefined)}
+          />
+        )}
         {compileOpen && (
           <form className="ideation-compile" onSubmit={compile}>
             <label>
@@ -868,7 +922,10 @@ export function IdeationStudio({
                       startedRole={role ? roleName[role] : undefined}
                       error={
                         error?.area === "decision" ? (
-                          <IdeationErrorNotice code={error.code} />
+                          <IdeationErrorNotice
+                            code={error.code}
+                            onAction={() => setError(undefined)}
+                          />
                         ) : undefined
                       }
                       onNewer={

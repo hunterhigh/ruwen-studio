@@ -43,6 +43,27 @@ export function markerFraction(offset: number | undefined, length: number) {
   return Math.max(0, Math.min(1, offset / length));
 }
 
+export function layoutMarkerCenters(
+  fractions: readonly number[],
+  height: number,
+) {
+  const ordered = fractions
+    .map((fraction, index) => ({ fraction, index }))
+    .sort((a, b) => a.fraction - b.fraction);
+  const step = Math.min(12, height / Math.max(1, ordered.length));
+  const hitHeight = Math.min(10, step);
+  const edge = hitHeight / 2;
+  const centers = fractions.map(() => 0);
+  let next = edge;
+  ordered.forEach(({ fraction, index }, rank) => {
+    const last = height - edge - (ordered.length - rank - 1) * step;
+    const center = Math.min(last, Math.max(next, fraction * height));
+    centers[index] = center;
+    next = center + step;
+  });
+  return { centers, hitHeight };
+}
+
 export function reviewAnnotations(data: Detail | undefined) {
   const records = new Map(
     data?.annotations?.map((item) => [`${item.roleId}:${item.index}`, item]),

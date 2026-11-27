@@ -1369,6 +1369,38 @@ export const signInCopy = {
   ],
 } as const;
 
+export const statusCopy = {
+  genericError: "这次操作未完成，请稍后重试。",
+  slow: "加载得比平时慢，可以刷新重试",
+  refresh: "刷新",
+  retry: "重试",
+  dismiss: "关闭提示",
+  adjust: "修改输入",
+  backAccount: "返回账户",
+  pending: {
+    shelf: "正在加载书架",
+    overview: "正在加载项目概览",
+    ideation: "正在加载故事构思",
+    chapter: "正在加载章节审稿桌",
+    memory: "正在加载资料提交视图",
+    files: "正在加载项目资料",
+    account: "正在加载账户与用量",
+    signIn: "正在等待登录请求",
+    text: "正在读取内容",
+  },
+  shelfFailed: "暂时读不到书架，请重试。",
+  projectTitleInvalid: "请核对书名。",
+  overviewFailed: "暂时读不到项目概览，请重试。",
+  runsFailed: "暂时读不到章节运行，请重试。",
+  chapterFailed: "暂时读不到章节详情，请重试。",
+  memoryFailed: "暂时读不到资料变更，请重试。",
+  settingsFailed: "暂时读不到写作选项，仍可开始正常写作。",
+  filesFailed: "暂时读不到项目文件列表，请重试。",
+  registryFailed: "暂时读不到资源注册表，请重试。",
+  exportFailed: "暂时无法导出项目，请重试。",
+  googleFailed: "暂时无法进入登录服务，请重试。",
+} as const;
+
 export const adminCopy = {
   section: "工作室管理",
   overview: "运行概况",

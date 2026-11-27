@@ -30,6 +30,7 @@ import {
   previewStatus,
   roleName,
 } from "../copy/zh-CN.ts";
+import { Button } from "../ui/Button.tsx";
 import { useConfirm } from "../ui/ConfirmDialog.tsx";
 import { useToast } from "../ui/Toast.tsx";
 import {
@@ -118,7 +119,8 @@ export function IdeationStudio({
   const [sessions, setSessions] = useState<readonly IdeationSession[]>([]);
   const [view, setView] = useState<View>();
   const [streams, setStreams] = useState(emptyRoleStreams);
-  const [selectedPreview, setSelectedPreview] = useState("");
+  const [selectedPreview, setSelectedPreview] = useState<string | null>();
+  const [scrollPreview, setScrollPreview] = useState<string>();
   const [inboxTab, setInboxTab] = useState<Inbox>("pending");
   const [compileOpen, setCompileOpen] = useState(false);
   const [error, setError] = useState<{
@@ -133,18 +135,19 @@ export function IdeationStudio({
   const [receipt, setReceipt] = useState<IdeationApprovalReceipt>();
   const sequence = useRef(0);
   const messagesBox = useRef<HTMLDivElement>(null);
-  const currentCard = useRef<HTMLDivElement>(null);
+  const currentEntry = useRef<HTMLButtonElement>(null);
   const nameInput = useRef<HTMLInputElement>(null);
   const follow = useRef(true);
 
   const selectSession = useCallback(
     (id: IdeationSessionId, preservePreview = false) => {
       setSelected(id);
-      setSelectedPreview(
-        preservePreview
-          ? (new URL(window.location.href).searchParams.get("preview") ?? "")
-          : "",
-      );
+      const preview = preservePreview
+        ? (new URL(window.location.href).searchParams.get("preview") ??
+          undefined)
+        : undefined;
+      setSelectedPreview(preview);
+      setScrollPreview(preview);
       writeQuery(
         preservePreview ? { session: id } : { session: id, preview: null },
       );
@@ -274,7 +277,17 @@ export function IdeationStudio({
     tab === "pending"
       ? pending
       : allPreviews.filter(({ status }) => status !== "pending");
-  const preview = chosen ?? previews[0];
+  const preview =
+    selectedPreview === null ? undefined : (chosen ?? previews[0]);
+  const expandedId = preview?.id;
+  useLayoutEffect(() => {
+    if (!scrollPreview || scrollPreview !== expandedId) return;
+    currentEntry.current?.scrollIntoView({
+      block: "nearest",
+      behavior: "instant",
+    });
+    setScrollPreview(undefined);
+  }, [expandedId, scrollPreview]);
   const newer =
     preview &&
     allPreviews.find(
@@ -307,18 +320,20 @@ export function IdeationStudio({
     setError((current) => (current?.area === "decision" ? undefined : current));
     setSelectedPreview(id);
     writeQuery({ preview: id });
-    if (reveal)
-      requestAnimationFrame(() =>
-        currentCard.current?.scrollIntoView({
-          block: "nearest",
-          behavior: "instant",
-        }),
-      );
+    if (reveal) setScrollPreview(id);
   }
-  function changeTab(next: Inbox) {
+  function togglePreview(id: IdeationPreviewId) {
+    if (id === preview?.id) {
+      changeTab(tab, null);
+      return;
+    }
+    openPreview(id, true);
+  }
+  function changeTab(next: Inbox, selection?: null) {
     setInboxTab(next);
     setError((current) => (current?.area === "decision" ? undefined : current));
-    setSelectedPreview("");
+    setSelectedPreview(selection);
+    setScrollPreview(undefined);
     writeQuery({ preview: null });
   }
   function toggleCompile(open: boolean) {
@@ -548,14 +563,13 @@ export function IdeationStudio({
               />
             </form>
           ) : (
-            <button
-              className="ui-btn ui-btn-ghost"
-              type="button"
+            <Button
+              variant="secondary"
               disabled={!interactive || busy}
               onClick={() => setCreating(true)}
             >
               {c.newSession}
-            </button>
+            </Button>
           )}
           <p>{c.privacy}</p>
         </div>
@@ -789,73 +803,88 @@ export function IdeationStudio({
         <section className="ideation-preview-list" aria-label={c.previewList}>
           {previews.map((item) => {
             const time = ideationTime(item.createdAt);
+            const expanded = preview?.id === item.id;
+            const cardId = `ideation-preview-${item.id}`;
             return (
-              <button
-                type="button"
-                key={item.id}
-                aria-current={preview?.id === item.id ? "true" : undefined}
-                data-kind={item.kind}
-                data-handled={item.status !== "pending"}
-                onClick={() => openPreview(item.id)}
-              >
-                <span>
-                  {previewKind(item)}
-                  {item.kind === "expression_candidate" && (
-                    <>
-                      {" "}
-                      ·{" "}
-                      {item.approvalStage === "activation"
-                        ? c.activationStage
-                        : c.candidateStage}
-                    </>
+              <div className="ideation-preview-entry" key={item.id}>
+                <button
+                  ref={expanded ? currentEntry : undefined}
+                  type="button"
+                  aria-current={expanded ? "true" : undefined}
+                  aria-expanded={expanded}
+                  aria-controls={cardId}
+                  data-kind={item.kind}
+                  data-handled={item.status !== "pending"}
+                  onClick={() => togglePreview(item.id)}
+                >
+                  <span>
+                    {previewKind(item)}
+                    {item.kind === "expression_candidate" && (
+                      <>
+                        {" "}
+                        ·{" "}
+                        {item.approvalStage === "activation"
+                          ? c.activationStage
+                          : c.candidateStage}
+                      </>
+                    )}
+                    {item.status !== "pending" && (
+                      <> · {previewStatus[item.status]}</>
+                    )}
+                  </span>
+                  <strong>
+                    <SafeMarkdown inline plain content={item.summary} />
+                  </strong>
+                  <small>
+                    {c.revision(item.revision)}
+                    {time ? (
+                      <>
+                        {" "}
+                        · <time dateTime={item.createdAt}>{time}</time>
+                      </>
+                    ) : (
+                      <> · {roleName[item.role]}</>
+                    )}
+                  </small>
+                </button>
+                <div
+                  id={cardId}
+                  hidden={!expanded}
+                  className="ideation-card-wrap"
+                >
+                  {expanded && (
+                    <PreviewCard
+                      key={`${item.id}:${item.sha256}:${closed}`}
+                      preview={item}
+                      busy={busy}
+                      canRevise={!closed}
+                      externalSearch={
+                        active?.session.capabilities.externalSearch ?? false
+                      }
+                      sources={sourcePaths}
+                      receipt={
+                        receipt?.previewId === item.id ? receipt : undefined
+                      }
+                      startedRole={role ? roleName[role] : undefined}
+                      error={
+                        error?.area === "decision" ? (
+                          <IdeationErrorNotice code={error.code} />
+                        ) : undefined
+                      }
+                      onNewer={
+                        newer ? () => openPreview(newer.id, true) : undefined
+                      }
+                      onAction={(kind, text, trialRead) =>
+                        void decide(kind, text, trialRead)
+                      }
+                    />
                   )}
-                  {item.status !== "pending" && (
-                    <> · {previewStatus[item.status]}</>
-                  )}
-                </span>
-                <strong>
-                  <SafeMarkdown inline plain content={item.summary} />
-                </strong>
-                <small>
-                  {c.revision(item.revision)}
-                  {time ? (
-                    <>
-                      {" "}
-                      · <time dateTime={item.createdAt}>{time}</time>
-                    </>
-                  ) : (
-                    <> · {roleName[item.role]}</>
-                  )}
-                </small>
-              </button>
+                </div>
+              </div>
             );
           })}
         </section>
-        {preview ? (
-          <div ref={currentCard} className="ideation-card-wrap">
-            <PreviewCard
-              key={`${preview.id}:${preview.sha256}:${closed}`}
-              preview={preview}
-              busy={busy}
-              canRevise={!closed}
-              externalSearch={
-                active?.session.capabilities.externalSearch ?? false
-              }
-              sources={sourcePaths}
-              receipt={receipt?.previewId === preview.id ? receipt : undefined}
-              startedRole={role ? roleName[role] : undefined}
-              error={
-                error?.area === "decision" ? (
-                  <IdeationErrorNotice code={error.code} />
-                ) : undefined
-              }
-              onNewer={newer ? () => openPreview(newer.id, true) : undefined}
-              onAction={(kind, text, trialRead) =>
-                void decide(kind, text, trialRead)
-              }
-            />
-          </div>
-        ) : (
+        {!previews.length && (
           <p className="ideation-inbox-empty">
             {tab === "pending" ? c.emptyInbox : c.emptyProcessed}
           </p>

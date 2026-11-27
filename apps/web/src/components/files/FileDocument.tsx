@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { filesCopy as copy } from "../../copy/zh-CN.ts";
+import { cleanupCopy, filesCopy as copy } from "../../copy/zh-CN.ts";
 import { KeyValueList } from "../../ui/KeyValueList.tsx";
 import { RoleTag } from "../../ui/Role.tsx";
 import { SafeMarkdown } from "../SafeMarkdown.tsx";
 import {
   fileKeyValues,
+  fileName,
   ledgerSummary,
   type ProjectFile,
   parseJson,
@@ -64,7 +65,18 @@ function RegistryTable({
         {[...registry.values()].map((entry) => (
           <tr key={entry.path}>
             <th scope="row">
-              <SafeMarkdown plain inline content={entry.id} />
+              <SafeMarkdown
+                plain
+                inline
+                content={entry.title ?? fileName(entry.path)}
+              />
+              <details className="files-registry-technical">
+                <summary>{copy.technical}</summary>
+                {cleanupCopy.resourceId}{" "}
+                <code>
+                  <SafeMarkdown plain inline content={entry.id} />
+                </code>
+              </details>
             </th>
             <td>
               <SafeMarkdown plain inline content={entry.path} />

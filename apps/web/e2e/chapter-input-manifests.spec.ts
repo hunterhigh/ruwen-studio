@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { expect, type Page, test } from "@playwright/test";
 import type { Detail } from "../src/components/chapter/review-data.ts";
 import { chapterCopy, roleName } from "../src/copy/zh-CN.ts";
+import { captureCleanup } from "./cleanup-11a.ts";
 import { createDemoFromShelf as createDemo, signIn } from "./helpers.ts";
 
 const stages = [
@@ -145,7 +146,14 @@ test("chapter desk displays current role manifests, reverification, and the lega
           (author.totals.packetChars / author.totals.packetBudget) * 100,
           3,
         );
-      await expect(popover).toContainText("按如文规则，小说作者不看故事大纲。");
+      await expect(
+        popover.getByText("按如文规则，小说作者不看以下材料", { exact: true }),
+      ).toHaveCount(1);
+      const tags = popover.locator(".chapter-manifest-tags");
+      await expect(tags.getByText("故事大纲", { exact: true })).toBeVisible();
+      await expect(tags.getByText("研究资料", { exact: true })).toBeVisible();
+      await tags.scrollIntoViewIfNeeded();
+      await captureCleanup(page, "08");
     }
 
     if (role === "qingjie-heyanyuan" || role === "xianshi-heyanyuan") {

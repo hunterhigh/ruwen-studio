@@ -1,5 +1,5 @@
 import type { InputManifest } from "@ruwen/core";
-import { inputManifestCopy as c } from "../../copy/zh-CN.ts";
+import { inputManifestCopy as c, cleanupCopy } from "../../copy/zh-CN.ts";
 
 const count = new Intl.NumberFormat("zh-CN");
 const listing = new Intl.ListFormat("zh-CN");
@@ -10,6 +10,28 @@ function known<K extends string, V>(
   key: string,
 ) {
   return Object.hasOwn(table, key) ? table[key as K] : undefined;
+}
+
+function withheldGroups(withheld: InputManifest["withheld"]) {
+  const groups = new Map<string, { labels: Set<string>; reason: string }>();
+  for (const { category, ruleRef } of withheld) {
+    const name = known(c.categories, category);
+    const label = name ?? c.unknownCategory;
+    const rule = name ? known(c.ruleReasons, ruleRef) : undefined;
+    const reason =
+      typeof rule === "function" ? rule(label) : (rule ?? c.unknownRule);
+    const groupReason =
+      ruleRef === "I4" && typeof rule === "function"
+        ? cleanupCopy.authorWithheld
+        : reason;
+    const group = groups.get(groupReason);
+    if (group) group.labels.add(label);
+    else groups.set(groupReason, { labels: new Set([label]), reason });
+  }
+  return Array.from(groups, ([groupReason, { labels, reason }]) => ({
+    labels: [...labels],
+    reason: labels.size > 1 ? groupReason : reason,
+  }));
 }
 
 export function roleInputsView(
@@ -41,17 +63,7 @@ export function roleInputsView(
       path,
       sha256,
     })),
-    withheld: manifest.withheld.map(({ category, ruleRef }) => {
-      const name = known(c.categories, category);
-      const reason = name ? known(c.ruleReasons, ruleRef) : undefined;
-      return {
-        label: name ?? c.unknownCategory,
-        reason:
-          typeof reason === "function"
-            ? reason(name ?? c.unknownCategory)
-            : (reason ?? c.unknownRule),
-      };
-    }),
+    withheld: withheldGroups(manifest.withheld),
     rules: c.rulesSize(
       count.format(manifest.rules.upstreamFileCount),
       count.format(manifest.rules.chars),

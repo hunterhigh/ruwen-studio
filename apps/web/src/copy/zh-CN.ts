@@ -1235,7 +1235,6 @@ export const accountCopy = {
   revoking: "正在撤销会话…",
   credits: "点数",
   points: (value: string) => `${value} 点`,
-  testCredits: (value: string) => `${value} 测试点数`,
   usage: "用量明细",
   record: "运行 / 账本记录",
   project: (title: string) => `《${title}》`,
@@ -1261,15 +1260,25 @@ export const accountCopy = {
   createCheckout: "创建沙箱结账",
   preparingCheckout: "正在创建结账…",
   checkoutPrepared: (credits: string) =>
-    `结账已创建。完成测试支付后将加入 ${credits} 测试点数。`,
+    `结账已创建。完成测试支付后将加入 ${credits} 点。`,
   resumeCheckout: "继续测试结账",
   checkoutAwaitingReview: "结账待核对",
   completePayment: "完成沙箱付款",
   openTestCheckout: "打开外部测试结账",
-  paid: (credits: string) => `已加入 ${credits} 沙箱点数。`,
+  paid: (credits: string) => `已向测试点数池加入 ${credits} 点。`,
   alreadyPaid: "这笔测试支付已经完成。",
   close: "关闭",
 };
+
+export const cleanupCopy = {
+  emptyMemoryQuestion: (chapter: string) => `确认${chapter}无需资料变更？`,
+  emptyMemoryHint: "确认后结束本章流程，项目资料保持原样。",
+  systemRecord: "系统记录，不供岗位读取",
+  resourceId: "资源 ID",
+  authorWithheld: "按如文规则，小说作者不看以下材料",
+  remainingReadiness: (n: number) => `展开其余 ${n} 项`,
+  creditUnit: "点",
+} as const;
 
 export const signInCopy = {
   brand: "如文",

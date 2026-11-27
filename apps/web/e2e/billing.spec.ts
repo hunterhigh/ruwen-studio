@@ -26,6 +26,9 @@ test("sandbox purchase records a real ledger entry once and refreshes segregated
   await dialog.getByRole("button", { name: "创建沙箱结账" }).click();
   const finish = dialog.getByRole("button", { name: "完成沙箱付款" });
   await expect(finish).toBeVisible();
+  await expect(
+    dialog.getByText(/完成测试支付后将加入 [\d,]+ 点。/),
+  ).toBeVisible();
   const prepared = await (await page.request.get("/api/account")).json();
   expect(prepared.banks).toEqual(before.banks);
   expect(prepared.ledger).toEqual(before.ledger);
@@ -45,7 +48,7 @@ test("sandbox purchase records a real ledger entry once and refreshes segregated
     .getByRole("button", { name: "完成模拟支付", exact: true })
     .click();
   await expect(page.getByRole("status")).toContainText(
-    /已加入 [\d,]+ 沙箱点数。/,
+    /已向测试点数池加入 [\d,]+ 点。/,
   );
   const after = await (await page.request.get("/api/account")).json();
   expect(BigInt(after.banks.sandbox.balance)).toBe(

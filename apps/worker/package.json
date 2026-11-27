@@ -13,6 +13,6 @@
     "@ruwen/core": "workspace:*",
     "@ruwen/db": "workspace:*",
     "@ruwen/pipeline": "workspace:*",
-    "pg-boss": "12.38.1"
+    "pg-boss": "12.38.2"
   }
 }

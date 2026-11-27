@@ -1,11 +1,31 @@
 "use client";
 import { type FormEvent, useState } from "react";
-import { confirmation } from "../copy/zh-CN.ts";
+import { adminCopy, confirmation } from "../copy/zh-CN.ts";
 import type { pendingReservations } from "../server/admin-review.ts";
+import { Button } from "../ui/Button.tsx";
 import { useConfirm } from "../ui/ConfirmDialog.tsx";
-import { post } from "./client.ts";
+import { ApiError, post } from "./client.ts";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
 import { useApi } from "./useApi.ts";
+
+const copy = adminCopy.review;
+const currency = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  currencyDisplay: "code",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+function resolveError(error: unknown) {
+  if (error instanceof ApiError) {
+    if (error.status === 400) return adminCopy.errors.reservationInvalid;
+    if (error.status === 404 || error.status === 409)
+      return adminCopy.errors.reservationUpdated;
+  }
+  return adminCopy.errors.reservationResolve;
+}
+
 export function AdminReservations() {
   const confirm = useConfirm();
   const {
@@ -15,19 +35,21 @@ export function AdminReservations() {
   } = useApi<Awaited<ReturnType<typeof pendingReservations>>>(
     "/api/admin/reservations",
   );
-  const [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [notice, setNotice] = useState("");
+  const [error, setError] = useState<{ id: string; text: string }>();
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+
   async function resolve(
     event: FormEvent<HTMLFormElement>,
     id: string,
     remaining: string,
   ) {
     event.preventDefault();
+    if (busy) return;
     const form = new FormData(event.currentTarget);
     if (!(await confirm(confirmation.resolveReservation))) return;
     setBusy(true);
-    setError("");
+    setError(undefined);
     setNotice("");
     try {
       await post(`/api/admin/reservations/${id}/resolve`, {
@@ -38,68 +60,98 @@ export function AdminReservations() {
         expectedRemaining: remaining,
       });
       await refresh();
-      setNotice("核对已完成，账本和处理理由已保存。");
+      setNotice(copy.saved);
     } catch (caught) {
-      setError((caught as Error).message);
+      setError({ id, text: resolveError(caught) });
     } finally {
       setBusy(false);
     }
   }
+
   return (
-    <main className="page-content">
+    <main className="page-content admin-page">
       <header className="page-heading">
         <div>
-          <span className="eyebrow">工作室管理 / 费用复核</span>
-          <h1>待核对预留</h1>
-          <a href="/admin">返回运行概况</a>
+          <span className="eyebrow">
+            {adminCopy.section} / {adminCopy.billingReview}
+          </span>
+          <h1>{copy.heading}</h1>
         </div>
+        <a className="ui-btn" href="/admin">
+          {copy.back}
+        </a>
       </header>
-      <p className="notice">
-        只处理服务商结果未知的运行。填写运行总实际费用时须包含已结算岗位；系统追加差额记录，不改写旧账。全额释放仅释放尚未结算的剩余预留。
-      </p>
-      {(error || loadError) && (
-        <div className="error" role="alert">
-          <SafeMarkdown plain content={error || loadError} />
+      <p className="admin-notice">{copy.guidance}</p>
+      {loadError && (
+        <div className="admin-error">
+          <p role="alert">{adminCopy.errors.reservationList}</p>
+          <Button variant="ghost" onClick={() => void refresh()}>
+            {adminCopy.reload}
+          </Button>
         </div>
       )}
-      {notice && <output>{notice}</output>}
+      {notice && <output className="admin-notice">{notice}</output>}
       {data?.length === 0 && (
-        <section className="paper-panel">
-          <h2>暂无待核对预留</h2>
+        <section className="paper-panel admin-panel">
+          <h2>{copy.noPending}</h2>
         </section>
       )}
       {data?.map((row) => (
-        <section className="paper-panel" key={row.id}>
+        <section className="paper-panel admin-panel" key={row.id}>
           <h2>
             <SafeMarkdown plain inline content={row.email} />
           </h2>
-          <p>
-            <SafeMarkdown plain inline content={row.run_id} /> ·{" "}
-            {row.bank === "sandbox" ? "沙箱" : "正式"} · 保留 {row.remaining}{" "}
-            点（预留折算 USD {Number(row.held_usd).toFixed(4)}，不是已发生费用）
-          </p>
+          <dl className="admin-reservation-details">
+            <div>
+              <dt>{copy.runId}</dt>
+              <dd>
+                <SafeMarkdown plain inline content={row.run_id} />
+              </dd>
+            </div>
+            <div>
+              <dt>{copy.bank}</dt>
+              <dd>
+                {row.bank === "sandbox"
+                  ? copy.sandbox
+                  : row.bank === "live"
+                    ? copy.live
+                    : adminCopy.empty}
+              </dd>
+            </div>
+            <div className="admin-number">
+              <dt>{copy.remaining}</dt>
+              <dd>{BigInt(row.remaining).toLocaleString("zh-CN")}</dd>
+            </div>
+            <div className="admin-number">
+              <dt>{copy.held}</dt>
+              <dd>{currency.format(Number(row.held_usd))}</dd>
+            </div>
+          </dl>
+          <p className="admin-helper">{copy.heldNote}</p>
           <form
+            className="admin-reservation-form"
             onSubmit={(event) => void resolve(event, row.id, row.remaining)}
           >
             <label>
-              处理方式
+              {copy.action}
               <select name="action" required disabled={busy}>
-                <option value="settle">按运行总实际费用结算</option>
-                <option value="release">全额释放剩余预留</option>
+                <option value="settle">{copy.settle}</option>
+                <option value="release">{copy.release}</option>
               </select>
             </label>
             <label>
-              运行总实际费用 USD
+              {copy.cost}
               <input
+                className="admin-number"
                 name="cost"
                 type="text"
                 inputMode="decimal"
-                placeholder="例如 0.125（含已结算用量）"
+                placeholder={copy.costExample}
                 disabled={busy}
               />
             </label>
             <label>
-              核对理由（必填，对用户可见）
+              {copy.reason}
               <textarea
                 name="reason"
                 required
@@ -107,9 +159,23 @@ export function AdminReservations() {
                 disabled={busy}
               />
             </label>
-            <button className="button primary" type="submit" disabled={busy}>
-              确认核对并记入审计
-            </button>
+            <Button variant="primary" type="submit" disabled={busy}>
+              {copy.submit}
+            </Button>
+            {error?.id === row.id && (
+              <div className="admin-error">
+                <p role="alert">{error.text}</p>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setError(undefined);
+                    void refresh();
+                  }}
+                >
+                  {adminCopy.reload}
+                </Button>
+              </div>
+            )}
           </form>
         </section>
       ))}

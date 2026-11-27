@@ -1,10 +1,21 @@
 "use client";
 import { useState } from "react";
-import { confirmation } from "../copy/zh-CN.ts";
+import { adminCopy, confirmation } from "../copy/zh-CN.ts";
 import type { AdminRiskReview } from "../server/admin-review.ts";
+import { Button } from "../ui/Button.tsx";
 import { useConfirm } from "../ui/ConfirmDialog.tsx";
-import { post } from "./client.ts";
+import { ApiError, post } from "./client.ts";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
+
+const copy = adminCopy.risk;
+const number = new Intl.NumberFormat("zh-CN");
+
+function auditAction(action: string) {
+  return Object.hasOwn(copy.actions, action)
+    ? copy.actions[action as keyof typeof copy.actions]
+    : copy.unknownAction;
+}
+
 export function AdminSecurity({
   review,
   onChanged,
@@ -13,123 +24,171 @@ export function AdminSecurity({
   onChanged?: () => Promise<unknown>;
 }) {
   const confirm = useConfirm();
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<{ id: string; text: string }>();
   const limits = review.designLimits;
+  const freezeScore = review.enforcedLimits.freezeScore;
   const controls = [
     [
-      "风险冻结阈值",
-      `${review.enforcedLimits.freezeScore ?? "尚未配置"} 分`,
-      "已执行 · 待 P3 校准",
+      copy.threshold,
+      freezeScore === null
+        ? copy.unconfigured
+        : `${number.format(freezeScore)} ${copy.point}`,
+      freezeScore === null ? copy.reference : copy.thresholdActive,
     ],
-    ["每用户同时运行章节", `${limits.userChapterConcurrency} 个`, "待后端"],
-    ["每项目同时运行", `${limits.projectConcurrency} 个`, "已有项目锁"],
     [
-      "协调员单条消息",
-      `${limits.coordinatorMessageChars} 字符`,
-      "已有输入上限",
+      copy.userChapter,
+      `${number.format(limits.userChapterConcurrency)} ${copy.item}`,
+      copy.reference,
     ],
-    ["协调员每会话每小时", `${limits.coordinatorTurnsPerHour} 轮`, "待后端"],
-    ["每日点数消耗", `套餐点数的 ${limits.dailyPlanPercent}%`, "待计费后端"],
     [
-      "试用点数目标",
-      `${limits.trialChapterRange.join("～")} 章`,
-      "待 P3 成本校准",
+      copy.project,
+      `${number.format(limits.projectConcurrency)} ${copy.item}`,
+      copy.projectLock,
+    ],
+    [
+      copy.message,
+      `${number.format(limits.coordinatorMessageChars)} ${copy.character}`,
+      copy.inputLimit,
+    ],
+    [
+      copy.turns,
+      `${number.format(limits.coordinatorTurnsPerHour)} ${copy.turn}`,
+      copy.reference,
+    ],
+    [
+      copy.dailyUsage,
+      adminCopy.risk.dailyPercent(number.format(limits.dailyPlanPercent)),
+      copy.reference,
+    ],
+    [
+      copy.trial,
+      `${limits.trialChapterRange.map((value) => number.format(value)).join("–")} ${copy.chapter}`,
+      copy.costCalibration,
     ],
   ];
+
+  async function unfreeze(id: string, frozenAt: string | null) {
+    if (busy || !frozenAt || !(await confirm(confirmation.unfreeze))) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      await post(`/api/admin/accounts/${id}/unfreeze`, {
+        confirmed: true,
+        expectedFrozenAt: frozenAt,
+      });
+      await onChanged?.();
+    } catch (caught) {
+      setError({
+        id,
+        text:
+          caught instanceof ApiError && caught.status === 409
+            ? adminCopy.errors.riskUpdated
+            : adminCopy.errors.unfreeze,
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <section className="admin-security" aria-label="安全与风险复核">
+    <section className="admin-security" aria-label={copy.section}>
       <header>
-        <span className="eyebrow">安全复核 / S1-4</span>
-        <h2>先看事实，再做处理。</h2>
+        <span className="eyebrow">{copy.review}</span>
+        <h2>{copy.heading}</h2>
       </header>
-      <div className="notice">
-        <strong>运行保护已接入</strong>
-        <p>
-          安全事件累计达到阈值会冻结后续运行。人工复核并解冻后，保留原事件和审计；后续新事件仍会累计。
-        </p>
+      <div className="admin-notice">
+        <strong>{copy.protected}</strong>
+        <p>{copy.protection}</p>
       </div>
-      {error && (
-        <div className="error" role="alert">
-          <SafeMarkdown plain content={error} />
-        </div>
-      )}
-      <section className="paper-panel">
-        <h3>风控配置对照</h3>
-        <p className="fine-print">
-          设计占位值 ·{" "}
+
+      <section className="paper-panel admin-panel">
+        <h3>{copy.comparison}</h3>
+        <p className="admin-helper">{copy.limits}</p>
+        <p className="admin-helper">
+          {copy.calibration} ·{" "}
           <SafeMarkdown plain inline content={review.calibration} />
-          。除标明已有的控制外，其余尚未在后端执行；不代表当前账户限额。
         </p>
         <dl className="risk-controls">
           {controls.map(([name, value, status]) => (
             <div key={name}>
               <dt>{name}</dt>
-              <dd>
+              <dd className="admin-number">
                 {value}
                 <small>{status}</small>
               </dd>
             </div>
           ))}
         </dl>
-        <p className="fine-print">
-          冻结阈值由服务端配置，当前试用点数已入账。一次性邮箱黑名单、会话频率与用户自行调整日上限尚未接入，不把设计配置当作已执行。
-        </p>
       </section>
-      <section className="paper-panel">
-        <h3>账户风险事实（最多100条）</h3>
+
+      <section className="paper-panel admin-panel">
+        <h3>{copy.accounts}</h3>
         <div className="table-scroll">
-          <table className="usage-table">
+          <table className="admin-table" aria-label={copy.accounts}>
             <thead>
               <tr>
-                <th>账户</th>
-                <th>风险分 / 事件数</th>
-                <th>最近事件</th>
-                <th>冻结状态</th>
+                <th scope="col">{copy.account}</th>
+                <th scope="col" className="admin-number">
+                  {copy.scoreAndEvents}
+                </th>
+                <th scope="col" className="admin-number">
+                  {copy.recentEvent}
+                </th>
+                <th scope="col">{copy.freezeState}</th>
               </tr>
             </thead>
             <tbody>
               {review.accounts.map((account) => (
                 <tr key={account.id}>
-                  <td>
+                  <th scope="row">
                     <SafeMarkdown plain inline content={account.email} />
+                  </th>
+                  <td className="admin-number">
+                    {number.format(account.score)} /{" "}
+                    {number.format(account.events)}
+                  </td>
+                  <td className="admin-number">
+                    {account.lastEvent ? (
+                      <time dateTime={account.lastEvent}>
+                        {new Date(account.lastEvent).toLocaleString("zh-CN")}
+                      </time>
+                    ) : (
+                      copy.noEvent
+                    )}
                   </td>
                   <td>
-                    {account.score} / {account.events}
-                  </td>
-                  <td>
-                    {account.lastEvent
-                      ? new Date(account.lastEvent).toLocaleString("zh-CN")
-                      : "暂无事件"}
-                  </td>
-                  <td>
-                    {account.frozenAt ? "已冻结 · 等待人工复核" : "未冻结"}
-                    <button
-                      type="button"
-                      className="text-button"
-                      disabled={busy || !account.frozenAt}
-                      onClick={async () => {
-                        if (
-                          !account.frozenAt ||
-                          !(await confirm(confirmation.unfreeze))
-                        )
-                          return;
-                        setBusy(true);
-                        setError("");
-                        void post(
-                          `/api/admin/accounts/${account.id}/unfreeze`,
-                          {
-                            confirmed: true,
-                            expectedFrozenAt: account.frozenAt,
-                          },
-                        )
-                          .then(() => onChanged?.())
-                          .catch((caught: Error) => setError(caught.message))
-                          .finally(() => setBusy(false));
-                      }}
+                    <span
+                      className={
+                        account.frozenAt ? "admin-failed-state" : undefined
+                      }
                     >
-                      人工复核并解冻
-                    </button>
+                      {account.frozenAt ? copy.frozen : copy.unfrozen}
+                    </span>
+                    <Button
+                      className="admin-table-action"
+                      variant="ghost"
+                      disabled={busy || !account.frozenAt}
+                      onClick={() =>
+                        void unfreeze(account.id, account.frozenAt)
+                      }
+                    >
+                      {copy.unfreeze}
+                    </Button>
+                    {error?.id === account.id && (
+                      <div className="admin-error">
+                        <p role="alert">{error.text}</p>
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            setError(undefined);
+                            void onChanged?.();
+                          }}
+                        >
+                          {adminCopy.reload}
+                        </Button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -137,54 +196,104 @@ export function AdminSecurity({
           </table>
         </div>
       </section>
-      <section className="paper-panel">
-        <h3>冻结与解冻审计</h3>
-        {review.riskAudit.map((entry) => (
-          <p key={entry.id}>
-            {new Date(entry.at).toLocaleString("zh-CN")} ·{" "}
-            <SafeMarkdown inline plain content={entry.userId} /> ·{" "}
-            {entry.action === "freeze" ? "自动冻结" : "人工解冻"} · 累计{" "}
-            {entry.score} 分 ·{" "}
-            <SafeMarkdown inline plain content={entry.actorId ?? "系统"} />
-          </p>
-        ))}
-      </section>
-      <section className="paper-panel">
-        <h3>管理访问审计（最近100条）</h3>
-        <p className="fine-print">
-          页面、数据读取和邀请码操作均留痕；记录不含稿件、提示词、会话令牌或邀请码原文。当前管理页不提供稿件或完整转录读取。
-        </p>
-        <div className="table-scroll">
-          <table className="usage-table">
-            <thead>
-              <tr>
-                <th>时间</th>
-                <th>操作人</th>
-                <th>操作</th>
-                <th>授权结果</th>
-              </tr>
-            </thead>
-            <tbody>
-              {review.audit.map((entry) => (
-                <tr key={entry.id}>
-                  <td>{new Date(entry.at).toLocaleString("zh-CN")}</td>
-                  <td>
-                    <SafeMarkdown
-                      plain
-                      inline
-                      content={entry.actorId ?? "未登录"}
-                    />
-                  </td>
-                  <td>
-                    <SafeMarkdown plain inline content={entry.action} />
-                  </td>
-                  <td>{entry.outcome === "allowed" ? "允许" : "拒绝"}</td>
+
+      <section className="paper-panel admin-panel">
+        <h3>{copy.riskAudit}</h3>
+        {review.riskAudit.length > 0 ? (
+          <div className="table-scroll">
+            <table className="admin-table" aria-label={copy.riskAudit}>
+              <thead>
+                <tr>
+                  <th scope="col" className="admin-number">
+                    {copy.time}
+                  </th>
+                  <th scope="col">{copy.account}</th>
+                  <th scope="col">{copy.operation}</th>
+                  <th scope="col" className="admin-number">
+                    {copy.accumulated}
+                  </th>
+                  <th scope="col">{copy.actor}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {review.audit.length === 0 && <p>暂无管理访问记录。</p>}
+              </thead>
+              <tbody>
+                {review.riskAudit.map((entry) => (
+                  <tr key={entry.id}>
+                    <td className="admin-number">
+                      <time dateTime={entry.at}>
+                        {new Date(entry.at).toLocaleString("zh-CN")}
+                      </time>
+                    </td>
+                    <td>
+                      <SafeMarkdown inline plain content={entry.userId} />
+                    </td>
+                    <td>
+                      {entry.action === "freeze"
+                        ? copy.autoFreeze
+                        : copy.manualUnfreeze}
+                    </td>
+                    <td className="admin-number">
+                      {number.format(BigInt(entry.score))}
+                    </td>
+                    <td>
+                      <SafeMarkdown
+                        inline
+                        plain
+                        content={entry.actorId ?? copy.system}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p>{copy.noRiskAudit}</p>
+        )}
+      </section>
+
+      <section className="paper-panel admin-panel">
+        <h3>{copy.adminAudit}</h3>
+        <p className="admin-helper">{copy.auditDescription}</p>
+        {review.audit.length > 0 ? (
+          <div className="table-scroll">
+            <table className="admin-table" aria-label={copy.adminAudit}>
+              <thead>
+                <tr>
+                  <th scope="col" className="admin-number">
+                    {copy.time}
+                  </th>
+                  <th scope="col">{copy.actor}</th>
+                  <th scope="col">{copy.operation}</th>
+                  <th scope="col">{copy.outcome}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {review.audit.map((entry) => (
+                  <tr key={entry.id}>
+                    <td className="admin-number">
+                      <time dateTime={entry.at}>
+                        {new Date(entry.at).toLocaleString("zh-CN")}
+                      </time>
+                    </td>
+                    <td>
+                      <SafeMarkdown
+                        plain
+                        inline
+                        content={entry.actorId ?? copy.signedOut}
+                      />
+                    </td>
+                    <td>{auditAction(entry.action)}</td>
+                    <td>
+                      {entry.outcome === "allowed" ? copy.allowed : copy.denied}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p>{copy.noAudit}</p>
+        )}
       </section>
     </section>
   );

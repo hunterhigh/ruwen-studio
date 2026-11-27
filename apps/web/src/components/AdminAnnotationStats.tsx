@@ -1,8 +1,12 @@
 "use client";
 import type { AnnotationStatsRow } from "@ruwen/db";
 import { useState } from "react";
-import { annotationStatsCopy as copy, roleName } from "../copy/zh-CN.ts";
-import { SafeMarkdown } from "./SafeMarkdown.tsx";
+import {
+  adminCopy,
+  annotationStatsCopy as copy,
+  roleName,
+} from "../copy/zh-CN.ts";
+import { Button } from "../ui/Button.tsx";
 import { useApi } from "./useApi.ts";
 
 const roles = {
@@ -19,18 +23,21 @@ const rate = (count: number, total: number) =>
   total ? percent.format(count / total) : copy.noRate;
 
 function StatsTable({ query }: { query: string }) {
-  const { data, error } = useApi<AnnotationStatsRow[]>(
+  const { data, error, refresh } = useApi<AnnotationStatsRow[]>(
     `/api/admin/annotation-stats?${query}`,
   );
   if (error)
     return (
-      <div role="alert">
-        <SafeMarkdown plain content={error} />
+      <div className="admin-error">
+        <p role="alert">{adminCopy.errors.stats}</p>
+        <Button variant="ghost" onClick={() => void refresh()}>
+          {adminCopy.reload}
+        </Button>
       </div>
     );
   if (!data) return <output>{copy.loading}</output>;
   return (
-    <table className="usage-table" aria-label={copy.title}>
+    <table className="admin-table" aria-label={copy.title}>
       <thead>
         <tr>
           {[
@@ -40,8 +47,12 @@ function StatsTable({ query }: { query: string }) {
             copy.dismissed,
             copy.useful,
             copy.notUseful,
-          ].map((label) => (
-            <th key={label} scope="col">
+          ].map((label, index) => (
+            <th
+              key={label}
+              scope="col"
+              className={index > 0 ? "admin-number" : undefined}
+            >
               {label}
             </th>
           ))}
@@ -55,11 +66,17 @@ function StatsTable({ query }: { query: string }) {
           return (
             <tr key={kind}>
               <th scope="row">{roles[kind]}</th>
-              <td>{total}</td>
-              <td>{rate(row?.accepted ?? 0, total)}</td>
-              <td>{rate(row?.dismissed ?? 0, total)}</td>
-              <td>{rate(row?.useful ?? 0, rated)}</td>
-              <td>{rate(row?.notUseful ?? 0, rated)}</td>
+              <td className="admin-number">{total.toLocaleString("zh-CN")}</td>
+              <td className="admin-number">
+                {rate(row?.accepted ?? 0, total)}
+              </td>
+              <td className="admin-number">
+                {rate(row?.dismissed ?? 0, total)}
+              </td>
+              <td className="admin-number">{rate(row?.useful ?? 0, rated)}</td>
+              <td className="admin-number">
+                {rate(row?.notUseful ?? 0, rated)}
+              </td>
             </tr>
           );
         })}
@@ -81,8 +98,12 @@ export function AdminAnnotationStats() {
   const [query, setQuery] = useState(() =>
     new URLSearchParams(initial).toString(),
   );
+  const [invalidDates, setInvalidDates] = useState(false);
   return (
-    <section className="paper-panel" aria-labelledby="annotation-stats-heading">
+    <section
+      className="paper-panel admin-panel"
+      aria-labelledby="annotation-stats-heading"
+    >
       <h2 id="annotation-stats-heading">{copy.title}</h2>
       <p>{copy.basis}</p>
       <form
@@ -90,26 +111,40 @@ export function AdminAnnotationStats() {
         onSubmit={(event) => {
           event.preventDefault();
           const form = new FormData(event.currentTarget);
-          setQuery(
-            new URLSearchParams({
-              from: String(form.get("from")),
-              to: String(form.get("to")),
-            }).toString(),
-          );
+          const from = String(form.get("from"));
+          const to = String(form.get("to"));
+          setInvalidDates(from > to);
+          if (from <= to)
+            setQuery(new URLSearchParams({ from, to }).toString());
         }}
       >
         <label>
           {copy.from}{" "}
-          <input type="date" name="from" required defaultValue={initial.from} />
+          <input
+            className="admin-number"
+            type="date"
+            name="from"
+            required
+            defaultValue={initial.from}
+          />
         </label>
         <label>
           {copy.to}{" "}
-          <input type="date" name="to" required defaultValue={initial.to} />
+          <input
+            className="admin-number"
+            type="date"
+            name="to"
+            required
+            defaultValue={initial.to}
+          />
         </label>
-        <button className="button" type="submit">
-          {copy.filter}
-        </button>
+        <Button type="submit">{copy.filter}</Button>
       </form>
+      {invalidDates && (
+        <p className="admin-error" role="alert">
+          {adminCopy.errors.dateRange}
+        </p>
+      )}
       <div className="table-scroll">
         <StatsTable key={query} query={query} />
       </div>

@@ -283,7 +283,7 @@ export function SignIn({
                     variant="primary"
                     disabled={!ready || Boolean(pending)}
                   >
-                    {copy.submit}
+                    {pending === "send" ? copy.submitting : copy.submit}
                   </Button>
                   <SignInNotice
                     problem={problem}
@@ -310,7 +310,9 @@ export function SignIn({
               )}
             </>
           )}
-          {pending && <PageSkeleton key={pending} page="signIn" />}
+          {pending && pending !== "send" && (
+            <PageSkeleton key={pending} page="signIn" />
+          )}
           {preview && <p className="signin-preview-note">{copy.previewNote}</p>}
         </div>
       </section>

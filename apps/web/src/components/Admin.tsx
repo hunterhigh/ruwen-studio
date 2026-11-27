@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
-import { adminCopy as copy, roleName } from "../copy/zh-CN.ts";
+import { adminCopy as copy, roleName, statusCopy } from "../copy/zh-CN.ts";
 import type { AdminRiskReview } from "../server/admin-review.ts";
 import { Button } from "../ui/Button.tsx";
+import { InlineNotice } from "../ui/InlineNotice.tsx";
 import { RoleTag } from "../ui/Role.tsx";
 import { AdminAnnotationStats } from "./AdminAnnotationStats.tsx";
 import { AdminSecurity } from "./AdminSecurity.tsx";
@@ -50,7 +51,6 @@ export function Admin() {
     <main className="page-content admin-page">
       <header className="page-heading">
         <div>
-          <span className="eyebrow">{copy.section}</span>
           <h1>{copy.overview}</h1>
           <p>
             {copy.users}{" "}
@@ -66,12 +66,11 @@ export function Admin() {
         </div>
       </header>
       {loadError && (
-        <div className="admin-error">
-          <p role="alert">{copy.errors.overview}</p>
-          <Button variant="ghost" onClick={() => void refresh()}>
-            {copy.reload}
-          </Button>
-        </div>
+        <InlineNotice
+          message={copy.errors.overview}
+          actionLabel={copy.reload}
+          onAction={() => void refresh()}
+        />
       )}
       <AdminAnnotationStats />
       <section className="paper-panel admin-panel">
@@ -91,9 +90,11 @@ export function Admin() {
           {creating ? copy.creatingInvite : copy.createInvite}
         </Button>
         {inviteError && (
-          <p className="admin-error" role="alert">
-            {copy.errors.invitation}
-          </p>
+          <InlineNotice
+            message={copy.errors.invitation}
+            actionLabel={statusCopy.dismiss}
+            onAction={() => setInviteError(false)}
+          />
         )}
         {code && (
           <output className="admin-invite-code">

@@ -4335,8 +4335,7 @@ textarea {
   margin-top: 12px;
   overflow-wrap: anywhere;
 }
-.admin-notice,
-.admin-error {
+.admin-notice {
   display: block;
   margin: 0 0 18px;
   padding: 10px 14px;
@@ -4349,21 +4348,6 @@ textarea {
 }
 .admin-notice p {
   margin: 4px 0 0;
-}
-.admin-error {
-  margin: 10px 0;
-  border-color: var(--seal-soft);
-  color: var(--seal-deep);
-  background: var(--seal-soft);
-}
-.admin-error p {
-  margin: 0;
-  color: inherit;
-}
-.admin-error .ui-btn {
-  margin: 4px 0 0;
-  padding-inline: 0;
-  color: inherit;
 }
 .admin-failed-state {
   display: inline-block;

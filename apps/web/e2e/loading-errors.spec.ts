@@ -77,6 +77,50 @@ test.describe("user page loading and errors", () => {
     await expect(notice).toHaveCount(0);
   });
 
+  test("sign-in keeps the form visible while sending and shows a safe error", async ({
+    page,
+  }) => {
+    const gate = deferred();
+    await page.route("**/api/login", async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      await gate.promise;
+      await route.fulfill({ status: 500, json: failure });
+    });
+    const now = Date.now();
+    await page.clock.install({ time: new Date(now) });
+    await page.clock.pauseAt(new Date(now + 2_000));
+    try {
+      await page.goto("/sign-in");
+      const email = page.getByLabel("邮箱", { exact: true });
+      await email.fill("writer@test.invalid");
+      const send = page.getByRole("button", {
+        name: "发送登录邮件",
+        exact: true,
+      });
+      await send.click();
+      const sending = page.getByRole("button", {
+        name: "正在发送…",
+        exact: true,
+      });
+      await expect(sending).toBeDisabled();
+      await expect(email).toBeVisible();
+      await page.clock.runFor(10_000);
+      await expect(page.getByTestId("loading-skeleton")).toHaveCount(0);
+      await expect(page.getByTestId("slow-load")).toHaveCount(0);
+      gate.resolve();
+      await expect(send).toBeEnabled();
+      await expect(email).toHaveValue("writer@test.invalid");
+      await expect(
+        page.getByTestId("inline-notice").getByRole("alert"),
+      ).toBeVisible();
+      await expect(page.locator("main")).not.toContainText(
+        /INTERNAL_UNEXPECTED_11B|TypeError|runtime\.ts/,
+      );
+    } finally {
+      gate.resolve();
+    }
+  });
+
   const views = [
     { page: "shelf", path: "/projects", endpoint: "/api/projects" },
     { page: "overview", path: "", endpoint: "" },
@@ -85,18 +129,15 @@ test.describe("user page loading and errors", () => {
     { page: "memory", path: "/chapters?view=memory", endpoint: "/runs" },
     { page: "files", path: "/files", endpoint: "/files" },
     { page: "account", path: "/account", endpoint: "/api/account" },
-    { page: "signIn", path: "/sign-in", endpoint: "/api/login" },
   ] as const;
 
   for (const view of views) {
     test(`${view.page} shows its skeleton and slow hint, then a safe error`, async ({
       page,
     }) => {
-      const login = view.page === "signIn";
-      if (!login) await page.context().addCookies(sessionCookies);
+      await page.context().addCookies(sessionCookies);
       const root = `/projects/${projectId}`;
-      const projectView =
-        view.page !== "shelf" && view.page !== "account" && !login;
+      const projectView = view.page !== "shelf" && view.page !== "account";
       const routePath = projectView ? root + view.path : view.path;
       let api = projectView ? `/api${root}${view.endpoint}` : view.endpoint;
       if (view.page === "chapter" || view.page === "memory") {
@@ -124,8 +165,7 @@ test.describe("user page loading and errors", () => {
       const gate = deferred();
       const entered = deferred();
       await page.route(endpoint, async (route) => {
-        if (route.request().method() !== (login ? "POST" : "GET"))
-          return route.fallback();
+        if (route.request().method() !== "GET") return route.fallback();
         entered.resolve();
         await gate.promise;
         await route.fulfill({ status: 500, json: failure });
@@ -133,17 +173,9 @@ test.describe("user page loading and errors", () => {
       const now = Date.now();
       await page.clock.install({ time: new Date(now) });
       await page.clock.pauseAt(new Date(now + 2_000));
-      const name = login ? "sign-in" : view.page;
+      const name = view.page;
       try {
         await page.goto(routePath);
-        if (login) {
-          await page
-            .getByLabel("邮箱", { exact: true })
-            .fill("writer@test.invalid");
-          await page
-            .getByRole("button", { name: "发送登录邮件", exact: true })
-            .click();
-        }
         await entered.promise;
         const skeleton = page
           .getByTestId("loading-skeleton")

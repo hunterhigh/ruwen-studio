@@ -4,6 +4,7 @@ import { adminCopy, confirmation } from "../copy/zh-CN.ts";
 import type { AdminRiskReview } from "../server/admin-review.ts";
 import { Button } from "../ui/Button.tsx";
 import { useConfirm } from "../ui/ConfirmDialog.tsx";
+import { InlineNotice } from "../ui/InlineNotice.tsx";
 import { ApiError, post } from "./client.ts";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
 
@@ -176,18 +177,14 @@ export function AdminSecurity({
                       {copy.unfreeze}
                     </Button>
                     {error?.id === account.id && (
-                      <div className="admin-error">
-                        <p role="alert">{error.text}</p>
-                        <Button
-                          variant="ghost"
-                          onClick={() => {
-                            setError(undefined);
-                            void onChanged?.();
-                          }}
-                        >
-                          {adminCopy.reload}
-                        </Button>
-                      </div>
+                      <InlineNotice
+                        message={error.text}
+                        actionLabel={adminCopy.reload}
+                        onAction={() => {
+                          setError(undefined);
+                          void onChanged?.();
+                        }}
+                      />
                     )}
                   </td>
                 </tr>

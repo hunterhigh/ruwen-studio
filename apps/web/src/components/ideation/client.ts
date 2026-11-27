@@ -9,8 +9,8 @@ import type {
   IdeationServiceV1_2 as IdeationService,
   IdeationSessionId,
 } from "@ruwen/pipeline";
+import { errorCopy } from "../../copy/zh-CN.ts";
 import { ApiError, request } from "../client.ts";
-import { errorCopy } from "./copy.ts";
 
 type ClientMethods = Omit<IdeationService, "listIdeationEvents">;
 export type IdeationClient = {

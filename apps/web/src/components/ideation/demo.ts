@@ -17,7 +17,7 @@ import type {
   IdeationSessionId,
   IdeationTask,
 } from "@ruwen/pipeline";
-import { errorCopy } from "./copy.ts";
+import { errorCopy } from "../../copy/zh-CN.ts";
 import {
   fixtureBrand as b,
   previewFixture,

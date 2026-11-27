@@ -30,19 +30,9 @@ summary {
     "Ruwen Serif", "Source Han Serif SC", "Noto Serif SC", "Songti SC", serif;
   --sans:
     "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
-  /* Compatibility aliases, removed in block 11. */
-  --mist: var(--desk);
-  --navy: var(--ink);
-  --steel: var(--ink-2);
-  --annotation: var(--editor);
-  --teal: var(--plot);
-  --line: var(--rule);
-  --muted: var(--ink-3);
-  --ui: var(--sans);
-  --story: var(--serif);
-  color: var(--navy);
-  background: var(--mist);
-  font-family: var(--ui);
+  color: var(--ink);
+  background: var(--desk);
+  font-family: var(--sans);
   font-size: 14px;
   line-height: 1.7;
   font-synthesis: none;
@@ -89,12 +79,12 @@ select {
   border-radius: 4px;
   padding: 10px 12px;
   background: var(--paper);
-  color: var(--navy);
+  color: var(--ink);
 }
 input:focus,
 textarea:focus,
 select:focus {
-  border-color: var(--teal);
+  border-color: var(--plot);
 }
 :focus-visible {
   outline: 3px solid #4d7b7b;
@@ -114,7 +104,7 @@ p {
   margin-top: 0;
 }
 h1 {
-  font-family: var(--story);
+  font-family: var(--serif);
   font-size: clamp(29px, 3vw, 42px);
   font-weight: 500;
   line-height: 1.4;
@@ -130,18 +120,18 @@ h3 {
   font-size: 15px;
 }
 p {
-  color: var(--steel);
+  color: var(--ink-2);
 }
 .eyebrow {
   display: block;
-  color: var(--muted);
+  color: var(--ink-3);
   font-size: 11px;
   letter-spacing: 0.16em;
   font-weight: 600;
   margin-bottom: 10px;
 }
 .wordmark {
-  font-family: var(--story);
+  font-family: var(--serif);
   font-size: 30px;
   letter-spacing: 0.15em;
   text-decoration: none;
@@ -150,7 +140,7 @@ p {
   gap: 12px;
 }
 .wordmark span {
-  font-family: var(--ui);
+  font-family: var(--sans);
   font-size: 10px;
   letter-spacing: 0.22em;
   opacity: 0.65;
@@ -170,7 +160,7 @@ p {
   min-height: 44px;
 }
 .primary {
-  background: var(--navy);
+  background: var(--ink);
   color: #fff;
 }
 .primary:hover:not(:disabled) {
@@ -179,7 +169,7 @@ p {
 .secondary {
   border-color: #b8c6d1;
   background: transparent;
-  color: var(--navy);
+  color: var(--ink);
 }
 .secondary:hover:not(:disabled) {
   background: #dce5eb;
@@ -188,19 +178,19 @@ p {
   border: 0;
   background: transparent;
   padding: 8px 0;
-  color: var(--teal);
+  color: var(--plot);
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 4px;
 }
 .text-link {
   text-underline-offset: 5px;
-  color: var(--teal);
+  color: var(--plot);
 }
 .error,
 .notice {
   padding: 16px 20px;
-  border-left: 3px solid var(--annotation);
+  border-left: 3px solid var(--editor);
   background: #f6e9ed;
   margin: 16px 0;
   overflow-wrap: anywhere;
@@ -209,9 +199,9 @@ p {
   color: #793344;
 }
 .notice {
-  border-color: var(--teal);
+  border-color: var(--plot);
   background: #e3eeef;
-  color: var(--navy);
+  color: var(--ink);
   display: block;
 }
 .plain-content {
@@ -238,20 +228,20 @@ p {
 }
 .safe-markdown td,
 .safe-markdown th {
-  border: 1px solid var(--line);
+  border: 1px solid var(--rule);
   padding: 8px;
 }
 .hidden-image {
-  color: var(--muted);
+  color: var(--ink-3);
   font-size: 12px;
 }
 .fine-print,
 .muted {
-  color: var(--muted);
+  color: var(--ink-3);
   font-size: 12px;
 }
 .success-text {
-  color: var(--teal);
+  color: var(--plot);
 }
 .sign-in {
   min-height: 100vh;
@@ -259,7 +249,7 @@ p {
   grid-template-columns: 1.15fr 1fr;
 }
 .welcome {
-  background: var(--navy);
+  background: var(--ink);
   color: var(--paper);
   padding: 60px clamp(40px, 8vw, 130px);
   display: flex;
@@ -305,7 +295,7 @@ p {
   margin-bottom: 32px;
 }
 .login-heading h2 {
-  font-family: var(--story);
+  font-family: var(--serif);
   font-size: 27px;
   font-weight: 500;
 }
@@ -322,7 +312,7 @@ p {
 .login-divider {
   text-align: center;
   margin: 20px 0;
-  color: var(--muted);
+  color: var(--ink-3);
   font-size: 12px;
 }
 .studio-shell {
@@ -457,7 +447,7 @@ p {
   margin-bottom: 4px;
 }
 .project-row h2 {
-  font-family: var(--story);
+  font-family: var(--serif);
   font-weight: 500;
   font-size: 26px;
   margin: 0 0 6px;
@@ -477,7 +467,7 @@ p {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--story);
+  font-family: var(--serif);
   letter-spacing: 0.3em;
   font-size: 15px;
 }
@@ -487,11 +477,11 @@ p {
   align-items: flex-end;
   gap: 14px;
   font-size: 12px;
-  color: var(--steel);
+  color: var(--ink-2);
 }
 .status-pill {
   background: #e1eded;
-  color: var(--teal);
+  color: var(--plot);
   border-radius: 20px;
   padding: 4px 12px;
   font-size: 11px;
@@ -505,13 +495,13 @@ p {
   margin: 25px 0;
 }
 .empty-state h2 {
-  font-family: var(--story);
+  font-family: var(--serif);
   font-size: 26px;
   font-weight: 500;
 }
 .empty-mark {
   display: block;
-  font-family: var(--story);
+  font-family: var(--serif);
   font-size: 38px;
   color: #91a7b7;
   margin-bottom: 16px;
@@ -542,7 +532,7 @@ p {
 }
 .creation-form {
   background: var(--paper);
-  border: 1px solid var(--line);
+  border: 1px solid var(--rule);
   padding: 26px;
   display: flex;
   gap: 20px;
@@ -684,11 +674,11 @@ p {
   text-decoration: none;
   padding: 12px 0;
   font-size: 13px;
-  color: var(--steel);
+  color: var(--ink-2);
 }
 .project-nav a[aria-current="page"] {
-  color: var(--navy);
-  border-bottom: 2px solid var(--navy);
+  color: var(--ink);
+  border-bottom: 2px solid var(--ink);
   font-weight: 700;
 }
 .project-nav .export-link {
@@ -713,7 +703,7 @@ p {
 .readiness-list {
   padding-left: 18px;
   font-size: 12px;
-  color: var(--steel);
+  color: var(--ink-2);
   display: grid;
   gap: 10px;
 }
@@ -732,7 +722,7 @@ p {
   font-size: 12px;
 }
 .run-list a span {
-  color: var(--muted);
+  color: var(--ink-3);
   font-size: 10px;
 }
 .chapter-page {
@@ -754,7 +744,7 @@ p {
   padding: 6px 12px;
   border: 1px solid #bccdd8;
   border-radius: 20px;
-  color: var(--steel);
+  color: var(--ink-2);
 }
 .chapter-toolbar {
   display: flex;
@@ -804,7 +794,7 @@ p {
   background: #9ca9b3;
 }
 .connection-dot.connected {
-  background: var(--teal);
+  background: var(--plot);
 }
 .role-progress {
   padding: 16px 0 20px;
@@ -831,12 +821,12 @@ p {
   font-size: 10px;
 }
 .role-progress .complete {
-  border-color: var(--teal);
-  color: var(--teal);
+  border-color: var(--plot);
+  color: var(--plot);
 }
 .role-progress .active {
-  border-color: var(--annotation);
-  color: var(--annotation);
+  border-color: var(--editor);
+  color: var(--editor);
 }
 .reading-desk {
   display: grid;
@@ -862,7 +852,7 @@ p {
   margin-bottom: 35px;
 }
 .manuscript h2 {
-  font-family: var(--story);
+  font-family: var(--serif);
   font-size: 29px;
   font-weight: 500;
   letter-spacing: 0.1em;
@@ -872,10 +862,10 @@ p {
 }
 .manuscript-meta {
   font-size: 11px;
-  color: var(--muted);
+  color: var(--ink-3);
 }
 .prose-paragraph {
-  font-family: var(--story);
+  font-family: var(--serif);
   font-size: 17px;
   line-height: 2.15;
   margin-bottom: 22px;
@@ -888,7 +878,7 @@ p {
   background: #e4eff0;
 }
 .manuscript-empty {
-  font-family: var(--story);
+  font-family: var(--serif);
   line-height: 2.2;
   color: #8a9ba7;
   font-size: 17px;
@@ -913,11 +903,11 @@ p {
   background: none;
   font-size: 11px;
   white-space: nowrap;
-  color: var(--steel);
+  color: var(--ink-2);
 }
 .margin-tabs button.selected {
-  color: var(--annotation);
-  border-color: var(--annotation);
+  color: var(--editor);
+  border-color: var(--editor);
 }
 .annotation-list {
   padding: 24px 22px;
@@ -925,7 +915,7 @@ p {
 }
 .margin-caption {
   font-size: 11px;
-  color: var(--muted);
+  color: var(--ink-3);
   margin-bottom: 25px;
 }
 .annotation {
@@ -940,7 +930,7 @@ p {
   background: #e9edf1;
   color: #596b79;
   padding: 8px 10px;
-  font-family: var(--story);
+  font-family: var(--serif);
   font-size: 13px;
   width: 100%;
   margin-bottom: 12px;
@@ -969,12 +959,12 @@ p {
 }
 .verdict {
   padding-bottom: 20px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--rule);
 }
 .approval-bar {
   position: sticky;
   bottom: 14px;
-  background: var(--navy);
+  background: var(--ink);
   color: #f1f5f8;
   border-radius: 6px;
   padding: 20px 24px;
@@ -992,7 +982,7 @@ p {
 }
 .approval-bar .primary {
   background: #e5eff3;
-  color: var(--navy);
+  color: var(--ink);
 }
 .confirm-check {
   display: flex;
@@ -1006,7 +996,7 @@ p {
 .confirm-check input {
   width: 16px;
   height: 16px;
-  accent-color: var(--teal);
+  accent-color: var(--plot);
 }
 .secondary-actions {
   display: flex;
@@ -1015,14 +1005,14 @@ p {
   margin: 20px 0;
 }
 .danger {
-  color: var(--annotation);
+  color: var(--editor);
 }
 .return-form {
   background: var(--paper);
   padding: 25px;
   display: grid;
   gap: 16px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--rule);
 }
 .return-form .button {
   justify-self: start;
@@ -1045,7 +1035,7 @@ p {
 }
 .file-diff h3 {
   font-size: 11px;
-  color: var(--teal);
+  color: var(--plot);
 }
 .file-diff .plain-content {
   font-size: 12px;
@@ -1079,13 +1069,13 @@ p {
   border: 0;
   background: transparent;
   font-size: 11px;
-  color: var(--steel);
+  color: var(--ink-2);
   overflow-wrap: anywhere;
 }
 .file-tree button:hover,
 .file-tree .selected {
   background: #dce7ed;
-  color: var(--navy);
+  color: var(--ink);
 }
 .file-content {
   padding: 30px;
@@ -1099,12 +1089,12 @@ p {
   display: flex;
   justify-content: space-between;
   gap: 20px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--rule);
   padding-bottom: 15px;
 }
 .file-metadata {
   font-size: 10px;
-  color: var(--muted);
+  color: var(--ink-3);
   padding: 15px 0;
   margin-bottom: 20px;
   overflow-wrap: anywhere;
@@ -1119,11 +1109,11 @@ p {
 .account-note {
   padding: 28px;
   background: #dae6ed;
-  border-left: 3px solid var(--steel);
+  border-left: 3px solid var(--ink-2);
   margin-bottom: 40px;
 }
 .account-note h2 {
-  font-family: var(--story);
+  font-family: var(--serif);
   font-size: 28px;
   font-weight: 500;
 }
@@ -1132,7 +1122,7 @@ p {
   font-size: 13px;
 }
 .section-title {
-  font-family: var(--story);
+  font-family: var(--serif);
   font-size: 24px;
   font-weight: 500;
 }
@@ -1159,7 +1149,7 @@ p {
 .usage-table small {
   display: block;
   font-size: 10px;
-  color: var(--muted);
+  color: var(--ink-3);
 }
 .usage-table .plain-content {
   max-width: 360px;
@@ -1171,7 +1161,7 @@ textarea {
 .safe-markdown a {
   text-decoration: underline;
   text-underline-offset: 3px;
-  color: var(--teal);
+  color: var(--plot);
 }
 @media (min-width: 1650px) {
   .reading-desk {
@@ -1257,7 +1247,7 @@ textarea {
   }
   .reading-margin {
     border-left: 0;
-    border-top: 1px solid var(--line);
+    border-top: 1px solid var(--rule);
     min-height: 250px;
   }
   .annotation-list {
@@ -1348,7 +1338,7 @@ textarea {
   }
   .file-tree {
     max-height: 220px;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--rule);
   }
   .file-content {
     padding: 22px;
@@ -1415,13 +1405,13 @@ textarea {
 }
 .billing-balances article,
 .billing-plans article {
-  border: 1px solid var(--line);
+  border: 1px solid var(--rule);
   padding: 20px;
   min-width: 0;
 }
 .billing-balances strong {
   font-size: 26px;
-  font-family: var(--story);
+  font-family: var(--serif);
 }
 .billing-plans .button {
   margin-top: 16px;
@@ -1429,7 +1419,7 @@ textarea {
 .billing-checkout {
   margin-top: 20px;
   padding-top: 12px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--rule);
 }
 @media (max-width: 650px) {
   .billing-balances,
@@ -1977,7 +1967,7 @@ textarea {
   gap: 24px;
 }
 .risk-controls dt {
-  color: var(--steel);
+  color: var(--ink-2);
   font-size: 12px;
 }
 .risk-controls dd {
@@ -1986,7 +1976,7 @@ textarea {
 }
 .risk-controls small {
   display: block;
-  color: var(--muted);
+  color: var(--ink-3);
   font-size: 11px;
   margin-top: 5px;
 }

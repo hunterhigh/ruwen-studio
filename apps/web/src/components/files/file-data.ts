@@ -1,6 +1,7 @@
 import { fieldName, filesCopy, uiCopy } from "../../copy/zh-CN.ts";
 
 export const registryPath = "治理/资源注册表.json";
+export const systemFolders = new Set(["治理", "authoring-ruwen-v5"]);
 
 export interface ProjectFile {
   path: string;
@@ -77,6 +78,11 @@ export function statusTone(status: string) {
   if (status === "active") return "active";
   if (status === "candidate" || status === "proposed") return "pending";
   return "neutral";
+}
+
+export function isSystemRecord(path: string) {
+  const separator = path.indexOf("/");
+  return separator > 0 && systemFolders.has(path.slice(0, separator));
 }
 
 export function fileName(path: string) {

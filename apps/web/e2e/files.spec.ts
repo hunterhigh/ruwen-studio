@@ -3,9 +3,11 @@ import { fileURLToPath } from "node:url";
 import { expect, type Page, test } from "@playwright/test";
 import { Database, PostgresFS } from "@ruwen/db";
 import { previewConfiguration } from "../../../config/preview.ts";
+import { captureCleanup } from "./cleanup-11a.ts";
 import { createDemoFromShelf, signIn } from "./helpers.ts";
 
 const researchPath = "研究/渡口冬季通行调查.md";
+const unregisteredPath = "研究/未登记的调查笔记.md";
 const chapterPath = "chapters/chapter-001.md";
 const registryPath = "治理/资源注册表.json";
 const auditPath = "治理/审计账本.jsonl";
@@ -30,6 +32,7 @@ async function seedReadingFiles(projectId: string) {
           "- 冰面开始松动后，货船恢复通行的时间。",
         ].join("\n\n"),
       );
+      await fs.write(unregisteredPath, "还有一处古渡口需要核对。");
       const registry = JSON.parse(await fs.readText(registryPath));
       registry.resources.push({
         id: "dukou-research",
@@ -174,6 +177,9 @@ test("项目资料按目录浏览，从注册表显示元数据，结构化渲�
     "情节核验员",
   ]);
   await capture(page, "candidate-research");
+  await file(unregisteredPath).click();
+  await expect(reader).toContainText("未登记到注册表，岗位无法读取");
+  await expect(reader).not.toContainText("系统记录，不供岗位读取");
 
   await folder("治理/ 系统记录").click();
   await file(registryPath).click();
@@ -191,6 +197,8 @@ test("项目资料按目录浏览，从注册表显示元数据，结构化渲�
   await capture(page, "registry-table");
 
   await file(auditPath).click();
+  await expect(reader).toContainText("系统记录，不供岗位读取");
+  await captureCleanup(page, "06");
   const ledger = reader.getByRole("list", { name: "账本记录" });
   await expect(ledger.locator("li summary")).toHaveCount(4);
   await expect(ledger.locator("summary time")).toHaveText([
@@ -230,6 +238,7 @@ test("项目资料按目录浏览，从注册表显示元数据，结构化渲�
   await folder("authoring-ruwen-v5/ 系统记录").click();
   await file("authoring-ruwen-v5/state.json").click();
   await expect(reader.locator(".ui-key-values")).toBeVisible();
+  await expect(reader).toContainText("系统记录，不供岗位读取");
   await expect(reader).not.toContainText('"schema_version"');
   await expect(reader.locator("[style]")).toHaveCount(0);
   await page.setViewportSize({ width: 1180, height: 900 });

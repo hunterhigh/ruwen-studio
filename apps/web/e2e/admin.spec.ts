@@ -62,14 +62,15 @@ test("management errors show nearby human-facing text without internal paths", a
   }
   await page.goto("/admin");
   const main = page.locator(".admin-page");
-  await expect(main.getByRole("alert")).toHaveText([
-    "暂时无法读取运行概况，请重试。",
-    "暂时无法读取意见反馈统计，请重试。",
-  ]);
+  await expect(main.getByTestId("inline-notice").getByRole("alert")).toHaveText(
+    ["暂时无法读取运行概况，请重试。", "暂时无法读取意见反馈统计，请重试。"],
+  );
+  await expect(main.locator(".page-heading .eyebrow")).toHaveCount(0);
   await expect(main).not.toContainText(/EIO|\/srv\/private/);
   await page.goto("/admin/reservations");
-  await expect(main.getByRole("alert")).toHaveText(
+  await expect(main.getByTestId("inline-notice").getByRole("alert")).toHaveText(
     "暂时无法读取待核对预留，请重试。",
   );
+  await expect(main.locator(".eyebrow")).toHaveText("工作室管理 / 费用复核");
   await expect(main).not.toContainText(/EIO|\/srv\/private/);
 });

@@ -2,10 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { IdeationErrorNotice } from "../src/components/IdeationStudio.tsx";
-import {
-  errorCopy,
-  type IdeationUiErrorCode,
-} from "../src/components/ideation/copy.ts";
+import { errorCopy, type IdeationUiErrorCode } from "../src/copy/zh-CN.ts";
 
 it("every contract error has safe copy; pending billing/freeze codes have clear next steps without automatic actions", () => {
   for (const code of Object.keys(errorCopy) as IdeationUiErrorCode[]) {

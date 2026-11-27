@@ -1,3 +1,5 @@
+import { statusCopy } from "../copy/zh-CN.ts";
+
 let token: Promise<string> | undefined;
 export class ApiError extends Error {
   constructor(
@@ -59,7 +61,7 @@ export async function request<T = unknown>(
         response.status,
       );
     throw new ApiError(
-      typeof value === "string" ? value : "请求未完成，请重试。",
+      typeof value === "string" ? value : statusCopy.requestFailed,
       undefined,
       data,
       response.status,

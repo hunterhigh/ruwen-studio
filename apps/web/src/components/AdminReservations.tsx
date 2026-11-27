@@ -4,6 +4,7 @@ import { adminCopy, confirmation } from "../copy/zh-CN.ts";
 import type { pendingReservations } from "../server/admin-review.ts";
 import { Button } from "../ui/Button.tsx";
 import { useConfirm } from "../ui/ConfirmDialog.tsx";
+import { InlineNotice } from "../ui/InlineNotice.tsx";
 import { ApiError, post } from "./client.ts";
 import { SafeMarkdown } from "./SafeMarkdown.tsx";
 import { useApi } from "./useApi.ts";
@@ -83,12 +84,11 @@ export function AdminReservations() {
       </header>
       <p className="admin-notice">{copy.guidance}</p>
       {loadError && (
-        <div className="admin-error">
-          <p role="alert">{adminCopy.errors.reservationList}</p>
-          <Button variant="ghost" onClick={() => void refresh()}>
-            {adminCopy.reload}
-          </Button>
-        </div>
+        <InlineNotice
+          message={adminCopy.errors.reservationList}
+          actionLabel={adminCopy.reload}
+          onAction={() => void refresh()}
+        />
       )}
       {notice && <output className="admin-notice">{notice}</output>}
       {data?.length === 0 && (
@@ -163,18 +163,14 @@ export function AdminReservations() {
               {copy.submit}
             </Button>
             {error?.id === row.id && (
-              <div className="admin-error">
-                <p role="alert">{error.text}</p>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setError(undefined);
-                    void refresh();
-                  }}
-                >
-                  {adminCopy.reload}
-                </Button>
-              </div>
+              <InlineNotice
+                message={error.text}
+                actionLabel={adminCopy.reload}
+                onAction={() => {
+                  setError(undefined);
+                  void refresh();
+                }}
+              />
             )}
           </form>
         </section>

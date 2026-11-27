@@ -5,8 +5,10 @@ import {
   adminCopy,
   annotationStatsCopy as copy,
   roleName,
+  statusCopy,
 } from "../copy/zh-CN.ts";
 import { Button } from "../ui/Button.tsx";
+import { InlineNotice } from "../ui/InlineNotice.tsx";
 import { useApi } from "./useApi.ts";
 
 const roles = {
@@ -28,12 +30,11 @@ function StatsTable({ query }: { query: string }) {
   );
   if (error)
     return (
-      <div className="admin-error">
-        <p role="alert">{adminCopy.errors.stats}</p>
-        <Button variant="ghost" onClick={() => void refresh()}>
-          {adminCopy.reload}
-        </Button>
-      </div>
+      <InlineNotice
+        message={adminCopy.errors.stats}
+        actionLabel={adminCopy.reload}
+        onAction={() => void refresh()}
+      />
     );
   if (!data) return <output>{copy.loading}</output>;
   return (
@@ -141,9 +142,11 @@ export function AdminAnnotationStats() {
         <Button type="submit">{copy.filter}</Button>
       </form>
       {invalidDates && (
-        <p className="admin-error" role="alert">
-          {adminCopy.errors.dateRange}
-        </p>
+        <InlineNotice
+          message={adminCopy.errors.dateRange}
+          actionLabel={statusCopy.dismiss}
+          onAction={() => setInvalidDates(false)}
+        />
       )}
       <div className="table-scroll">
         <StatsTable key={query} query={query} />

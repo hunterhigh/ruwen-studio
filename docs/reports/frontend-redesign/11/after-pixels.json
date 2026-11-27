@@ -1,0 +1,80 @@
+{
+  "404": {
+    "changed": 0,
+    "maximum": 0,
+    "bounds": null,
+    "accepted": true
+  },
+  "account": {
+    "changed": 0,
+    "maximum": 0,
+    "bounds": null,
+    "accepted": true
+  },
+  "admin-overview": {
+    "changed": 258200,
+    "maximum": 252,
+    "bounds": [240, 76, 1384, 890],
+    "accepted": false
+  },
+  "chapter-approved": {
+    "changed": 0,
+    "maximum": 0,
+    "bounds": null,
+    "accepted": true
+  },
+  "chapter-candidate": {
+    "changed": 18,
+    "maximum": 1,
+    "bounds": [1046, 482, 1351, 572],
+    "accepted": true
+  },
+  "chapter-revised": {
+    "changed": 5,
+    "maximum": 1,
+    "bounds": [1046, 482, 1049, 484],
+    "accepted": true
+  },
+  "files": {
+    "changed": 0,
+    "maximum": 0,
+    "bounds": null,
+    "accepted": true
+  },
+  "ideation": {
+    "changed": 0,
+    "maximum": 0,
+    "bounds": null,
+    "accepted": true
+  },
+  "memory": {
+    "changed": 0,
+    "maximum": 0,
+    "bounds": null,
+    "accepted": true
+  },
+  "overview": {
+    "changed": 0,
+    "maximum": 0,
+    "bounds": null,
+    "accepted": true
+  },
+  "shelf": {
+    "changed": 0,
+    "maximum": 0,
+    "bounds": null,
+    "accepted": true
+  },
+  "sign-in-sending": {
+    "changed": 112397,
+    "maximum": 216,
+    "bounds": [905, 159, 1305, 742],
+    "accepted": false
+  },
+  "sign-in": {
+    "changed": 19,
+    "maximum": 1,
+    "bounds": [905, 563, 908, 625],
+    "accepted": true
+  }
+}

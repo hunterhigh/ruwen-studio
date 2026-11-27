@@ -30,6 +30,7 @@ import {
   previewStatus,
   roleName,
 } from "../copy/zh-CN.ts";
+import { Button } from "../ui/Button.tsx";
 import { useConfirm } from "../ui/ConfirmDialog.tsx";
 import { useToast } from "../ui/Toast.tsx";
 import {
@@ -562,14 +563,13 @@ export function IdeationStudio({
               />
             </form>
           ) : (
-            <button
-              className="ui-btn ui-btn-ghost"
-              type="button"
+            <Button
+              variant="secondary"
               disabled={!interactive || busy}
               onClick={() => setCreating(true)}
             >
               {c.newSession}
-            </button>
+            </Button>
           )}
           <p>{c.privacy}</p>
         </div>

@@ -69,6 +69,12 @@ test("persisted conversations: switching, clean handoff, safe user Markdown, clo
   });
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(`/projects/${projectId}/ideation`);
+  const newSession = page.getByRole("button", {
+    name: c.newSession,
+    exact: true,
+  });
+  await expect(newSession).toHaveClass(/\bui-btn-secondary\b/);
+  await captureCleanup(page, "05");
   await createIdeationSession(page, "北岸冬信");
   await captureIdeation05(page, "empty-session");
   const raw =
